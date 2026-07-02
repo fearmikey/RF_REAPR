@@ -39,9 +39,15 @@ RF-REAPR integrates a wide range of security modules:
 
 ### Installation
 
+#### Option 1: Download APK (Recommended for users)
+1.  Go to the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page.
+2.  Download the latest `RF_REAPR_vX.X.X.apk` file.
+3.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
+
+#### Option 2: Build from Source (Recommended for developers)
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/fearmikey/rf_reapr.git
+    git clone https://github.com/fearmikey/RF_REAPR.git
     ```
 2.  Open the project in **Android Studio**.
 3.  Build and run the app on your physical device or emulator.
