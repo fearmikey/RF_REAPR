@@ -2,7 +2,7 @@
 
 RF-REAPR is a comprehensive Android-based security auditing and network reconnaissance tool. Designed for security professionals and enthusiasts, it provides a suite of tools to analyze, map, and evaluate the security posture of various network and radio frequency environments.
 
-## 🚀 Features
+## Features
 
 RF-REAPR integrates a wide range of security modules:
 
@@ -17,7 +17,7 @@ RF-REAPR integrates a wide range of security modules:
 *   **DHCP Monitor**: Monitor DHCP traffic for rogue servers or lease analysis.
 *   **RDAP Auditor**: Query Registration Data Access Protocol (RDAP) for domain and IP information.
 
-## 🛠 Tech Stack
+## Tech Stack
 
 *   **Language**: [Kotlin](https://kotlinlang.org/)
 *   **UI Framework**: [Jetpack Compose](https://developer.android.com/jetpack/compose) (Material 3)
@@ -26,11 +26,11 @@ RF-REAPR integrates a wide range of security modules:
 *   **Dependency Injection**: Kotlin-based modular architecture
 *   **Concurrency**: [Kotlin Coroutines](https://kotlinlang.org/docs/coroutines-overview.html) & Flow
 
-## 📱 Screenshots
+## Screenshots
 
 *(Coming Soon - Add your screenshots here!)*
 
-## 📥 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -46,10 +46,10 @@ RF-REAPR integrates a wide range of security modules:
 2.  Open the project in **Android Studio**.
 3.  Build and run the app on your physical device or emulator.
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 RF-REAPR is intended for **educational and authorized security auditing purposes only**. Unauthorized access to networks or devices is illegal. The developers assume no liability for misuse of this tool.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
