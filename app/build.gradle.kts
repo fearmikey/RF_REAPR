@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.reapr.kotlin.android)
@@ -23,6 +25,23 @@ android {
 
     buildTypes {
         release {
+            val keystoreProperties = Properties()
+            val keystorePropertiesFile = rootProject.file("local.properties")
+            if (keystorePropertiesFile.exists()) {
+                keystorePropertiesFile.inputStream().use { stream ->
+                    keystoreProperties.load(stream)
+                }
+            }
+
+            if (keystoreProperties.containsKey("KEYSTORE_PATH")) {
+                signingConfig = signingConfigs.create("release") {
+                    storeFile = file(keystoreProperties["KEYSTORE_PATH"] as String)
+                    storePassword = keystoreProperties["KEYSTORE_PASSWORD"] as String
+                    keyAlias = keystoreProperties["KEY_ALIAS"] as String
+                    keyPassword = keystoreProperties["KEY_PASSWORD"] as String
+                }
+            }
+
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
