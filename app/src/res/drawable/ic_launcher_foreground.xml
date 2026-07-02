@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Cyber Cyan Cascading Text 'REAPR' -->
+    <!-- R (Top Left) -->
+    <path
+        android:fillColor="#00B0FF"
+        android:pathData="M20,20 h8 a4,4 0 0,1 0,8 h-8 v6 M20,28 l6,6"
+        android:strokeColor="#00B0FF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- E -->
+    <path
+        android:fillColor="#00B0FF"
+        android:pathData="M35,35 h8 M35,40 h6 M35,45 h8 M35,35 v10"
+        android:strokeColor="#00B0FF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- A -->
+    <path
+        android:fillColor="#00B0FF"
+        android:pathData="M50,50 l-4,10 M50,50 l4,10 M48,56 h4"
+        android:strokeColor="#00B0FF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- P -->
+    <path
+        android:fillColor="#00B0FF"
+        android:pathData="M65,65 h6 a3,3 0 0,1 0,6 h-6 v6 M65,65 v12"
+        android:strokeColor="#00B0FF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- R (Bottom Right) -->
+    <path
+        android:fillColor="#00B0FF"
+        android:pathData="M80,80 h8 a4,4 0 0,1 0,8 h-8 v6 M80,88 l6,6"
+        android:strokeColor="#00B0FF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Tech Accents / Connectors -->
+    <path
+        android:strokeColor="#3300B0FF"
+        android:strokeWidth="1"
+        android:pathData="M28,34 L35,35 M43,45 L48,52 M52,58 L65,65 M73,77 L80,80" />
+</vector>

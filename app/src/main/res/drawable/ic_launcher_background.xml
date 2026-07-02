@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Midnight Blue Background -->
+    <path
+        android:fillColor="#00050A"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <!-- Subtle PCB Traces -->
+    <path
+        android:pathData="M20,10 L40,10 L50,20 L50,40"
+        android:strokeWidth="1"
+        android:strokeColor="#1A00B0FF" />
+    <path
+        android:pathData="M10,80 L10,60 L25,45 L45,45"
+        android:strokeWidth="1"
+        android:strokeColor="#1A00B0FF" />
+    <path
+        android:pathData="M80,20 L100,20 L100,50 L85,65"
+        android:strokeWidth="1"
+        android:strokeColor="#1A00B0FF" />
+    <path
+        android:pathData="M90,90 L70,90 L60,80 L60,60"
+        android:strokeWidth="1"
+        android:strokeColor="#1A00B0FF" />
+
+    <!-- Nodes/Vias -->
+    <path
+        android:fillColor="#1A00B0FF"
+        android:pathData="M50,40 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0" />
+    <path
+        android:fillColor="#1A00B0FF"
+        android:pathData="M45,45 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0" />
+    <path
+        android:fillColor="#1A00B0FF"
+        android:pathData="M85,65 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0" />
+    <path
+        android:fillColor="#1A00B0FF"
+        android:pathData="M60,60 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0" />
+</vector>
