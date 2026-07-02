@@ -1,4 +1,4 @@
-# RF-REAPR (Radio Frequency - Reconnaissance, Evaluation, And Penetration Response)
+# RF-REAPR (Radio Frequency, Reconnaissance, Evaluation, And Protocol Reconnaissance)
 
 RF-REAPR is a comprehensive Android-based security auditing and network reconnaissance tool. Designed for security professionals and enthusiasts, it provides a suite of tools to analyze, map, and evaluate the security posture of various network and radio frequency environments.
 
