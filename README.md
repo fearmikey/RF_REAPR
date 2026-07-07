@@ -1,4 +1,4 @@
-# RF-REAPR (RF - Reconnaissance, Evaluation, Analysis, and Penetration Reporting)
+# RF-REAPR (Reconnaissance, Evaluation, Analysis, and Penetration Reporting)
 
 RF-REAPR is a comprehensive Android-based security auditing and network reconnaissance tool. Designed for security professionals and enthusiasts, it provides a suite of tools to analyze, map, and evaluate the security posture of various network and radio frequency environments.
 
@@ -6,29 +6,42 @@ RF-REAPR is a comprehensive Android-based security auditing and network reconnai
 
 RF-REAPR integrates a wide range of security modules:
 
-*   **Network Discovery & Topology**: Visualize your network structure with an interactive topology map.
+### 🛡️ Compliance & Auditing
+*   **Audit Checklists**: Built-in checklists for various security frameworks (ISO 27001, SOC2, etc.).
+*   **Evidence Capture**: Integrated camera system to capture and tag physical security evidence.
+*   **Evidence Gallery**: Organize and review collected evidence by project and folder.
+*   **Recycle Bin**: Secure deletion with an automated 30-day retention and cleanup system.
+
+### 🌐 Network Discovery & Analysis
+*   **Network Topology Map**: Interactive visualization of network structure and connected devices.
 *   **Port Scanner**: Identify open ports and potential vulnerabilities on network devices.
-*   **Wi-Fi Fingerprinting**: Analyze Wi-Fi environments and identify access points.
-*   **BLE Auditor**: Scan and audit Bluetooth Low Energy devices.
-*   **NFC Scanner**: Read and analyze NFC tag data.
-*   **HTTP/HTTPS Inspector**: Inspect web traffic and security headers.
-*   **TLS Auditor**: Evaluate the strength and configuration of TLS/SSL certificates.
-*   **DNS Enumerator**: Discover subdomains and DNS records for targets.
-*   **DHCP Monitor**: Monitor DHCP traffic for rogue servers or lease analysis.
-*   **RDAP Auditor**: Query Registration Data Access Protocol (RDAP) for domain and IP information.
+*   **Website Inspector**: Basic web auditing and security header analysis.
+*   **Ping Tool**: Network latency and connectivity testing.
+*   **DNS Enumerator**: Discover subdomains and DNS records.
+*   **DHCP Monitor**: Monitor DHCP traffic for rogue servers.
+*   **RDAP Auditor**: Query registration data for domains and IP ranges.
+
+### 📶 Wireless & RF Auditing
+*   **Bluetooth Proximity Finder**: Locate and track BLE devices based on signal strength (RSSI).
+*   **Wi-Fi Fingerprinting**: Analyze Wi-Fi environments, channel distribution, and signal quality.
+*   **NFC Scanner**: Read and analyze NFC tag data and technology types.
+
+### 🛠️ Physical & Hardware Tools
+*   **Magnetometer**: Detect magnetic fields and hidden electronic devices.
+*   **HID Injector**: Interface for planning or testing Human Interface Device (HID) payloads.
+
+### 📊 Logging & Management
+*   **Centralized Logging**: Specialized log views for Wi-Fi, BLE, Port Scanning, Web, and Ping modules.
+*   **Local Storage**: Robust data persistence using Room database for sessions, nodes, and evidence.
 
 ## Tech Stack
 
 *   **Language**: [Kotlin](https://kotlinlang.org/)
 *   **UI Framework**: [Jetpack Compose](https://developer.android.com/jetpack/compose) (Material 3)
-*   **Architecture**: MVVM (Model-View-ViewModel)
+*   **Database**: [Room](https://developer.android.com/training/data-storage/room)
 *   **Networking**: [Retrofit](https://square.github.io/retrofit/) & [OkHttp](https://square.github.io/okhttp/)
-*   **Dependency Injection**: Kotlin-based modular architecture
+*   **Architecture**: MVVM (Model-View-ViewModel) with Repository Pattern
 *   **Concurrency**: [Kotlin Coroutines](https://kotlinlang.org/docs/coroutines-overview.html) & Flow
-
-## Screenshots
-
-*(Coming Soon - Add your screenshots here!)*
 
 ## Getting Started
 
@@ -40,9 +53,8 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Go to the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page.
-2.  Download the latest `RF_REAPR_vX.X.X.apk` file.
-3.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
+1.  Download the latest `RF_REAPR_v1.2.5.apk` from the root of this repository.
+2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)
 1.  Clone the repository:
@@ -50,7 +62,7 @@ RF-REAPR integrates a wide range of security modules:
     git clone https://github.com/fearmikey/RF_REAPR.git
     ```
 2.  Open the project in **Android Studio**.
-3.  Build and run the app on your physical device or emulator.
+3.  Build and run the app on your physical device.
 
 ## Disclaimer
 
