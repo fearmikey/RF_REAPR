@@ -1,5 +1,6 @@
 package com.example.rf_reapr.ui.scanner
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -205,10 +206,10 @@ fun SeverityBadge(severity: RiskLevel) {
         RiskLevel.HIGH -> Color(0xFFFFA500) // Orange
         RiskLevel.CRITICAL -> Color.Red
     }
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.padding(top = 4.dp)
+    Box(
+        modifier = Modifier
+            .padding(top = 4.dp)
+            .background(color = color.copy(alpha = 0.2f), shape = MaterialTheme.shapes.small)
     ) {
         Text(
             text = severity.name,

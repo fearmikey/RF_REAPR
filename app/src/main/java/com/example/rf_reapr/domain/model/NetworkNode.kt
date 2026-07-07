@@ -9,8 +9,15 @@ data class NetworkNode(
     val macAddress: String? = null,
     val hostname: String? = null,
     val riskLevel: RiskLevel = RiskLevel.LOW,
-    val openPorts: List<OpenPort> = emptyList()
-)
+    val openPorts: List<OpenPort> = emptyList(),
+    val deviceType: DeviceType = DeviceType.UNKNOWN,
+    val manufacturer: String? = null,
+    val parentId: String? = null
+) {
+    companion object {
+        val HIGH_IMPACT_PORTS = listOf(21, 22, 23, 53, 80, 443, 445, 161, 389, 1433, 3306, 3389, 8080, 8443)
+    }
+}
 
 /**
  * Represents a connection between two nodes (e.g., Gateway to Device).

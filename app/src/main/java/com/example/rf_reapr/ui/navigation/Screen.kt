@@ -5,7 +5,7 @@ sealed class Screen(val route: String) {
     data object MainMenu : Screen("main_menu")
     data object PortScanner : Screen("port_scanner")
     data object TopologyMap : Screen("topology_map")
-    data object BleAuditor : Screen("ble_auditor")
+    data object BluetoothProximityFinder : Screen("bluetooth_proximity_finder")
     data object WifiFingerprinter : Screen("wifi_fingerprinter")
     data object NfcScanner : Screen("nfc_scanner")
     data object HttpInspector : Screen("http_inspector")
@@ -14,4 +14,27 @@ sealed class Screen(val route: String) {
     data object DnsEnumerator : Screen("dns_enumerator")
     data object DhcpMonitor : Screen("dhcp_monitor")
     data object RdapAuditor : Screen("rdap_auditor")
+    data object WebsiteInspector : Screen("website_inspector")
+    data object PingTool : Screen("ping_tool")
+    
+    // New Physical Access & Wireless Tools
+    data object HidInjector : Screen("hid_injector")
+    data object EvidenceCapture : Screen("evidence_capture")
+    data object EvidenceGallery : Screen("evidence_gallery")
+    data object RecycleBin : Screen("recycle_bin")
+    data object Magnetometer : Screen("magnetometer")
+
+    data object ComplianceChecklists : Screen("compliance_checklists")
+    data object AuditChecklist : Screen("audit_checklist/{frameworkId}") {
+        fun createRoute(frameworkId: String) = "audit_checklist/$frameworkId"
+    }
+    data object PermissionExplanation : Screen("permission_explanation")
+    
+    // Log Screens
+    data object WifiLogs : Screen("logs/wifi")
+    data object BleLogs : Screen("logs/ble")
+    data object PortLogs : Screen("logs/port")
+    data object WebLogs : Screen("logs/web")
+    data object PingLogs : Screen("logs/ping")
+    data object TopologyLogs : Screen("logs/topology")
 }

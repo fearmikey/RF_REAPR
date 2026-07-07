@@ -32,6 +32,14 @@ class WifiFingerprintRepositoryImpl(private val context: Context) : WifiFingerpr
                             bssid = it.BSSID,
                             signalLevel = it.level,
                             frequency = it.frequency,
+                            bandwidth = when (it.channelWidth) {
+                                android.net.wifi.ScanResult.CHANNEL_WIDTH_20MHZ -> 20
+                                android.net.wifi.ScanResult.CHANNEL_WIDTH_40MHZ -> 40
+                                android.net.wifi.ScanResult.CHANNEL_WIDTH_80MHZ -> 80
+                                android.net.wifi.ScanResult.CHANNEL_WIDTH_160MHZ -> 160
+                                android.net.wifi.ScanResult.CHANNEL_WIDTH_80MHZ_PLUS_MHZ -> 160
+                                else -> 20 // Default to 20MHz
+                            },
                             capabilities = it.capabilities,
                             isRogueSuspect = analyzeForRogue(ssid, it.BSSID, it.capabilities, results)
                         )

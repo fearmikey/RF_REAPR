@@ -39,6 +39,7 @@ class WifiAccessPointTest {
         bssid = "00:00:00:00:00:00",
         signalLevel = -50,
         frequency = frequency,
+        bandwidth = 20,
         capabilities = "",
         isRogueSuspect = false
     )

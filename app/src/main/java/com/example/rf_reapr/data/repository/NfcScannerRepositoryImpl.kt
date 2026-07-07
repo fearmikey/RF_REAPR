@@ -52,6 +52,12 @@ class NfcScannerRepositoryImpl : NfcScannerRepository {
         if (techList.contains("android.nfc.tech.MifareClassic")) {
             return true to "Legacy Mifare Classic detected (vulnerable to cloning)"
         }
+
+        if (techList.contains("android.nfc.tech.NfcA") && !techList.contains("android.nfc.tech.Ndef")) {
+            // Many simple keyfobs use NfcA but aren't NDEF formatted.
+            // This isn't necessarily a vulnerability, but we can highlight it for audit.
+            return true to "Generic NfcA Tag (potential low-security keyfob)"
+        }
         
         messages.forEach { msg ->
             if (msg.contains("http://") || msg.contains("https://")) {

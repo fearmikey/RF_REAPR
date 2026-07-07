@@ -70,6 +70,7 @@ class NetworkDiscoveryRepositoryImpl(
                                     val node = NetworkNode(
                                         id = ip,
                                         ipAddress = ip,
+                                        macAddress = getMacFromArpTable(ip),
                                         hostname = try { InetAddress.getByName(ip).hostName } catch (_: Exception) { null },
                                         riskLevel = RiskLevel.LOW // Default
                                     )
@@ -100,7 +101,8 @@ class NetworkDiscoveryRepositoryImpl(
 
     private fun isHostAlive(host: String): Boolean {
         // Try common ports to check if host is alive, since Ping (ICMP) often fails on Android
-        val portsToCheck = listOf(80, 443, 22, 135, 445)
+        // Added 8080, 8443 (UniFi), 23 (Telnet), 161 (SNMP) for better infra discovery
+        val portsToCheck = listOf(80, 443, 22, 135, 445, 8080, 8443, 23, 161)
         for (port in portsToCheck) {
             try {
                 Socket().use { socket ->
@@ -111,11 +113,43 @@ class NetworkDiscoveryRepositoryImpl(
                 // Continue to next port
             }
         }
-        // Fallback to InetAddress.isReachable (might work on some setups/emulators)
+        
+        // Fallback 1: Native Ping (ICMP) - More reliable than isReachable on many Android versions
+        try {
+            val process = Runtime.getRuntime().exec("ping -c 1 -W 1 $host")
+            val exitCode = process.waitFor()
+            if (exitCode == 0) return true
+        } catch (e: Exception) {
+            // Fallback to next
+        }
+
+        // Fallback 2: InetAddress.isReachable (might work on some setups/emulators)
         return try {
             InetAddress.getByName(host).isReachable(300)
         } catch (e: Exception) {
             false
+        }
+    }
+
+    private fun getMacFromArpTable(ip: String): String? {
+        return try {
+            val file = java.io.File("/proc/net/arp")
+            if (!file.exists()) return null
+            
+            file.bufferedReader().useLines { lines ->
+                lines.drop(1).forEach { line ->
+                    val columns = line.split(Regex("\\s+")).filter { it.isNotBlank() }
+                    if (columns.size >= 4 && columns[0] == ip) {
+                        val mac = columns[3]
+                        if (mac != "00:00:00:00:00:00") {
+                            return mac
+                        }
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            null
         }
     }
 

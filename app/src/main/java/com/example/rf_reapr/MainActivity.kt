@@ -7,6 +7,9 @@ import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,45 +21,41 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.rf_reapr.data.remote.VulnerabilityApiService
-import com.example.rf_reapr.data.repository.BleScannerRepositoryImpl
+import androidx.work.*
+import com.example.rf_reapr.data.db.AppDatabase
 import com.example.rf_reapr.data.local.SettingsRepositoryImpl
-import com.example.rf_reapr.data.repository.DhcpMonitorRepositoryImpl
-import com.example.rf_reapr.data.repository.DnsEnumeratorRepositoryImpl
-import com.example.rf_reapr.data.repository.HttpInspectorRepositoryImpl
-import com.example.rf_reapr.data.repository.NetworkDiscoveryRepositoryImpl
-import com.example.rf_reapr.data.repository.NfcScannerRepositoryImpl
-import com.example.rf_reapr.data.repository.PortScannerRepositoryImpl
-import com.example.rf_reapr.data.repository.RdapRepositoryImpl
-import com.example.rf_reapr.data.repository.TlsAuditorRepositoryImpl
-import com.example.rf_reapr.data.repository.VulnerabilityRepositoryImpl
-import com.example.rf_reapr.data.repository.WifiFingerprintRepositoryImpl
+import com.example.rf_reapr.data.remote.VulnerabilityApiService
+import com.example.rf_reapr.data.repository.*
+import com.example.rf_reapr.data.worker.RecycleBinWorker
 import com.example.rf_reapr.domain.model.ThemePreference
 import com.example.rf_reapr.ui.dhcp.DhcpMonitorScreen
 import com.example.rf_reapr.ui.dhcp.DhcpMonitorViewModel
-import com.example.rf_reapr.ui.dns.DnsEnumeratorScreen
-import com.example.rf_reapr.ui.dns.DnsEnumeratorViewModel
-import com.example.rf_reapr.ui.http.HttpInspectorScreen
-import com.example.rf_reapr.ui.http.HttpInspectorViewModel
+import com.example.rf_reapr.ui.logs.LogListScreen
+import com.example.rf_reapr.ui.logs.LogViewModel
 import com.example.rf_reapr.ui.menu.MainMenuScreen
 import com.example.rf_reapr.ui.navigation.Screen
+import com.example.rf_reapr.ui.compliance.*
 import com.example.rf_reapr.ui.nfc.NfcScannerScreen
 import com.example.rf_reapr.ui.nfc.NfcScannerViewModel
-import com.example.rf_reapr.ui.rdap.RdapScreen
-import com.example.rf_reapr.ui.rdap.RdapViewModel
-import com.example.rf_reapr.ui.scanner.BleScannerScreen
-import com.example.rf_reapr.ui.scanner.BleScannerViewModel
+import com.example.rf_reapr.ui.ping.PingScreen
+import com.example.rf_reapr.ui.ping.PingViewModel
+import com.example.rf_reapr.ui.web.WebsiteInspectorScreen
+import com.example.rf_reapr.ui.web.WebsiteInspectorViewModel
 import com.example.rf_reapr.ui.scanner.PortScannerScreen
 import com.example.rf_reapr.ui.scanner.PortScannerViewModel
 import com.example.rf_reapr.ui.settings.SettingsScreen
 import com.example.rf_reapr.ui.settings.SettingsViewModel
 import com.example.rf_reapr.ui.splash.SplashScreen
-import com.example.rf_reapr.ui.tls.TlsAuditorScreen
-import com.example.rf_reapr.ui.tls.TlsAuditorViewModel
 import com.example.rf_reapr.ui.topology.TopologyScreen
 import com.example.rf_reapr.ui.topology.TopologyViewModel
 import com.example.rf_reapr.ui.wifi.WifiFingerprintScreen
 import com.example.rf_reapr.ui.wifi.WifiFingerprintViewModel
+import com.example.rf_reapr.ui.permissions.PermissionExplanationScreen
+import com.example.rf_reapr.ui.physical.HidInjectorScreen
+import com.example.rf_reapr.ui.physical.MagnetometerScreen
+import com.example.rf_reapr.ui.wireless.BluetoothProximityFinderScreen
+import com.example.rf_reapr.ui.wireless.BluetoothProximityFinderViewModel
+import com.example.rf_reapr.data.repository.BleProximityRepositoryImpl
 import com.example.rf_reapr.ui.theme.RF_REAPRTheme
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -64,6 +63,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     private var nfcAdapter: NfcAdapter? = null
@@ -72,29 +72,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Request permissions for BLE scanning
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_CONNECT,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ),
-                1
-            )
-        }
-        
-        // Manual DI for demonstration
+        // Manual DI
         val retrofit = Retrofit.Builder()
             .baseUrl("https://api.example-vulnerability-db.com/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             
         val apiService = retrofit.create(VulnerabilityApiService::class.java)
-        
         val okHttpClient = OkHttpClient()
+        val database = AppDatabase.getDatabase(this)
+        
+        val scanSessionRepository = ScanSessionRepositoryImpl(
+            database.networkDao(),
+            database.scanSessionDao()
+        )
         
         val portRepository = PortScannerRepositoryImpl()
         val vulnerabilityRepository = VulnerabilityRepositoryImpl(apiService)
@@ -102,17 +93,22 @@ class MainActivity : ComponentActivity() {
         val wifiRepository = WifiFingerprintRepositoryImpl(this)
         val bleRepository = BleScannerRepositoryImpl(this)
         nfcRepository = NfcScannerRepositoryImpl()
-        val httpRepository = HttpInspectorRepositoryImpl(okHttpClient)
-        val tlsRepository = TlsAuditorRepositoryImpl()
-        val dnsRepository = DnsEnumeratorRepositoryImpl()
         val settingsRepository = SettingsRepositoryImpl(this)
         val dhcpRepository = DhcpMonitorRepositoryImpl(discoveryRepository)
-        val rdapRepository = RdapRepositoryImpl(okHttpClient)
+        val websiteInspectorRepository = WebsiteInspectorRepositoryImpl(okHttpClient)
+        val pingRepository = PingRepositoryImpl()
+        val logRepository = LogRepositoryImpl(database.eventLogDao())
+        val complianceRepository = ComplianceRepositoryImpl(database.complianceDao())
+        val proximityRepository = BleProximityRepositoryImpl(this)
+        val evidenceRepository = EvidenceRepositoryImpl(database.evidenceDao(), this)
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+
+        // Schedule Recycle Bin Cleanup
+        scheduleRecycleBinCleanup()
 
         setContent {
             val settingsViewModel: SettingsViewModel = viewModel {
-                SettingsViewModel(settingsRepository)
+                SettingsViewModel(settingsRepository, logRepository)
             }
             val themePreference by settingsViewModel.themePreference.collectAsState()
             
@@ -129,34 +125,40 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val portScannerViewModel: PortScannerViewModel = viewModel {
-                        PortScannerViewModel(portRepository, vulnerabilityRepository)
+                        PortScannerViewModel(portRepository, vulnerabilityRepository, scanSessionRepository, logRepository)
                     }
                     val topologyViewModel: TopologyViewModel = viewModel {
-                        TopologyViewModel(discoveryRepository)
+                        TopologyViewModel(discoveryRepository, scanSessionRepository, portRepository, vulnerabilityRepository, logRepository)
                     }
                     val wifiViewModel: WifiFingerprintViewModel = viewModel {
-                        WifiFingerprintViewModel(wifiRepository)
-                    }
-                    val bleViewModel: BleScannerViewModel = viewModel {
-                        BleScannerViewModel(bleRepository)
+                        WifiFingerprintViewModel(wifiRepository, logRepository)
                     }
                     val nfcViewModel: NfcScannerViewModel = viewModel {
                         NfcScannerViewModel(nfcRepository)
                     }
-                    val httpViewModel: HttpInspectorViewModel = viewModel {
-                        HttpInspectorViewModel(httpRepository)
+                    val websiteInspectorViewModel: WebsiteInspectorViewModel = viewModel {
+                        WebsiteInspectorViewModel(websiteInspectorRepository, logRepository)
                     }
-                    val tlsViewModel: TlsAuditorViewModel = viewModel {
-                        TlsAuditorViewModel(tlsRepository)
+                    val pingViewModel: PingViewModel = viewModel {
+                        PingViewModel(pingRepository, logRepository)
                     }
-                    val dnsViewModel: DnsEnumeratorViewModel = viewModel {
-                        DnsEnumeratorViewModel(dnsRepository)
+                    val logViewModel: LogViewModel = viewModel {
+                        LogViewModel(logRepository)
                     }
                     val dhcpViewModel: DhcpMonitorViewModel = viewModel {
                         DhcpMonitorViewModel(dhcpRepository)
                     }
-                    val rdapViewModel: RdapViewModel = viewModel {
-                        RdapViewModel(rdapRepository)
+                    val complianceViewModel: ComplianceViewModel = viewModel {
+                        ComplianceViewModel(complianceRepository)
+                    }
+                    val proximityViewModel: BluetoothProximityFinderViewModel = viewModel {
+                        BluetoothProximityFinderViewModel(proximityRepository, bleRepository)
+                    }
+                    val evidenceViewModel: EvidenceCaptureViewModel = viewModel {
+                        EvidenceCaptureViewModel(evidenceRepository, logRepository)
+                    }
+                    val recycleBinViewModel: RecycleBinViewModel = viewModel {
+                        RecycleBinViewModel(evidenceRepository)
                     }
 
                     NavHost(
@@ -165,8 +167,24 @@ class MainActivity : ComponentActivity() {
                     ) {
                         composable(Screen.Splash.route) {
                             SplashScreen(onTimeout = {
+                                val hasBluetooth = ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                                val hasLocation = ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                
+                                if (hasBluetooth && hasLocation) {
+                                    navController.navigate(Screen.MainMenu.route) {
+                                        popUpTo(Screen.Splash.route) { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate(Screen.PermissionExplanation.route) {
+                                        popUpTo(Screen.Splash.route) { inclusive = true }
+                                    }
+                                }
+                            })
+                        }
+                        composable(Screen.PermissionExplanation.route) {
+                            PermissionExplanationScreen(onPermissionsGranted = {
                                 navController.navigate(Screen.MainMenu.route) {
-                                    popUpTo(Screen.Splash.route) { inclusive = true }
+                                    popUpTo(Screen.PermissionExplanation.route) { inclusive = true }
                                 }
                             })
                         }
@@ -179,9 +197,7 @@ class MainActivity : ComponentActivity() {
                             PortScannerScreen(
                                 viewModel = portScannerViewModel,
                                 onBack = { navController.popBackStack() },
-                                onUpdateTopology = { results, gateway ->
-                                    topologyViewModel.updateTopology(results, gateway)
-                                }
+                                onUpdateTopology = { _, _ -> }
                             )
                         }
                         composable(Screen.TopologyMap.route) {
@@ -196,9 +212,9 @@ class MainActivity : ComponentActivity() {
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
-                        composable(Screen.BleAuditor.route) {
-                            BleScannerScreen(
-                                viewModel = bleViewModel,
+                        composable(Screen.BluetoothProximityFinder.route) {
+                            BluetoothProximityFinderScreen(
+                                viewModel = proximityViewModel,
                                 onBack = { navController.popBackStack() }
                             )
                         }
@@ -208,27 +224,9 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
-                        composable(Screen.HttpInspector.route) {
-                            HttpInspectorScreen(
-                                viewModel = httpViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
-                        }
-                        composable(Screen.TlsAuditor.route) {
-                            TlsAuditorScreen(
-                                viewModel = tlsViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
-                        }
                         composable(Screen.Settings.route) {
                             SettingsScreen(
                                 viewModel = settingsViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
-                        }
-                        composable(Screen.DnsEnumerator.route) {
-                            DnsEnumeratorScreen(
-                                viewModel = dnsViewModel,
                                 onBack = { navController.popBackStack() }
                             )
                         }
@@ -238,9 +236,99 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
-                        composable(Screen.RdapAuditor.route) {
-                            RdapScreen(
-                                viewModel = rdapViewModel,
+                        composable(Screen.WebsiteInspector.route) {
+                            WebsiteInspectorScreen(
+                                viewModel = websiteInspectorViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.PingTool.route) {
+                            PingScreen(
+                                viewModel = pingViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.HidInjector.route) {
+                            HidInjectorScreen(onBack = { navController.popBackStack() })
+                        }
+                        
+                        // EVIDENCE FLOW
+                        composable(Screen.EvidenceCapture.route) {
+                            EvidenceProjectSelectionScreen(
+                                viewModel = evidenceViewModel,
+                                onProjectSelected = {
+                                    navController.navigate(Screen.EvidenceGallery.route)
+                                },
+                                onNavigateToRecycleBin = {
+                                    navController.navigate(Screen.RecycleBin.route)
+                                },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        
+                        composable(Screen.EvidenceGallery.route) {
+                            EvidenceGalleryScreen(
+                                viewModel = evidenceViewModel,
+                                onBack = { navController.popBackStack() },
+                                onNavigateToCapture = { 
+                                    navController.navigate("camera_capture") 
+                                }
+                            )
+                        }
+                        
+                        composable("camera_capture") {
+                            EvidenceCaptureScreen(
+                                viewModel = evidenceViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable(Screen.RecycleBin.route) {
+                            RecycleBinScreen(
+                                viewModel = recycleBinViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable(Screen.Magnetometer.route) {
+                            MagnetometerScreen(onBack = { navController.popBackStack() })
+                        }
+                        
+                        // Log Routes
+                        composable(Screen.WifiLogs.route) {
+                            LogListScreen("WIFI", "WiFi Scanning Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.BleLogs.route) {
+                            LogListScreen("BLE", "Bluetooth Scanning Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.PortLogs.route) {
+                            LogListScreen("PORT", "Port Scanning Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.WebLogs.route) {
+                            LogListScreen("WEB", "Website Inspector Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.PingLogs.route) {
+                            LogListScreen("PING", "Ping Report Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.TopologyLogs.route) {
+                            LogListScreen("TOPOLOGY", "Network Map Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        
+                        // Compliance Routes
+                        composable(Screen.ComplianceChecklists.route) {
+                            ComplianceChecklistsScreen(
+                                viewModel = complianceViewModel,
+                                onFrameworkClick = { frameworkId ->
+                                    navController.navigate(Screen.AuditChecklist.createRoute(frameworkId))
+                                },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.AuditChecklist.route) { backStackEntry ->
+                            val frameworkId = backStackEntry.arguments?.getString("frameworkId") ?: ""
+                            AuditChecklistScreen(
+                                frameworkId = frameworkId,
+                                viewModel = complianceViewModel,
                                 onBack = { navController.popBackStack() }
                             )
                         }
@@ -250,16 +338,49 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun scheduleRecycleBinCleanup() {
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .setRequiresStorageNotLow(true)
+            .build()
+
+        val cleanupRequest = PeriodicWorkRequestBuilder<RecycleBinWorker>(24, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "RecycleBinCleanup",
+            ExistingPeriodicWorkPolicy.KEEP,
+            cleanupRequest
+        )
+    }
+
     override fun onResume() {
         super.onResume()
         nfcAdapter?.enableReaderMode(
             this,
-            { tag -> nfcRepository.processTag(tag) },
+            { tag ->
+                vibratePhone()
+                nfcRepository.processTag(tag)
+            },
             NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or
                     NfcAdapter.FLAG_READER_NFC_F or NfcAdapter.FLAG_READER_NFC_V or
+                    NfcAdapter.FLAG_READER_NFC_BARCODE or
                     NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK,
             null
         )
+    }
+
+    private fun vibratePhone() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            val vibrator = vibratorManager.defaultVibrator
+            vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
+            vibrator.vibrate(50)
+        }
     }
 
     override fun onPause() {

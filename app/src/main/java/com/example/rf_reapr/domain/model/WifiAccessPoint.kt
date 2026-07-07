@@ -5,6 +5,7 @@ data class WifiAccessPoint(
     val bssid: String,
     val signalLevel: Int, // RSSI
     val frequency: Int,
+    val bandwidth: Int, // in MHz
     val capabilities: String, // Encryption etc.
     val isRogueSuspect: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()

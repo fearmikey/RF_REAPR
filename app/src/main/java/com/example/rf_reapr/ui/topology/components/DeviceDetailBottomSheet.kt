@@ -1,27 +1,41 @@
 package com.example.rf_reapr.ui.topology.components
 
+import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.rf_reapr.domain.model.DeviceType
 import com.example.rf_reapr.domain.model.NetworkNode
 import com.example.rf_reapr.ui.scanner.AuditResultCard
 import com.example.rf_reapr.ui.scanner.SeverityBadge
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DeviceDetailBottomSheet(
     node: NetworkNode,
-    onDismiss: () -> Unit
+    allNodes: List<NetworkNode> = emptyList(),
+    onDismiss: () -> Unit,
+    onTypeChange: (DeviceType) -> Unit = {},
+    onParentChange: (String?) -> Unit = {}
 ) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState()
@@ -45,13 +59,93 @@ fun DeviceDetailBottomSheet(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(text = "IP: ${node.ipAddress}", style = MaterialTheme.typography.bodyMedium)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            clipboardManager.setText(AnnotatedString(node.ipAddress))
+                            Toast.makeText(context, "IP copied: ${node.ipAddress}", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text(text = "IP: ${node.ipAddress}", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy IP",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     node.macAddress?.let {
                         Text(text = "MAC: $it", style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 SeverityBadge(severity = node.riskLevel)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // --- Device Type Manual Override ---
+            Text(text = "Device Classification", style = MaterialTheme.typography.labelLarge)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DeviceType.values().forEach { type ->
+                    FilterChip(
+                        selected = node.deviceType == type,
+                        onClick = { onTypeChange(type) },
+                        label = { Text(type.name, style = MaterialTheme.typography.labelSmall) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- Parent Selection ---
+            if (node.deviceType != DeviceType.GATEWAY) {
+                Text(text = "Connected Via (Parent)", style = MaterialTheme.typography.labelLarge)
+                val infraNodes = allNodes.filter { 
+                    it.id != node.id && (it.deviceType == DeviceType.SWITCH || it.deviceType == DeviceType.ACCESS_POINT || it.deviceType == DeviceType.GATEWAY)
+                }
+                
+                var expanded by remember { mutableStateOf(false) }
+                val currentParent = allNodes.find { it.id == node.parentId }
+
+                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    OutlinedCard(
+                        onClick = { expanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = currentParent?.let { "${it.hostname ?: it.ipAddress} (${it.deviceType})" } ?: "Auto-Detected (IP Proximity)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Auto-Detected") },
+                            onClick = { onParentChange(null); expanded = false }
+                        )
+                        infraNodes.forEach { infra ->
+                            DropdownMenuItem(
+                                text = { Text("${infra.hostname ?: infra.ipAddress} (${infra.deviceType})") },
+                                onClick = { onParentChange(infra.id); expanded = false }
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))

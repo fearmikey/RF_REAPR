@@ -3,9 +3,13 @@ package com.example.rf_reapr.ui.scanner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rf_reapr.domain.model.OpenPort
+import com.example.rf_reapr.domain.model.RiskLevel
+import com.example.rf_reapr.domain.repository.LogRepository
 import com.example.rf_reapr.domain.repository.PortScannerRepository
+import com.example.rf_reapr.domain.repository.ScanSessionRepository
 import com.example.rf_reapr.domain.repository.VulnerabilityRepository
 import com.example.rf_reapr.domain.scanner.NetworkScanner
+import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,13 +18,16 @@ import kotlinx.coroutines.launch
 
 class PortScannerViewModel(
     private val portScannerRepository: PortScannerRepository,
-    private val vulnerabilityRepository: VulnerabilityRepository
+    private val vulnerabilityRepository: VulnerabilityRepository,
+    private val scanSessionRepository: ScanSessionRepository,
+    private val logRepository: LogRepository
 ) : ViewModel() {
 
     private val _scanState = MutableStateFlow<NetworkScanner.ScanResult<OpenPort>>(NetworkScanner.ScanResult.Idle)
     val scanState: StateFlow<NetworkScanner.ScanResult<OpenPort>> = _scanState.asStateFlow()
 
     private var scanJob: Job? = null
+    private val gson = Gson()
 
     companion object {
         val COMMON_PORTS = listOf(
@@ -34,15 +41,18 @@ class PortScannerViewModel(
         )
     }
 
+    private var currentTargetIp: String = ""
+
     fun startScan(ipAddress: String, fromPort: Int, toPort: Int) {
         stopScan() // Cancel any existing scan
-        
+        currentTargetIp = ipAddress
         portScannerRepository.setConfig(ipAddress, fromPort..toPort)
         initiateScan()
     }
 
     fun startCommonPortsScan(ipAddress: String) {
         stopScan()
+        currentTargetIp = ipAddress
         portScannerRepository.setConfig(ipAddress, COMMON_PORTS)
         initiateScan()
     }
@@ -52,7 +62,7 @@ class PortScannerViewModel(
             portScannerRepository.startScan().collect { result ->
                 when (result) {
                     is NetworkScanner.ScanResult.Finished -> {
-                        performVulnerabilityAudit(result.foundData)
+                        performVulnerabilityAudit(currentTargetIp, result.foundData)
                     }
                     else -> {
                         _scanState.value = result
@@ -62,12 +72,41 @@ class PortScannerViewModel(
         }
     }
 
-    private suspend fun performVulnerabilityAudit(ports: List<OpenPort>) {
+    private suspend fun performVulnerabilityAudit(ipAddress: String, ports: List<OpenPort>) {
         val auditedPorts = ports.map { port ->
             val vulns = vulnerabilityRepository.lookupVulnerabilities(port.serviceName, port.banner)
             port.copy(vulnerabilities = vulns)
         }
         _scanState.value = NetworkScanner.ScanResult.Finished(auditedPorts)
+        
+        // Log results
+        viewModelScope.launch {
+            logRepository.saveLog(
+                type = "PORT",
+                summary = "Scanned $ipAddress, found ${auditedPorts.size} open ports",
+                detailJson = gson.toJson(mapOf("ip" to ipAddress, "ports" to auditedPorts))
+            )
+        }
+        
+        // Update persisted node info
+        val existingNode = scanSessionRepository.getNodeByIp(ipAddress)
+        if (existingNode != null) {
+            val updatedNode = existingNode.copy(
+                openPorts = auditedPorts,
+                riskLevel = calculateAggregatedRisk(auditedPorts)
+            )
+            scanSessionRepository.updateNodeDetails(updatedNode)
+        }
+    }
+
+    private fun calculateAggregatedRisk(ports: List<OpenPort>): RiskLevel {
+        val allVulns = ports.flatMap { it.vulnerabilities }
+        return when {
+            allVulns.any { it.severity == RiskLevel.CRITICAL } -> RiskLevel.CRITICAL
+            allVulns.any { it.severity == RiskLevel.HIGH } -> RiskLevel.HIGH
+            allVulns.any { it.severity == RiskLevel.MEDIUM } -> RiskLevel.MEDIUM
+            else -> RiskLevel.LOW
+        }
     }
 
     fun stopScan() {

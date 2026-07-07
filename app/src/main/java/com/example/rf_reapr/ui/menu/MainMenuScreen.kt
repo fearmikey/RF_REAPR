@@ -18,12 +18,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.rf_reapr.ui.navigation.Screen
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.rf_reapr.ui.theme.RF_REAPRTheme
 
 enum class ToolCategory(val title: String, val icon: ImageVector) {
     NETWORK("Network Auditing", Icons.Default.Router),
     WIRELESS("Wireless & RF", Icons.Default.Wifi),
     WEB("Web & Infrastructure", Icons.Default.Language),
-    PHYSICAL("Physical Access", Icons.Default.Nfc)
+    PHYSICAL("Physical Access", Icons.Default.Nfc),
+    COMPLIANCE("Compliance & Reporting", Icons.Default.Assignment),
+    LOGS("Log Exports", Icons.AutoMirrored.Filled.List)
 }
 
 data class ToolkitTool(
@@ -60,15 +64,22 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             ToolCategory.NETWORK
         ),
         ToolkitTool(
-            "BLE Auditor",
-            "Scan for IoT devices and estimate distance.",
+            "Ping Tool",
+            "Send ICMP echo requests to a host or IP.",
+            Icons.Default.NetworkCheck,
+            Screen.PingTool.route,
+            ToolCategory.NETWORK
+        ),
+        ToolkitTool(
+            "Bluetooth Proximity Finder",
+            "Consolidated auditor and locator for BLE devices.",
             Icons.Default.Bluetooth,
-            Screen.BleAuditor.route,
+            Screen.BluetoothProximityFinder.route,
             ToolCategory.WIRELESS
         ),
         ToolkitTool(
-            "WiFi Fingerprinter",
-            "Analyze SSIDs, signal strength, and security.",
+            "WiFi Spectrum Analyzer",
+            "Interactive visualization of WiFi channel overlap and bandwidth.",
             Icons.Default.Wifi,
             Screen.WifiFingerprinter.route,
             ToolCategory.WIRELESS
@@ -81,32 +92,83 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             ToolCategory.PHYSICAL
         ),
         ToolkitTool(
-            "HTTP Inspector",
-            "Analyze web headers for security misconfigurations.",
+            "HID Injector",
+            "Deploy keystroke payloads via USB HID emulation.",
+            Icons.Default.Usb,
+            Screen.HidInjector.route,
+            ToolCategory.PHYSICAL
+        ),
+        ToolkitTool(
+            "Evidence Capture",
+            "Securely document physical security findings with metadata.",
+            Icons.Default.CameraAlt,
+            Screen.EvidenceCapture.route,
+            ToolCategory.COMPLIANCE
+        ),
+        ToolkitTool(
+            "Magnetometer",
+            "Detect hidden electronics and wiring via magnetic fields.",
+            Icons.Default.Waves,
+            Screen.Magnetometer.route,
+            ToolCategory.PHYSICAL
+        ),
+        ToolkitTool(
+            "Website Inspector",
+            "Combined HTTP, TLS, DNS, and RDAP audit tool.",
             Icons.Default.Language,
-            Screen.HttpInspector.route,
+            Screen.WebsiteInspector.route,
             ToolCategory.WEB
         ),
+        // Compliance Tools
         ToolkitTool(
-            "SSL/TLS Auditor",
-            "Audit handshake for weak ciphers and expired certs.",
-            Icons.Default.Lock,
-            Screen.TlsAuditor.route,
-            ToolCategory.WEB
+            "Audit Checklists",
+            "NIST, ISO 27001, and SOC2 automated audit checklists.",
+            Icons.Default.Assignment,
+            Screen.ComplianceChecklists.route,
+            ToolCategory.COMPLIANCE
+        ),
+        // Log Tools
+        ToolkitTool(
+            "WiFi Spectrum Logs",
+            "Export event logs for WiFi scans.",
+            Icons.Default.Wifi,
+            Screen.WifiLogs.route,
+            ToolCategory.LOGS
         ),
         ToolkitTool(
-            "Domain Auditor (RDAP)",
-            "Audit registration and infrastructure data.",
-            Icons.Default.Public,
-            Screen.RdapAuditor.route,
-            ToolCategory.WEB
+            "Bluetooth Scanning Logs",
+            "Export event logs for BLE scans.",
+            Icons.Default.Bluetooth,
+            Screen.BleLogs.route,
+            ToolCategory.LOGS
         ),
         ToolkitTool(
-            "DNS Enumerator",
-            "Map infrastructure via DNS record analysis.",
-            Icons.Default.Dns,
-            Screen.DnsEnumerator.route,
-            ToolCategory.WEB
+            "Network Map Logs",
+            "Export network topology audit logs.",
+            Icons.AutoMirrored.Filled.List,
+            Screen.TopologyLogs.route,
+            ToolCategory.LOGS
+        ),
+        ToolkitTool(
+            "Port Scanning Logs",
+            "Export detailed port scan results.",
+            Icons.Default.Search,
+            Screen.PortLogs.route,
+            ToolCategory.LOGS
+        ),
+        ToolkitTool(
+            "Website Inspector Logs",
+            "Export web infrastructure audit logs.",
+            Icons.Default.Language,
+            Screen.WebLogs.route,
+            ToolCategory.LOGS
+        ),
+        ToolkitTool(
+            "Ping Report Logs",
+            "Export ICMP ping response logs.",
+            Icons.Default.NetworkCheck,
+            Screen.PingLogs.route,
+            ToolCategory.LOGS
         )
     )
 
@@ -229,5 +291,13 @@ fun ToolItem(tool: ToolkitTool, onNavigate: (String) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun MainMenuScreenPreview() {
+    RF_REAPRTheme {
+        MainMenuScreen(onNavigate = {})
     }
 }

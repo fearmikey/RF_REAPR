@@ -7,16 +7,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.rf_reapr.domain.model.NetworkNode
+import com.example.rf_reapr.domain.model.RiskLevel
 import com.example.rf_reapr.ui.scanner.SeverityBadge
+
+@Immutable
+data class NetworkNodeListState(
+    val nodes: List<NetworkNode>
+)
 
 @Composable
 fun NetworkNodeList(
-    nodes: List<NetworkNode>,
+    state: NetworkNodeListState,
     onNodeClick: (NetworkNode) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -25,7 +32,11 @@ fun NetworkNodeList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(nodes) { node ->
+        items(
+            items = state.nodes,
+            key = { it.id },
+            contentType = { "network_node" }
+        ) { node ->
             NodeListItem(node = node, onClick = { onNodeClick(node) })
         }
     }
@@ -34,6 +45,28 @@ fun NetworkNodeList(
 @Composable
 fun NodeListItem(
     node: NetworkNode,
+    onClick: () -> Unit
+) {
+    // Passing individual properties instead of the node object itself
+    // helps Compose skip recomposition if these specific fields haven't changed,
+    // even if other fields (like openPorts) have.
+    NodeListItemContent(
+        hostname = node.hostname,
+        ipAddress = node.ipAddress,
+        macAddress = node.macAddress,
+        manufacturer = node.manufacturer,
+        riskLevel = node.riskLevel,
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun NodeListItemContent(
+    hostname: String?,
+    ipAddress: String,
+    macAddress: String?,
+    manufacturer: String?,
+    riskLevel: RiskLevel,
     onClick: () -> Unit
 ) {
     Card(
@@ -55,22 +88,29 @@ fun NodeListItem(
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = node.hostname ?: "Unknown Device",
+                    text = hostname ?: "Unknown Device",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "IP: ${node.ipAddress}",
+                    text = "IP: $ipAddress",
                     style = MaterialTheme.typography.bodySmall
                 )
-                node.macAddress?.let {
+                macAddress?.let {
                     Text(
                         text = "MAC: $it",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+                manufacturer?.let {
+                    Text(
+                        text = "Manufacturer: $it",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
-            SeverityBadge(severity = node.riskLevel)
+            SeverityBadge(severity = riskLevel)
         }
     }
 }
