@@ -24,20 +24,20 @@ fun EvidenceProjectSelectionScreen(
     viewModel: EvidenceCaptureViewModel,
     onProjectSelected: (EvidenceProject) -> Unit,
     onNavigateToRecycleBin: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val projects by viewModel.projects.collectAsState()
-    var showProjectCreator by remember { mutableStateOf(false) }
-    var projectToDelete by remember { mutableStateOf<EvidenceProject?>(null) }
+    var showProjectCreator by remember { mutableStateOf(value = false) }
+    var projectToDelete by remember { mutableStateOf<EvidenceProject?>(value = null) }
     
     // Reset selection whenever we enter this screen
     LaunchedEffect(Unit) {
         viewModel.resetProjectSelection()
     }
 
-    // Auto-show creator if no projects exist
-    var hasAutoPrompted by remember { mutableStateOf(false) }
-    LaunchedEffect(projects, hasAutoPrompted) {
+    // Auto-show creator if no projects exist (only once per entry)
+    var hasAutoPrompted by remember { mutableStateOf(value = false) }
+    LaunchedEffect(projects) {
         if (!hasAutoPrompted && projects.isEmpty()) {
             showProjectCreator = true
             hasAutoPrompted = true
@@ -79,7 +79,7 @@ fun EvidenceProjectSelectionScreen(
                 )
                 Button(
                     onClick = { showProjectCreator = true },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -131,7 +131,7 @@ fun EvidenceProjectSelectionScreen(
         if (showProjectCreator) {
             var newProjectName by remember { mutableStateOf("") }
             AlertDialog(
-                onDismissRequest = { if (projects.isNotEmpty()) showProjectCreator = false },
+                onDismissRequest = { showProjectCreator = false },
                 title = { Text("New Project") },
                 text = {
                     OutlinedTextField(
@@ -156,10 +156,8 @@ fun EvidenceProjectSelectionScreen(
                     }
                 },
                 dismissButton = {
-                    if (projects.isNotEmpty()) {
-                        TextButton(onClick = { showProjectCreator = false }) {
-                            Text("Cancel")
-                        }
+                    TextButton(onClick = { showProjectCreator = false }) {
+                        Text("Cancel")
                     }
                 }
             )
