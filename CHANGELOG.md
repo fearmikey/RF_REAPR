@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.6] - 2024-07-07
+
+### Added
+- **UI/UX Refinement**:
+    - Renamed "Wireless & RF" category to "Wireless Auditing" for better consistency.
+    - Moved "NFC Scanner" to the "Wireless Auditing" category.
+
+### Fixed
+- **Build Warnings & Stability**:
+    - Resolved multiple build warnings across the project.
+    - Added API level checks for Bluetooth scanning (API 31+).
+    - Modernized vibration logic using `VibrationEffect` on supported versions.
+    - Cleaned up unused imports and navigation objects.
+    - Standardized code style with trailing lambdas and commas.
+
 ## [1.2.5] - 2024-05-20
 
 ### Added

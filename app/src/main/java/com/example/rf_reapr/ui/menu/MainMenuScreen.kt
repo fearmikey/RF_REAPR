@@ -6,8 +6,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,10 +23,10 @@ import com.example.rf_reapr.ui.theme.RF_REAPRTheme
 
 enum class ToolCategory(val title: String, val icon: ImageVector) {
     NETWORK("Network Auditing", Icons.Default.Router),
-    WIRELESS("Wireless & RF", Icons.Default.Wifi),
+    WIRELESS("Wireless Auditing", Icons.Default.Wifi),
     WEB("Web & Infrastructure", Icons.Default.Language),
     PHYSICAL("Physical Access", Icons.Default.Nfc),
-    COMPLIANCE("Compliance & Reporting", Icons.Default.Assignment),
+    COMPLIANCE("Compliance & Reporting", Icons.AutoMirrored.Filled.Assignment),
     LOGS("Log Exports", Icons.AutoMirrored.Filled.List)
 }
 
@@ -89,7 +89,7 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             "Audit physical access tags and NDEF messages.",
             Icons.Default.Nfc,
             Screen.NfcScanner.route,
-            ToolCategory.PHYSICAL
+            ToolCategory.WIRELESS
         ),
         ToolkitTool(
             "HID Injector",
@@ -123,7 +123,7 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
         ToolkitTool(
             "Audit Checklists",
             "NIST, ISO 27001, and SOC2 automated audit checklists.",
-            Icons.Default.Assignment,
+            Icons.AutoMirrored.Filled.Assignment,
             Screen.ComplianceChecklists.route,
             ToolCategory.COMPLIANCE
         ),

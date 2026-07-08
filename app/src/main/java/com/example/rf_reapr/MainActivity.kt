@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
         
         val scanSessionRepository = ScanSessionRepositoryImpl(
             database.networkDao(),
-            database.scanSessionDao()
+            database.scanSessionDao(),
         )
         
         val portRepository = PortScannerRepositoryImpl()
@@ -163,11 +163,15 @@ class MainActivity : ComponentActivity() {
 
                     NavHost(
                         navController = navController,
-                        startDestination = Screen.Splash.route
+                        startDestination = Screen.Splash.route,
                     ) {
                         composable(Screen.Splash.route) {
-                            SplashScreen(onTimeout = {
-                                val hasBluetooth = ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                            SplashScreen {
+                                val hasBluetooth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                                } else {
+                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED
+                                }
                                 val hasLocation = ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                                 
                                 if (hasBluetooth && hasLocation) {
@@ -179,77 +183,68 @@ class MainActivity : ComponentActivity() {
                                         popUpTo(Screen.Splash.route) { inclusive = true }
                                     }
                                 }
-                            })
+                            }
                         }
                         composable(Screen.PermissionExplanation.route) {
-                            PermissionExplanationScreen(onPermissionsGranted = {
+                            PermissionExplanationScreen {
                                 navController.navigate(Screen.MainMenu.route) {
                                     popUpTo(Screen.PermissionExplanation.route) { inclusive = true }
                                 }
-                            })
+                            }
                         }
                         composable(Screen.MainMenu.route) {
-                            MainMenuScreen(onNavigate = { route ->
+                            MainMenuScreen { route ->
                                 navController.navigate(route)
-                            })
+                            }
                         }
                         composable(Screen.PortScanner.route) {
                             PortScannerScreen(
                                 viewModel = portScannerViewModel,
                                 onBack = { navController.popBackStack() },
-                                onUpdateTopology = { _, _ -> }
-                            )
+                            ) { _, _ -> }
                         }
                         composable(Screen.TopologyMap.route) {
                             TopologyScreen(
                                 viewModel = topologyViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.WifiFingerprinter.route) {
                             WifiFingerprintScreen(
                                 viewModel = wifiViewModel,
-                                onBackClick = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.BluetoothProximityFinder.route) {
                             BluetoothProximityFinderScreen(
                                 viewModel = proximityViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.NfcScanner.route) {
                             NfcScannerScreen(
                                 viewModel = nfcViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.Settings.route) {
                             SettingsScreen(
                                 viewModel = settingsViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.DhcpMonitor.route) {
                             DhcpMonitorScreen(
                                 viewModel = dhcpViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.WebsiteInspector.route) {
                             WebsiteInspectorScreen(
                                 viewModel = websiteInspectorViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.PingTool.route) {
                             PingScreen(
                                 viewModel = pingViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.HidInjector.route) {
-                            HidInjectorScreen(onBack = { navController.popBackStack() })
+                            HidInjectorScreen { navController.popBackStack() }
                         }
                         
                         // EVIDENCE FLOW
@@ -262,36 +257,32 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToRecycleBin = {
                                     navController.navigate(Screen.RecycleBin.route)
                                 },
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         
                         composable(Screen.EvidenceGallery.route) {
                             EvidenceGalleryScreen(
                                 viewModel = evidenceViewModel,
                                 onBack = { navController.popBackStack() },
-                                onNavigateToCapture = { 
-                                    navController.navigate("camera_capture") 
-                                }
-                            )
+                            ) { 
+                                navController.navigate("camera_capture") 
+                            }
                         }
                         
                         composable("camera_capture") {
                             EvidenceCaptureScreen(
                                 viewModel = evidenceViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
 
                         composable(Screen.RecycleBin.route) {
                             RecycleBinScreen(
                                 viewModel = recycleBinViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
 
                         composable(Screen.Magnetometer.route) {
-                            MagnetometerScreen(onBack = { navController.popBackStack() })
+                            MagnetometerScreen { navController.popBackStack() }
                         }
                         
                         // Log Routes
@@ -321,16 +312,14 @@ class MainActivity : ComponentActivity() {
                                 onFrameworkClick = { frameworkId ->
                                     navController.navigate(Screen.AuditChecklist.createRoute(frameworkId))
                                 },
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.AuditChecklist.route) { backStackEntry ->
                             val frameworkId = backStackEntry.arguments?.getString("frameworkId") ?: ""
                             AuditChecklistScreen(
                                 frameworkId = frameworkId,
                                 viewModel = complianceViewModel,
-                                onBack = { navController.popBackStack() }
-                            )
+                            ) { navController.popBackStack() }
                         }
                     }
                 }
@@ -340,8 +329,8 @@ class MainActivity : ComponentActivity() {
 
     private fun scheduleRecycleBinCleanup() {
         val constraints = Constraints.Builder()
-            .setRequiresBatteryNotLow(true)
-            .setRequiresStorageNotLow(true)
+            .setRequiresBatteryNotLow(requiresBatteryNotLow = true)
+            .setRequiresStorageNotLow(requiresStorageNotLow = true)
             .build()
 
         val cleanupRequest = PeriodicWorkRequestBuilder<RecycleBinWorker>(24, TimeUnit.HOURS)
@@ -351,7 +340,7 @@ class MainActivity : ComponentActivity() {
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "RecycleBinCleanup",
             ExistingPeriodicWorkPolicy.KEEP,
-            cleanupRequest
+            cleanupRequest,
         )
     }
 
@@ -367,7 +356,7 @@ class MainActivity : ComponentActivity() {
                     NfcAdapter.FLAG_READER_NFC_F or NfcAdapter.FLAG_READER_NFC_V or
                     NfcAdapter.FLAG_READER_NFC_BARCODE or
                     NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK,
-            null
+            null,
         )
     }
 
@@ -379,6 +368,7 @@ class MainActivity : ComponentActivity() {
         } else {
             @Suppress("DEPRECATION")
             val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
+            @Suppress("DEPRECATION")
             vibrator.vibrate(50)
         }
     }

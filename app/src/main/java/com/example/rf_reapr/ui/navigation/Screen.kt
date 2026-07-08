@@ -8,12 +8,8 @@ sealed class Screen(val route: String) {
     data object BluetoothProximityFinder : Screen("bluetooth_proximity_finder")
     data object WifiFingerprinter : Screen("wifi_fingerprinter")
     data object NfcScanner : Screen("nfc_scanner")
-    data object HttpInspector : Screen("http_inspector")
-    data object TlsAuditor : Screen("tls_auditor")
     data object Settings : Screen("settings")
-    data object DnsEnumerator : Screen("dns_enumerator")
     data object DhcpMonitor : Screen("dhcp_monitor")
-    data object RdapAuditor : Screen("rdap_auditor")
     data object WebsiteInspector : Screen("website_inspector")
     data object PingTool : Screen("ping_tool")
     

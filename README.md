@@ -21,10 +21,10 @@ RF-REAPR integrates a wide range of security modules:
 *   **DHCP Monitor**: Monitor DHCP traffic for rogue servers.
 *   **RDAP Auditor**: Query registration data for domains and IP ranges.
 
-### 📶 Wireless & RF Auditing
+### 📶 Wireless Auditing
 *   **Bluetooth Proximity Finder**: Locate and track BLE devices based on signal strength (RSSI).
 *   **Wi-Fi Fingerprinting**: Analyze Wi-Fi environments, channel distribution, and signal quality.
-*   **NFC Scanner**: Read and analyze NFC tag data and technology types.
+*   **NFC Scanner**: Read and analyze NFC tag data and technology types (Now under Wireless Auditing).
 
 ### 🛠️ Physical & Hardware Tools
 *   **Magnetometer**: Detect magnetic fields and hidden electronic devices.
@@ -53,7 +53,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.2.5.apk` from the root of this repository.
+1.  Download the latest `RF_REAPR_v1.2.6.apk` from the root of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)
