@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 class WifiFingerprintViewModel(
     private val repository: WifiFingerprintRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
 ) : ViewModel() {
 
     enum class FrequencyRange {
@@ -26,7 +26,7 @@ class WifiFingerprintViewModel(
     private val _accessPoints = MutableStateFlow<List<WifiAccessPoint>>(emptyList())
     val accessPoints: StateFlow<List<WifiAccessPoint>> = _accessPoints
 
-    private val _isScanning = MutableStateFlow(false)
+    private val _isScanning = MutableStateFlow(value = false)
     val isScanning: StateFlow<Boolean> = _isScanning
 
     private val _selectedRange = MutableStateFlow(FrequencyRange.FREQ_2_4GHZ)
@@ -38,9 +38,9 @@ class WifiFingerprintViewModel(
     val filteredAccessPoints = combine(accessPoints, _selectedRange) { aps, range ->
         aps.filter { ap ->
             when (range) {
-                FrequencyRange.FREQ_2_4GHZ -> ap.frequency in 2400..2500
-                FrequencyRange.FREQ_5GHZ -> ap.frequency in 5000..5900
-                FrequencyRange.FREQ_6GHZ -> ap.frequency in 5925..7125
+                FrequencyRange.FREQ_2_4GHZ -> (ap.frequency in 2400..2500)
+                FrequencyRange.FREQ_5GHZ -> (ap.frequency in 5000..5900)
+                FrequencyRange.FREQ_6GHZ -> (ap.frequency in 5925..7125)
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -87,7 +87,7 @@ class WifiFingerprintViewModel(
             val importedAps: List<WifiAccessPoint> = if (jsonToParse.startsWith("{")) {
                 val jsonObject = com.google.gson.JsonParser.parseString(jsonToParse).asJsonObject
                 val detailJson = if (jsonObject.has("detailJson")) {
-                    jsonObject.get("detailJson").asString
+                    jsonObject["detailJson"].asString
                 } else {
                     jsonToParse
                 }
@@ -98,10 +98,8 @@ class WifiFingerprintViewModel(
                 gson.fromJson(jsonToParse, type)
             }
             
-            if (importedAps != null) {
-                android.util.Log.d("WifiViewModel", "Successfully parsed ${importedAps.size} APs")
-                _accessPoints.value = importedAps
-            }
+            android.util.Log.d("WifiViewModel", "Successfully parsed ${importedAps.size} APs")
+            _accessPoints.value = importedAps
         } catch (e: Exception) {
             android.util.Log.e("WifiViewModel", "Failed to parse WiFi data", e)
         }

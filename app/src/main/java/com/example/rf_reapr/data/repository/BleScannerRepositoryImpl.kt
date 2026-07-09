@@ -8,6 +8,7 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.BroadcastReceiver
+import android.os.Build
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -19,8 +20,10 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 
+import kotlin.time.Duration.Companion.milliseconds
+
 class BleScannerRepositoryImpl(
-    private val context: Context
+    private val context: Context,
 ) : BleScannerRepository {
 
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -32,7 +35,7 @@ class BleScannerRepositoryImpl(
     override fun getDiscoveredDevices(): Flow<List<BleDevice>> = _discoveredDevices.asStateFlow()
 
     @SuppressLint("MissingPermission")
-    override fun startScan(): Flow<NetworkScanner.ScanResult<BleDevice>> = startScan(false)
+    override fun startScan(): Flow<NetworkScanner.ScanResult<BleDevice>> = startScan(active = false)
 
     @SuppressLint("MissingPermission")
     override fun startScan(active: Boolean): Flow<NetworkScanner.ScanResult<BleDevice>> = callbackFlow {
@@ -88,7 +91,12 @@ class BleScannerRepositoryImpl(
             override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
                     BluetoothDevice.ACTION_FOUND -> {
-                        val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        }
                         val rssi: Short = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE)
                         val name: String? = intent.getStringExtra(BluetoothDevice.EXTRA_NAME)
                         
@@ -131,7 +139,7 @@ class BleScannerRepositoryImpl(
                 val allDevices = deviceMap.values.toList()
                 val now = System.currentTimeMillis()
                 
-                if (now - lastSortTime >= sortInterval || currentOrder.isEmpty()) {
+                if ((now - lastSortTime >= sortInterval) || currentOrder.isEmpty()) {
                     // Perform a fresh sort
                     val sortedDevices = allDevices.sortedByDescending { it.rssi }
                     currentOrder = sortedDevices.map { it.address }
@@ -155,7 +163,7 @@ class BleScannerRepositoryImpl(
                     trySend(NetworkScanner.ScanResult.Progress(0f, combined))
                 }
 
-                delay(if (active) 1000 else 5000)
+                delay(if (active) 1000.milliseconds else 5000.milliseconds)
             }
         }
 

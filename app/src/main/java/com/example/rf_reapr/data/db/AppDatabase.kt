@@ -29,7 +29,7 @@ import com.example.rf_reapr.data.db.entity.SessionNodeCrossRef
         ComplianceFindingEntity::class,
         EvidenceEntity::class,
         EvidenceProjectEntity::class,
-        EvidenceFolderEntity::class
+        EvidenceFolderEntity::class,
     ],
     version = 8,
     exportSchema = false
@@ -53,7 +53,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "reapr_database"
                 )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
                 INSTANCE = instance
                 instance

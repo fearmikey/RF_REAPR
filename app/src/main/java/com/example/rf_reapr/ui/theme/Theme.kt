@@ -26,7 +26,7 @@ private val TechColorScheme = darkColorScheme(
     onBackground = Color.White,
     onSurface = Color.White,
     error = HackerRed,
-    onError = Color.White
+    onError = Color.White,
 )
 
 private val TechLightColorScheme = lightColorScheme(
@@ -41,7 +41,7 @@ private val TechLightColorScheme = lightColorScheme(
     onBackground = MidnightBlue,
     onSurface = MidnightBlue,
     error = HackerRed,
-    onError = Color.White
+    onError = Color.White,
 )
 
 @Composable
@@ -51,7 +51,7 @@ fun RF_REAPRTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
-        dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S -> {
+        (dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
@@ -63,6 +63,7 @@ fun RF_REAPRTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            @Suppress("DEPRECATION")
             window.statusBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
