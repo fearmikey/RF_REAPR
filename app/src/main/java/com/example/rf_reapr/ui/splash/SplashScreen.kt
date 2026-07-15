@@ -17,13 +17,20 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
+@Preview(showBackground = true)
 @Composable
-fun SplashScreen(onTimeout: () -> Unit) {
+fun SplashScreenPreview() {
+    SplashScreen(versionName = "1.2.6") { }
+}
+
+@Composable
+fun SplashScreen(versionName: String, onTimeout: () -> Unit) {
     LaunchedEffect(Unit) {
         delay(4000.milliseconds)
         onTimeout()
@@ -39,7 +46,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
         PCBBackground()
 
         // Scattered Tech Elements
-        TechElementsOverlay()
+        TechElementsOverlay(versionName)
 
         // Central Logo Area
         Column(
@@ -78,11 +85,20 @@ fun SplashScreen(onTimeout: () -> Unit) {
             )
             
             Text(
+                text = "v $versionName",
+                color = Color(0xFF00B0FF),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(top = 4.dp).alpha(0.8f)
+            )
+
+            Text(
                 text = "SYSTEM INITIALIZING...",
                 color = Color(0xFF00E676), // Matrix green
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 12.dp)
             )
         }
     }
@@ -110,7 +126,7 @@ fun PCBBackground() {
 }
 
 @Composable
-fun TechElementsOverlay() {
+fun TechElementsOverlay(versionName: String) {
     Box(modifier = Modifier.fillMaxSize()) {
         TextElement("Pr = Pt+Gt+Gr+20log(λ/4πd)", 20, 150, 15f, 0.5f)
         TextElement("192.168.1.104", 250, 100, -10f, 0.4f)
@@ -118,7 +134,7 @@ fun TechElementsOverlay() {
         TextElement("c = fλ", 280, 700, -20f, 0.5f)
         TextElement("S = PtGt / 4πd²", 180, 50, 0f, 0.4f)
         TextElement("10.0.0.1", 30, 450, 30f, 0.3f)
-        TextElement("REAPR_v1.0", 300, 850, -45f, 0.5f)
+        TextElement("REAPR_v$versionName", 250, 800, -45f, 0.5f)
         TextElement("0xFF 0xAA 0x12", 320, 300, 10f, 0.4f)
     }
 }

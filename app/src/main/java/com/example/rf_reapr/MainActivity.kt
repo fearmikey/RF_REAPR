@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     val navController = rememberNavController()
+                    val versionName = getAppVersion()
                     val portScannerViewModel: PortScannerViewModel = viewModel {
                         PortScannerViewModel(portRepository, vulnerabilityRepository, scanSessionRepository, logRepository)
                     }
@@ -166,7 +167,7 @@ class MainActivity : ComponentActivity() {
                         startDestination = Screen.Splash.route,
                     ) {
                         composable(Screen.Splash.route) {
-                            SplashScreen {
+                            SplashScreen(versionName = versionName) {
                                 val hasBluetooth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                     ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
                                 } else {
@@ -342,6 +343,20 @@ class MainActivity : ComponentActivity() {
             ExistingPeriodicWorkPolicy.KEEP,
             cleanupRequest,
         )
+    }
+
+    private fun getAppVersion(): String {
+        return try {
+            val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0)
+            }
+            packageInfo.versionName ?: "Unknown"
+        } catch (_: Exception) {
+            "Unknown"
+        }
     }
 
     override fun onResume() {
