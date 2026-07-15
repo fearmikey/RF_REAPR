@@ -6,13 +6,13 @@ RF-REAPR is a comprehensive Android-based security auditing and network reconnai
 
 RF-REAPR integrates a wide range of security modules:
 
-### 🛡️ Compliance & Auditing
+### Compliance & Auditing
 *   **Audit Checklists**: Built-in checklists for various security frameworks (ISO 27001, SOC2, etc.).
 *   **Evidence Capture**: Integrated camera system to capture and tag physical security evidence.
 *   **Evidence Gallery**: Organize and review collected evidence by project and folder.
 *   **Recycle Bin**: Secure deletion with an automated 30-day retention and cleanup system.
 
-### 🌐 Network Discovery & Analysis
+### Network Discovery & Analysis
 *   **Network Topology Map**: Interactive visualization of network structure and connected devices.
 *   **Port Scanner**: Identify open ports and potential vulnerabilities on network devices.
 *   **Website Inspector**: Basic web auditing and security header analysis.
@@ -21,16 +21,16 @@ RF-REAPR integrates a wide range of security modules:
 *   **DHCP Monitor**: Monitor DHCP traffic for rogue servers.
 *   **RDAP Auditor**: Query registration data for domains and IP ranges.
 
-### 📶 Wireless Auditing
+### Wireless Auditing
 *   **Bluetooth Proximity Finder**: Locate and track BLE devices based on signal strength (RSSI).
 *   **Wi-Fi Fingerprinting**: Analyze Wi-Fi environments, channel distribution, and signal quality.
 *   **NFC Scanner**: Read and analyze NFC tag data and technology types (Now under Wireless Auditing).
 
-### 🛠️ Physical & Hardware Tools
+### Physical & Hardware Tools
 *   **Magnetometer**: Detect magnetic fields and hidden electronic devices.
 *   **HID Injector**: Interface for planning or testing Human Interface Device (HID) payloads.
 
-### 📊 Logging & Management
+### Logging & Management
 *   **Centralized Logging**: Specialized log views for Wi-Fi, BLE, Port Scanning, Web, and Ping modules.
 *   **Local Storage**: Robust data persistence using Room database for sessions, nodes, and evidence.
 
