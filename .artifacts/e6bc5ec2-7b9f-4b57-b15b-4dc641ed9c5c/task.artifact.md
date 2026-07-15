@@ -1,0 +1,4 @@
+- [ ] Update app version in `app/build.gradle.kts`
+- [ ] Update APK link in `README.md`
+- [ ] Add version 1.3.0 entry to `CHANGELOG.md`
+- [ ] Commit and push changes to GitHub

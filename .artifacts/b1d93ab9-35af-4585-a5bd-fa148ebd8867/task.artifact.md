@@ -1,0 +1,5 @@
+- [ ] Adjust 2.4 GHz frequency range and labels in `WifiChannelGraph.kt`
+- [ ] Adjust 6 GHz frequency range and labels in `WifiChannelGraph.kt`
+- [ ] Adjust 5 GHz frequency range and labels in `WifiChannelGraph.kt` for consistency
+- [ ] Update `WifiFingerprintViewModel.kt` frequency filters to match new ranges
+- [ ] Verify build and UI layout

@@ -8,15 +8,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.rf_reapr"
+    namespace = "com.fearmikey.rf_reapr"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.rf_reapr"
+        applicationId = "com.fearmikey.rf_reapr"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.6"
+        versionCode = 5
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-07-15
+
+### Added
+- **UI/UX**: Dynamic version display on the splash screen.
+
+### Fixed
+- **Evidence Capture**: Resolved undismissable project creator popup.
+- **Modules**: Addressed various deprecations in BLE, Wi-Fi, and Database modules for better stability.
+
+### Changed
+- **Repository**: Cleaned up outdated APK files from the repository root.
+- **System**: General refactoring and minor performance improvements.
+
 ## [1.2.6] - 2024-07-07
 
 ### Added
