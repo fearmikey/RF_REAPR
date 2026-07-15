@@ -1,50 +1,23 @@
-# Magnetometer Module Implementation Plan
+# Magnetometer Module Enhancements Implementation Plan
 
-Implement a fully functional Magnetometer module to detect magnetic field strength and direction, useful for identifying hidden electronics, wiring, or magnetic interference.
+Improve user experience and accuracy by providing usage guidance and smoothing out detection status transitions.
 
 ## Proposed Changes
 
-### Data & Domain Layer
-
-#### [NEW] [MagnetometerData.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/example/rf_reapr/domain/model/MagnetometerData.kt)
-Create a data class to hold X, Y, Z components and the calculated total strength ($\mu T$).
-
-#### [NEW] [MagnetometerRepository.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/example/rf_reapr/domain/repository/MagnetometerRepository.kt)
-Define an interface for magnetic field data streaming.
-
-#### [NEW] [MagnetometerRepositoryImpl.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/example/rf_reapr/data/repository/MagnetometerRepositoryImpl.kt)
-Implement the repository using Android's `SensorManager` and `TYPE_MAGNETIC_FIELD`.
-
----
-
-### UI Layer
-
-#### [NEW] [MagnetometerViewModel.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/example/rf_reapr/ui/physical/MagnetometerViewModel.kt)
-Expose the magnetometer data flow as a `StateFlow`. Track peak values.
+### UI Components
 
 #### [MODIFY] [MagnetometerScreen.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/example/rf_reapr/ui/physical/MagnetometerScreen.kt)
-Replace the placeholder with a functional UI including:
-- **Strength Gauge**: A visual representation of the total magnetic field.
-- **Axis Breakdown**: Individual X, Y, Z readings.
-- **Peak Tracking**: Display the highest reading observed in the current session.
-- **Threshold Alerts**: Visual warnings when a high field strength is detected (e.g., > 100 $\mu T$).
+- **Calibration Popup**: Add an `AlertDialog` that appears when the screen is first launched, advising users to keep the back of the phone clear of their hands for better sensor accuracy.
+- **Hysteresis Logic**: Update `DetectionStatus` to use a state-based approach with hysteresis to prevent rapid flickering of status messages when the field strength is near a threshold.
 
----
+### ViewModel
 
-### Integration
-
-#### [MODIFY] [MainActivity.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/example/rf_reapr/MainActivity.kt)
-- Instantiate `MagnetometerRepositoryImpl`.
-- Update `MagnetometerScreen` route to provide the `MagnetometerViewModel`.
+#### [MODIFY] [MagnetometerViewModel.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/example/rf_reapr/ui/physical/MagnetometerViewModel.kt)
+- **Status State**: Optionally move the status calculation logic here to manage hysteresis more robustly across recompositions.
 
 ## Verification Plan
 
-### Automated Tests
-- Unit tests for `MagnetometerRepositoryImpl` (mocking `SensorManager` might be complex, but logic for total strength calculation can be tested).
-- Unit tests for `MagnetometerViewModel` to ensure peak value is correctly updated.
-
 ### Manual Verification
-- Deploy to a physical device (sensors are usually not available on emulators unless specially configured).
-- Verify real-time updates of X, Y, Z values.
-- Test "Peak" tracking.
-- Test visual threshold alerts by bringing a magnet or electronic device close to the phone.
+1. Open the Magnetometer screen and verify the "Accuracy Tip" popup appears.
+2. Dismiss the popup and ensure it doesn't reappear until the screen is re-entered (or implement logic to show it only once per session).
+3. Test hysteresis by placing the device near a magnetic source that causes the reading to hover around a threshold (e.g., 80 $\mu T$). Verify that the status doesn't flicker rapidly.

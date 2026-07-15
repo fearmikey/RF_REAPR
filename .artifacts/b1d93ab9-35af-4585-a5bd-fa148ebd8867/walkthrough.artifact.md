@@ -13,8 +13,9 @@ I have adjusted the frequency ranges and channel labels for the WiFi Spectrum An
     - Adjusted range to `[5145 MHz, 5840 MHz]`.
     - This centers the common channel set (36 to 161) evenly within the view.
 - **6 GHz Band**:
-    - Maintained the `[5925 MHz, 7125 MHz]` range but improved labeling.
-    - Added channel **233** (the upper bound of the band) to the labels to ensure they span the full width of the graph.
+    - Adjusted range to `[5900 MHz, 7150 MHz]`.
+    - This provides a larger buffer (45 MHz) on both ends, preventing the channel labels "1" and "233" from being cut off by the edge of the graph.
+    - Added channel **233** to the labels.
 
 ### ViewModel Adjustments in `WifiFingerprintViewModel.kt`
 

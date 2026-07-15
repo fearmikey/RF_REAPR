@@ -1,9 +1,7 @@
-# Magnetometer Module Tasks
+# Magnetometer Module Enhancements
 
-- `[ ]` Create `MagnetometerData` domain model
-- `[ ]` Create `MagnetometerRepository` domain interface
-- `[ ]` Implement `MagnetometerRepositoryImpl` in data layer
-- `[ ]` Create `MagnetometerViewModel`
-- `[ ]` Update `MagnetometerScreen` with functional UI
-- `[ ]` Integrate `MagnetometerRepository` and `MagnetometerViewModel` in `MainActivity`
-- `[ ]` Verification & Walkthrough
+- `[x]` Add "Accuracy Tip" popup to `MagnetometerScreen`
+- `[x]` Implement `FieldStatus` enum for clear state management
+- `[x]` Implement hysteresis logic in `MagnetometerViewModel`
+- `[x]` Update `DetectionStatus` composable to use the new status state
+- `[x]` Verification & Walkthrough

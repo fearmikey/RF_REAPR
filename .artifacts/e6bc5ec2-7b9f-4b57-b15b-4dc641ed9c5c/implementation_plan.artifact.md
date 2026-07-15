@@ -16,7 +16,15 @@ This plan covers updating the app version to 1.3.0 across the project configurat
 - Update the APK download link to reference `RF_REAPR_v1.3.0.apk`.
 
 #### [MODIFY] [CHANGELOG.md](file:///home/michael/AndroidStudioProjects/RF_REAPR/CHANGELOG.md)
-- Add a new entry for version `1.3.0` with the current date (2026-07-15).
+- Add a new entry for version `1.3.0` (2026-07-15) with the following notes:
+    - **Added**:
+        - Dynamic version display on splash screen.
+    - **Fixed**:
+        - Undismissable project creator popup in Evidence Capture.
+        - Addressed various deprecations in BLE, Wi-Fi, and Database modules.
+    - **Changed**:
+        - Repository cleanup: Removed outdated APK files.
+        - General refactoring and minor stability improvements.
 
 ### Version Control
 
