@@ -12,6 +12,8 @@ data class Evidence(
     val projectId: String? = null,
     val folderId: String? = null,
     val notes: String = "",
+    val hasStego: Boolean = false,
+    val stegoType: String? = null,
     val isDeleted: Boolean = false,
     val deletedAt: Date? = null
 )

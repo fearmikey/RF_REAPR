@@ -1,0 +1,23 @@
+- [x] Update `VulnerabilityApiService.kt` with keyword search support
+- [x] Refactor `VulnerabilityRepositoryImpl.kt`
+    - [x] Improve banner parsing logic
+    - [x] Implement live API fallback lookup
+- [x] Update `VulnerabilityUpdateWorker.kt`
+    - [x] Add initial backfill logic (last 30 days)
+    - [x] Improve logging
+- [x] Update and run `VulnerabilityRepositoryTest.kt`
+- [x] Verify build
+- [x] Fix Build Performance (Global Synthetics hang)
+    - [x] Increase Gradle heap size in `gradle.properties`
+    - [x] Refactor `material-icons-extended` imports to explicit ones
+    - [x] Verify debug APK build
+- [x] Fix False Positives (Version Filtering)
+    - [x] Update `VulnerabilityDto.kt` with version range fields
+    - [x] Create `VersionUtils.kt` for version comparison
+    - [x] Update `VulnerabilityRepositoryImpl.kt` with filtering logic
+    - [x] Update tests and verify
+- [x] Add API Key Recommendation Popups
+    - [x] Update `PortScannerViewModel.kt` & `TopologyViewModel.kt`
+    - [x] Update `MainActivity.kt` (DI)
+    - [x] Implement `PortScannerScreen.kt` recommendation dialog
+    - [x] Implement `TopologyScreen.kt` recommendation dialog

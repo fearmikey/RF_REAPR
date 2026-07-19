@@ -6,7 +6,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Http
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +23,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import com.fearmikey.rf_reapr.domain.model.*
 import com.fearmikey.rf_reapr.domain.repository.WebsiteInspectorRepository.InspectorStatus
 import com.fearmikey.rf_reapr.ui.scanner.SeverityBadge
@@ -29,6 +42,7 @@ fun WebsiteInspectorScreen(
 ) {
     var url by remember { mutableStateOf("https://google.com") }
     val uiState by viewModel.uiState.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Scaffold(
         topBar = {
@@ -53,13 +67,27 @@ fun WebsiteInspectorScreen(
                 onValueChange = { url = it },
                 label = { Text("Target URL or Domain") },
                 modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) }
+                leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Search,
+                    autoCorrect = false
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        viewModel.inspectWebsite(url)
+                        keyboardController?.hide()
+                    }
+                )
             )
             
             Spacer(modifier = Modifier.height(16.dp))
             
             Button(
-                onClick = { viewModel.inspectWebsite(url) },
+                onClick = {
+                    viewModel.inspectWebsite(url)
+                    keyboardController?.hide()
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Run Comprehensive Audit")

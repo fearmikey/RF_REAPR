@@ -20,6 +20,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -34,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.fearmikey.rf_reapr.domain.model.BleDevice
+import com.fearmikey.rf_reapr.ui.theme.BluetoothBlue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -261,36 +264,55 @@ fun TargetSelection(
         ) {
             items(
                 items = recentlySeen,
-                key = { it.address }
+                key = { it.address },
+                contentType = { "ble_device" }
             ) { device ->
                 val displayName = device.name ?: "Unnamed Device"
-                Card(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onSelect(device.address, displayName) }
+                        .clickable { onSelect(device.address, displayName) },
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 1.dp
                 ) {
-                    ListItem(
-                        headlineContent = { Text(displayName) },
-                        supportingContent = { 
+                    Row(
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bluetooth, 
+                            contentDescription = null, 
+                            tint = BluetoothBlue,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = displayName, 
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
                             Text(
                                 text = if (device.manufacturer != null && !displayName.contains(device.manufacturer!!))
                                     "${device.manufacturer} • ${device.address}" 
-                                else device.address
-                            ) 
-                        },
-                        trailingContent = { 
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("${device.rssi} dBm", style = MaterialTheme.typography.labelMedium)
-                                Text(
-                                    text = "~${"%.1f".format(device.estimatedDistance)}m",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        },
-                        leadingContent = { Icon(Icons.Default.Bluetooth, contentDescription = null) }
-                    )
+                                else device.address,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("${device.rssi} dBm", style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                text = "~${"%.1f".format(device.estimatedDistance)}m",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -416,93 +438,100 @@ fun RssiHistoryGraph(history: List<Int>, modifier: Modifier = Modifier) {
     val labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
     val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
     val axisColor = MaterialTheme.colorScheme.outline
+    val labelTextSize = 10.sp
 
-    androidx.compose.foundation.Canvas(modifier = modifier) {
-        val labelWidth = 40.dp.toPx()
-        val graphPadding = 8.dp.toPx()
-        val width = size.width - labelWidth - graphPadding
-        val height = size.height - graphPadding * 2
-        val maxPoints = 60
-        val minRssi = -100f
-        val maxRssi = -15f
-        val range = maxRssi - minRssi
+    androidx.compose.foundation.Canvas(
+        modifier = modifier.drawWithCache {
+            val labelWidth = 40.dp.toPx()
+            val graphPadding = 8.dp.toPx()
+            val width = size.width - labelWidth - graphPadding
+            val height = size.height - graphPadding * 2
+            val maxPoints = 60
+            val minRssi = -100f
+            val maxRssi = -15f
+            val range = maxRssi - minRssi
 
-        fun getRssiColor(rssi: Int): Color {
-            return when {
-                rssi > -65 -> Color.Red
-                rssi > -80 -> Color(0xFFFFA500)
-                else -> Color.Cyan
+            val textPaint = android.graphics.Paint().apply {
+                this.color = labelColor.toArgb()
+                this.textSize = labelTextSize.toPx()
             }
-        }
 
-        val gridLevels = listOf(-15, -30, -50, -70, -90, -100)
-        gridLevels.forEach { level ->
-            val y = height - ((level.toFloat() - minRssi) / range * height) + graphPadding
-            drawLine(
-                color = gridColor,
-                start = androidx.compose.ui.geometry.Offset(labelWidth, y),
-                end = androidx.compose.ui.geometry.Offset(size.width, y),
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-            )
-            drawContext.canvas.nativeCanvas.drawText(
-                "$level",
-                10f,
-                y + 10f,
-                android.graphics.Paint().apply {
-                    this.color = labelColor.toArgb()
-                    this.textSize = 10.sp.toPx()
+            onDrawBehind {
+                fun getRssiColor(rssi: Int): Color {
+                    return when {
+                        rssi > -65 -> Color.Red
+                        rssi > -80 -> Color(0xFFFFA500)
+                        else -> Color.Cyan
+                    }
                 }
-            )
-        }
 
-        drawLine(
-            color = axisColor,
-            start = androidx.compose.ui.geometry.Offset(labelWidth, graphPadding),
-            end = androidx.compose.ui.geometry.Offset(labelWidth, height + graphPadding),
-            strokeWidth = 1.dp.toPx()
-        )
-        drawLine(
-            color = axisColor,
-            start = androidx.compose.ui.geometry.Offset(labelWidth, height + graphPadding),
-            end = androidx.compose.ui.geometry.Offset(size.width, height + graphPadding),
-            strokeWidth = 1.dp.toPx()
-        )
+                val gridLevels = listOf(-15, -30, -50, -70, -90, -100)
+                gridLevels.forEach { level ->
+                    val y = height - ((level.toFloat() - minRssi) / range * height) + graphPadding
+                    drawLine(
+                        color = gridColor,
+                        start = androidx.compose.ui.geometry.Offset(labelWidth, y),
+                        end = androidx.compose.ui.geometry.Offset(size.width, y),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    )
+                    drawContext.canvas.nativeCanvas.drawText(
+                        "$level",
+                        10f,
+                        y + 10f,
+                        textPaint
+                    )
+                }
 
-        if (history.size < 2) return@Canvas
-
-        for (i in 0 until history.size - 1) {
-            val rssi1 = history[i]
-            val rssi2 = history[i + 1]
-            val x1 = labelWidth + (width / (maxPoints - 1)) * i
-            val y1 = height - ((rssi1.toFloat() - minRssi) / range * height) + graphPadding
-            val x2 = labelWidth + (width / (maxPoints - 1)) * (i + 1)
-            val y2 = height - ((rssi2.toFloat() - minRssi) / range * height) + graphPadding
-            val segmentColor = getRssiColor(rssi2)
-
-            drawLine(
-                color = segmentColor,
-                start = androidx.compose.ui.geometry.Offset(x1, y1),
-                end = androidx.compose.ui.geometry.Offset(x2, y2),
-                strokeWidth = 2.dp.toPx()
-            )
-
-            val fillPath = Path().apply {
-                moveTo(x1, height + graphPadding)
-                lineTo(x1, y1)
-                lineTo(x2, y2)
-                lineTo(x2, height + graphPadding)
-                close()
-            }
-            drawPath(
-                path = fillPath,
-                brush = Brush.verticalGradient(
-                    colors = listOf(segmentColor.copy(alpha = 0.2f), Color.Transparent),
-                    startY = minOf(y1, y2),
-                    endY = height + graphPadding
+                drawLine(
+                    color = axisColor,
+                    start = androidx.compose.ui.geometry.Offset(labelWidth, graphPadding),
+                    end = androidx.compose.ui.geometry.Offset(labelWidth, height + graphPadding),
+                    strokeWidth = 1.dp.toPx()
                 )
-            )
+                drawLine(
+                    color = axisColor,
+                    start = androidx.compose.ui.geometry.Offset(labelWidth, height + graphPadding),
+                    end = androidx.compose.ui.geometry.Offset(size.width, height + graphPadding),
+                    strokeWidth = 1.dp.toPx()
+                )
+
+                if (history.size < 2) return@onDrawBehind
+
+                for (i in 0 until history.size - 1) {
+                    val rssi1 = history[i]
+                    val rssi2 = history[i + 1]
+                    val x1 = labelWidth + (width / (maxPoints - 1)) * i
+                    val y1 = height - ((rssi1.toFloat() - minRssi) / range * height) + graphPadding
+                    val x2 = labelWidth + (width / (maxPoints - 1)) * (i + 1)
+                    val y2 = height - ((rssi2.toFloat() - minRssi) / range * height) + graphPadding
+                    val segmentColor = getRssiColor(rssi2)
+
+                    drawLine(
+                        color = segmentColor,
+                        start = androidx.compose.ui.geometry.Offset(x1, y1),
+                        end = androidx.compose.ui.geometry.Offset(x2, y2),
+                        strokeWidth = 2.dp.toPx()
+                    )
+
+                    val fillPath = Path().apply {
+                        moveTo(x1, height + graphPadding)
+                        lineTo(x1, y1)
+                        lineTo(x2, y2)
+                        lineTo(x2, height + graphPadding)
+                        close()
+                    }
+                    drawPath(
+                        path = fillPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(segmentColor.copy(alpha = 0.2f), Color.Transparent),
+                            startY = minOf(y1, y2),
+                            endY = height + graphPadding
+                        )
+                    )
+                }
+            }
         }
-    }
+    ) {}
 }
 
 @Composable

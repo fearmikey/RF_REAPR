@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
 import android.location.Location
+import android.net.Uri
 import android.util.Log
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageProxy
@@ -20,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -69,47 +71,35 @@ class EvidenceCaptureViewModel(
         }
 
         viewModelScope.launch {
-            _currentProject.collect { project ->
+            combine(_currentProject, _currentFolder) { project, folder ->
+                project to folder
+            }.collect { (project, folder) ->
                 evidenceJob?.cancel()
                 folderJob?.cancel()
-                _currentFolder.value = null
-                
+
                 if (project != null) {
                     folderJob = viewModelScope.launch {
-                        evidenceRepository.getFoldersForProject(project.id).collect {
+                        evidenceRepository.getFolders(project.id, folder?.id).collect {
                             _folders.value = it
                         }
                     }
-                    
+
                     evidenceJob = viewModelScope.launch {
-                        evidenceRepository.getEvidenceForProject(project.id).collect {
-                            _evidenceList.value = it
+                        if (folder != null) {
+                            evidenceRepository.getEvidenceForFolder(folder.id).collect {
+                                _evidenceList.value = it
+                            }
+                        } else {
+                            evidenceRepository.getEvidenceForProject(project.id).map { list ->
+                                list.filter { it.folderId == null }
+                            }.collect {
+                                _evidenceList.value = it
+                            }
                         }
                     }
                 } else {
                     _folders.value = emptyList()
                     _evidenceList.value = emptyList()
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            _currentFolder.collect { folder ->
-                evidenceJob?.cancel()
-                if (folder != null) {
-                    evidenceJob = viewModelScope.launch {
-                        evidenceRepository.getEvidenceForFolder(folder.id).collect {
-                            _evidenceList.value = it
-                        }
-                    }
-                } else {
-                    _currentProject.value?.let { project ->
-                        evidenceJob = viewModelScope.launch {
-                            evidenceRepository.getEvidenceForProject(project.id).collect {
-                                _evidenceList.value = it
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -148,12 +138,25 @@ class EvidenceCaptureViewModel(
         _currentFolder.value = folder
     }
 
+    fun navigateUp() {
+        val current = _currentFolder.value ?: return
+        viewModelScope.launch {
+            if (current.parentFolderId == null) {
+                _currentFolder.value = null
+            } else {
+                _currentFolder.value = evidenceRepository.getFolderById(current.parentFolderId)
+            }
+        }
+    }
+
     fun createFolder(name: String) {
         val project = _currentProject.value ?: return
+        val parentFolder = _currentFolder.value
         viewModelScope.launch {
             val folder = EvidenceFolder(
                 id = UUID.randomUUID().toString(),
                 projectId = project.id,
+                parentFolderId = parentFolder?.id,
                 name = name
             )
             evidenceRepository.createFolder(folder)
@@ -170,7 +173,7 @@ class EvidenceCaptureViewModel(
     }
 
     @SuppressLint("MissingPermission")
-    fun captureEvidence(context: Context, imageProxy: ImageProxy, controlId: String? = null) {
+    fun captureEvidence(context: Context, imageProxy: ImageProxy, notes: String = "", controlId: String? = null) {
         if (_isCapturing.value) return
         _isCapturing.value = true
 
@@ -243,14 +246,15 @@ class EvidenceCaptureViewModel(
                     longitude = location?.longitude,
                     controlId = controlId,
                     projectId = projectId,
-                    folderId = folderId
+                    folderId = folderId,
+                    notes = notes
                 )
 
                 evidenceRepository.saveEvidence(evidence)
                 logRepository.saveLog(
                     type = "COMPLIANCE",
                     summary = "Evidence captured (Folder: ${folderId ?: "None"})",
-                    detailJson = "{\"id\":\"${evidence.id}\", \"path\":\"${evidence.filePath}\"}"
+                    detailJson = "{\"id\":\"${evidence.id}\", \"path\":\"${evidence.filePath}\", \"notes\":\"$notes\"}"
                 )
             } catch (e: Exception) {
                 Log.e("EvidenceCapture", "Evidence capture failed", e)
@@ -323,6 +327,22 @@ class EvidenceCaptureViewModel(
         }
     }
 
+    fun deleteFolder(folderId: String) {
+        viewModelScope.launch {
+            // Need to get the folder object or just use softDeleteFolder(folderId) if it was available
+            // Looking at EvidenceRepository, it has suspend fun softDeleteFolder(folder: EvidenceFolder)
+            // I should probably add a simpler one or just get it first.
+            // Actually, I'll just use softDeleteFolder if I can get the folder.
+            // Or I can just call evidenceRepository.softDeleteFolder(folder) if I had it.
+            // Let's assume I need to get it or the repository can handle it.
+            // Looking at Repository, it has deleteFolder(folder: EvidenceFolder)
+            // I'll use a simplified version for batch delete if needed, but for now I'll just find it.
+            _folders.value.find { it.id == folderId }?.let { folder ->
+                evidenceRepository.deleteFolder(folder)
+            }
+        }
+    }
+
     fun deleteProject(project: EvidenceProject) {
         viewModelScope.launch {
             evidenceRepository.deleteProject(project)
@@ -341,6 +361,18 @@ class EvidenceCaptureViewModel(
         }
     }
 
+    fun moveFolder(folderId: String, targetProjectId: String?, targetFolderId: String?) {
+        viewModelScope.launch {
+            evidenceRepository.moveFolder(folderId, targetProjectId, targetFolderId)
+        }
+    }
+
+    fun copyFolder(folderId: String, targetProjectId: String?, targetFolderId: String?) {
+        viewModelScope.launch {
+            evidenceRepository.copyFolder(folderId, targetProjectId, targetFolderId)
+        }
+    }
+
     fun getFoldersForProject(projectId: String): Flow<List<EvidenceFolder>> {
         return evidenceRepository.getFoldersForProject(projectId)
     }
@@ -348,5 +380,69 @@ class EvidenceCaptureViewModel(
     fun resetProjectSelection() {
         _currentProject.value = null
         _currentFolder.value = null
+    }
+
+    fun importEvidence(context: Context, uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        
+        val project = _currentProject.value
+        val projectId = project?.id
+        val folderId = _currentFolder.value?.id
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            uris.forEach { uri ->
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        val fileName = "evidence_import_${System.currentTimeMillis()}_${UUID.randomUUID()}.jpg"
+                        val file = File(context.filesDir, fileName)
+                        
+                        FileOutputStream(file).use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+
+                        val timestamp = Date()
+                        val evidence = Evidence(
+                            id = UUID.randomUUID().toString(),
+                            filePath = file.absolutePath,
+                            timestamp = timestamp,
+                            latitude = null,
+                            longitude = null,
+                            projectId = projectId,
+                            folderId = folderId
+                        )
+
+                        evidenceRepository.saveEvidence(evidence)
+                        logRepository.saveLog(
+                            type = "COMPLIANCE",
+                            summary = "Evidence imported from gallery",
+                            detailJson = "{\"id\":\"${evidence.id}\", \"path\":\"${evidence.filePath}\"}"
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("EvidenceCapture", "Failed to import image: $uri", e)
+                }
+            }
+        }
+    }
+
+    fun hideData(evidence: Evidence, message: String, passphrase: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                evidenceRepository.hideData(evidence, message, passphrase.toCharArray())
+                logRepository.saveLog(
+                    type = "COMPLIANCE",
+                    summary = "Data hidden in evidence (Vault)",
+                    detailJson = "{\"id\":\"${evidence.id}\"}"
+                )
+            } catch (e: Exception) {
+                Log.e("EvidenceCapture", "Stego encoding failed", e)
+            }
+        }
+    }
+
+    suspend fun revealData(evidence: Evidence, passphrase: String): Result<String> {
+        return withContext(Dispatchers.IO) {
+            evidenceRepository.revealData(evidence, passphrase.toCharArray())
+        }
     }
 }

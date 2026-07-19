@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">RF_REAPR</string>
     <string name="app_full_name">Radio Frequency - Reconnaissance, Evaluation, Analysis, and Penetration Reporting</string>
+    <string name="copy_to_clipboard_success">IP %1$s copied to clipboard</string>
 </resources>

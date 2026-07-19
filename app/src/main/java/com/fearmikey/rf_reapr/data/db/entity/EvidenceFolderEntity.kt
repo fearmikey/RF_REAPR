@@ -8,6 +8,7 @@ data class EvidenceFolderEntity(
     @PrimaryKey
     val id: String,
     val projectId: String,
+    val parentFolderId: String? = null,
     val name: String,
     val createdAt: Long,
     val isDeleted: Boolean = false,

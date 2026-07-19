@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-07-19
+
+### Added
+- **Networking**:
+    - DNS Auditor for domain analysis.
+    - Service Discovery (mDNS) to locate network services.
+    - Traceroute utility for network path analysis.
+    - Cloud Asset Scanner and Subdomain Finder for web reconnaissance.
+    - TLS Cipher Scanner for SSL/TLS security audits.
+- **Physical Security**:
+    - HID Assets and HID Injector modules for hardware-based testing.
+    - Magnetometer screen for physical environment checks.
+- **Compliance & Reporting**:
+    - Report Builder for generating comprehensive audit reports.
+    - Evidence Capture enhancements with camera and gallery integration.
+    - Automated cleanup worker for deleted evidence in Recycle Bin.
+- **System**:
+    - Dynamic version utility and centralized notification management.
+    - Global "Stop All" receiver for background tasks.
+
+### Changed
+- **Architecture**: Major refactoring to Repository pattern across all modules for better testability and separation of concerns.
+- **UI/UX**: Refined main menu structure and navigation flow.
+- **Database**: Room database expansion to support HID assets and improved session management.
+
+### Removed
+- Outdated or redundant implementations of Packet Capture and RDAP tools.
+
 ## [1.3.0] - 2026-07-15
 
 ### Added

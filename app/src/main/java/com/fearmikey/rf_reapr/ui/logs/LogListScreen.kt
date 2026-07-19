@@ -61,7 +61,11 @@ fun LogListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(logs) { log ->
+                items(
+                    items = logs,
+                    key = { it.id },
+                    contentType = { "log" }
+                ) { log ->
                     LogCard(
                         log = log,
                         onDelete = { viewModel.deleteLog(log.id) },
@@ -91,28 +95,51 @@ fun LogCard(
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(log.timestamp))
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = date, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = date, 
+                    style = MaterialTheme.typography.labelMedium, 
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
                 Row {
-                    IconButton(onClick = onExport) {
-                        Icon(Icons.Default.Share, contentDescription = "Export")
+                    IconButton(onClick = onExport, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Share, 
+                            contentDescription = "Export",
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Delete, 
+                            contentDescription = "Delete", 
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = log.summary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "JSON size: ${log.detailJson.length} chars",
+                text = log.summary, 
+                style = MaterialTheme.typography.titleMedium, 
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Size: ${log.detailJson.length} chars",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

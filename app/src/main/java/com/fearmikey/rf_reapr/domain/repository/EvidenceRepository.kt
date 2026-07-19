@@ -16,6 +16,8 @@ interface EvidenceRepository {
     suspend fun deleteProject(project: EvidenceProject) // Keeping this for backward compat if needed, but should use softDelete
 
     fun getFoldersForProject(projectId: String): Flow<List<EvidenceFolder>>
+    fun getFolders(projectId: String, parentFolderId: String?): Flow<List<EvidenceFolder>>
+    suspend fun getFolderById(folderId: String): EvidenceFolder?
     fun getDeletedFolders(): Flow<List<EvidenceFolder>>
     suspend fun createFolder(folder: EvidenceFolder)
     suspend fun deleteFolder(folder: EvidenceFolder)
@@ -38,4 +40,10 @@ interface EvidenceRepository {
 
     suspend fun moveEvidence(evidenceId: String, targetProjectId: String?, targetFolderId: String?)
     suspend fun copyEvidence(evidenceId: String, targetProjectId: String?, targetFolderId: String?)
+
+    suspend fun moveFolder(folderId: String, targetProjectId: String?, targetFolderId: String?)
+    suspend fun copyFolder(folderId: String, targetProjectId: String?, targetFolderId: String?)
+
+    suspend fun hideData(evidence: Evidence, message: String, passphrase: CharArray)
+    suspend fun revealData(evidence: Evidence, passphrase: CharArray): Result<String>
 }

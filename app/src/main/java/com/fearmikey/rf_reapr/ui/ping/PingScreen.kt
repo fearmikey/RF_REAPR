@@ -17,6 +17,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import com.fearmikey.rf_reapr.domain.repository.PingRepository.PingStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,6 +35,7 @@ fun PingScreen(
     val uiState by viewModel.uiState.collectAsState()
     val pingLines by viewModel.pingLines.collectAsState()
     val listState = rememberLazyListState()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     val isRunning = uiState is PingStatus.Loading || uiState is PingStatus.Progress
 
@@ -64,6 +70,19 @@ fun PingScreen(
                 label = { Text("Target Host or IP") },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isRunning,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Go,
+                    autoCorrect = false
+                ),
+                keyboardActions = KeyboardActions(
+                    onGo = {
+                        if (host.isNotBlank()) {
+                            viewModel.runPing(host, continuous)
+                            keyboardController?.hide()
+                        }
+                    }
+                ),
                 trailingIcon = {
                     if (isRunning) {
                         IconButton(onClick = { viewModel.cancelPing() }) {
@@ -71,7 +90,10 @@ fun PingScreen(
                         }
                     } else {
                         IconButton(
-                            onClick = { viewModel.runPing(host, continuous) },
+                            onClick = {
+                                viewModel.runPing(host, continuous)
+                                keyboardController?.hide()
+                            },
                             enabled = host.isNotBlank()
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Run Ping")

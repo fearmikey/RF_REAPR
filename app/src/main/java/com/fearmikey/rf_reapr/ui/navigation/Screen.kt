@@ -13,19 +13,29 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object DhcpMonitor : Screen("dhcp_monitor")
     data object WebsiteInspector : Screen("website_inspector")
+    data object SubdomainFinder : Screen("subdomain_finder")
+    data object TlsCipherScanner : Screen("tls_cipher_scanner")
+    data object CloudAssetScanner : Screen("cloud_asset_scanner")
     data object PingTool : Screen("ping_tool")
     
     // New Physical Access & Wireless Tools
     data object HidInjector : Screen("hid_injector")
+    data object HidAssets : Screen("hid_assets")
     data object EvidenceCapture : Screen("evidence_capture")
     data object EvidenceGallery : Screen("evidence_gallery")
     data object RecycleBin : Screen("recycle_bin")
     data object Magnetometer : Screen("magnetometer")
 
+    // New Network Monitoring Tools
+    data object ServiceDiscovery : Screen("service_discovery")
+    data object DnsAuditor : Screen("dns_auditor")
+    data object Traceroute : Screen("traceroute")
+
     data object ComplianceChecklists : Screen("compliance_checklists")
     data object AuditChecklist : Screen("audit_checklist/{frameworkId}") {
         fun createRoute(frameworkId: String) = "audit_checklist/$frameworkId"
     }
+    data object ReportBuilder : Screen("report_builder")
     data object PermissionExplanation : Screen("permission_explanation")
     
     // Log Screens

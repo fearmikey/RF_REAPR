@@ -1,14 +1,19 @@
 package com.fearmikey.rf_reapr.ui.compliance
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -17,7 +22,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.FolderSpecial
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -34,6 +56,7 @@ import coil.compose.AsyncImage
 import com.fearmikey.rf_reapr.domain.model.Evidence
 import com.fearmikey.rf_reapr.domain.model.EvidenceFolder
 import com.fearmikey.rf_reapr.domain.model.EvidenceProject
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -61,6 +84,16 @@ fun EvidenceGalleryScreen(
     var isManualSelectionModeActive by remember { mutableStateOf(false) }
     
     val effectivelyInSelectionMode = isInSelectionMode || isManualSelectionModeActive
+    val context = LocalContext.current
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(),
+        onResult = { uris ->
+            if (uris.isNotEmpty()) {
+                viewModel.importEvidence(context, uris)
+            }
+        }
+    )
 
     // Handle back button for selection mode and navigation
     BackHandler(enabled = effectivelyInSelectionMode || currentFolder != null) {
@@ -68,7 +101,7 @@ fun EvidenceGalleryScreen(
             selectedIds.clear()
             isManualSelectionModeActive = false
         } else if (currentFolder != null) {
-            viewModel.selectFolder(null)
+            viewModel.navigateUp()
         }
     }
 
@@ -84,7 +117,14 @@ fun EvidenceGalleryScreen(
                     onMove = { if (selectedIds.isNotEmpty()) showTransferDialog = TransferType.MOVE },
                     onCopy = { if (selectedIds.isNotEmpty()) showTransferDialog = TransferType.COPY },
                     onDelete = {
-                        evidenceList.filter { it.id in selectedIds }.forEach { viewModel.deleteEvidence(it) }
+                        selectedIds.forEach { fullId ->
+                            val id = fullId.substringAfter(":")
+                            if (fullId.startsWith("ev:")) {
+                                evidenceList.find { it.id == id }?.let { viewModel.deleteEvidence(it) }
+                            } else if (fullId.startsWith("fo:")) {
+                                viewModel.deleteFolder(id)
+                            }
+                        }
                         selectedIds.clear()
                         isManualSelectionModeActive = false
                     }
@@ -109,7 +149,7 @@ fun EvidenceGalleryScreen(
                     navigationIcon = {
                         IconButton(onClick = {
                             if (currentFolder != null) {
-                                viewModel.selectFolder(null)
+                                viewModel.navigateUp()
                             } else {
                                 onBack()
                             }
@@ -118,24 +158,8 @@ fun EvidenceGalleryScreen(
                         }
                     },
                     actions = {
-                        // Blue "Add Images" button (Camera)
-                        Button(
-                            onClick = onNavigateToCapture,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Icon(Icons.Default.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Add Images")
-                        }
-
                         IconButton(onClick = { isManualSelectionModeActive = true }) {
                             Icon(Icons.Default.Checklist, contentDescription = "Select")
-                        }
-                        
-                        IconButton(onClick = { showCreationDialog = CreationType.FOLDER }) {
-                            Icon(Icons.Default.CreateNewFolder, contentDescription = "New Folder")
                         }
 
                         if (currentProject != null && currentFolder == null) {
@@ -150,51 +174,48 @@ fun EvidenceGalleryScreen(
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             Crossfade(targetState = currentFolder, label = "GalleryTransition") { folder ->
-                if (folder == null) {
-                    // Sub-folders and loose evidence for the project
-                    SubFolderAndEvidenceGrid(
-                        folders = folders,
-                        evidenceList = evidenceList.filter { it.folderId == null },
-                        selectedIds = selectedIds,
-                        isInSelectionMode = effectivelyInSelectionMode,
-                        onFolderClick = { viewModel.selectFolder(it) },
-                        onEvidenceClick = { evidence ->
-                            if (effectivelyInSelectionMode) {
-                                if (evidence.id in selectedIds) selectedIds.remove(evidence.id)
-                                else selectedIds.add(evidence.id)
-                            } else {
-                                selectedEvidenceForDetail = evidence
-                            }
-                        },
-                        onEvidenceLongClick = { evidence ->
-                            if (!effectivelyInSelectionMode) {
-                                selectedIds.add(evidence.id)
-                            }
-                        },
-                        onEmptyAction = { showCreationDialog = CreationType.FOLDER }
-                    )
-                } else {
-                    // Evidence within a folder
-                    EvidenceGrid(
-                        evidenceList = evidenceList,
-                        selectedIds = selectedIds,
-                        isInSelectionMode = effectivelyInSelectionMode,
-                        onEvidenceClick = { evidence ->
-                            if (effectivelyInSelectionMode) {
-                                if (evidence.id in selectedIds) selectedIds.remove(evidence.id)
-                                else selectedIds.add(evidence.id)
-                            } else {
-                                selectedEvidenceForDetail = evidence
-                            }
-                        },
-                        onEvidenceLongClick = { evidence ->
-                            if (!effectivelyInSelectionMode) {
-                                selectedIds.add(evidence.id)
-                            }
-                        },
-                        onEmptyAction = { onNavigateToCapture() }
-                    )
-                }
+                // Always use SubFolderAndEvidenceGrid because any level can have both
+                SubFolderAndEvidenceGrid(
+                    folders = folders,
+                    evidenceList = evidenceList,
+                    selectedIds = selectedIds,
+                    isInSelectionMode = effectivelyInSelectionMode,
+                    onCreateFolder = { showCreationDialog = CreationType.FOLDER },
+                    onTakeImages = onNavigateToCapture,
+                    onImportPhotos = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    onFolderClick = { clickedFolder ->
+                        if (effectivelyInSelectionMode) {
+                            val id = "fo:${clickedFolder.id}"
+                            if (id in selectedIds) selectedIds.remove(id)
+                            else selectedIds.add(id)
+                        } else {
+                            viewModel.selectFolder(clickedFolder)
+                        }
+                    },
+                    onFolderLongClick = { clickedFolder ->
+                        if (!effectivelyInSelectionMode) {
+                            selectedIds.add("fo:${clickedFolder.id}")
+                        }
+                    },
+                    onEvidenceClick = { evidence ->
+                        if (effectivelyInSelectionMode) {
+                            val id = "ev:${evidence.id}"
+                            if (id in selectedIds) selectedIds.remove(id)
+                            else selectedIds.add(id)
+                        } else {
+                            selectedEvidenceForDetail = evidence
+                        }
+                    },
+                    onEvidenceLongClick = { evidence ->
+                        if (!effectivelyInSelectionMode) {
+                            selectedIds.add("ev:${evidence.id}")
+                        }
+                    }
+                )
             }
         }
 
@@ -236,7 +257,8 @@ fun EvidenceGalleryScreen(
                 onDelete = {
                     viewModel.deleteEvidence(evidence)
                     selectedEvidenceForDetail = null
-                }
+                },
+                viewModel = viewModel
             )
         }
 
@@ -245,13 +267,25 @@ fun EvidenceGalleryScreen(
                 InternalTransferDialog(
                     type = type,
                     projectName = project.name,
-                    folders = folders,
+                    folders = folders.filter { folder -> 
+                        // Filter out currently selected folders to prevent moving into themselves
+                        "fo:${folder.id}" !in selectedIds
+                    },
                     onConfirm = { targetFolder ->
-                        selectedIds.forEach { id ->
-                            if (type == TransferType.MOVE) {
-                                viewModel.moveEvidence(id, project.id, targetFolder?.id)
-                            } else {
-                                viewModel.copyEvidence(id, project.id, targetFolder?.id)
+                        selectedIds.forEach { fullId ->
+                            val id = fullId.substringAfter(":")
+                            if (fullId.startsWith("ev:")) {
+                                if (type == TransferType.MOVE) {
+                                    viewModel.moveEvidence(id, project.id, targetFolder?.id)
+                                } else {
+                                    viewModel.copyEvidence(id, project.id, targetFolder?.id)
+                                }
+                            } else if (fullId.startsWith("fo:")) {
+                                if (type == TransferType.MOVE) {
+                                    viewModel.moveFolder(id, project.id, targetFolder?.id)
+                                } else {
+                                    viewModel.copyFolder(id, project.id, targetFolder?.id)
+                                }
                             }
                         }
                         showTransferDialog = null
@@ -308,11 +342,10 @@ enum class CreationType { PROJECT, FOLDER }
 @Composable
 fun ProjectFolderGrid(
     projects: List<EvidenceProject>, 
-    onProjectClick: (EvidenceProject) -> Unit,
-    onEmptyAction: () -> Unit
+    onProjectClick: (EvidenceProject) -> Unit
 ) {
     if (projects.isEmpty()) {
-        EmptyState("No projects found. Create one to begin.", Icons.Default.FolderOpen, onEmptyAction)
+        EmptyState("No projects found. Create one to begin.", Icons.Default.FolderOpen)
     } else {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(160.dp),
@@ -338,32 +371,49 @@ fun SubFolderAndEvidenceGrid(
     evidenceList: List<Evidence>,
     selectedIds: List<String>,
     isInSelectionMode: Boolean,
+    onCreateFolder: () -> Unit,
+    onTakeImages: () -> Unit,
+    onImportPhotos: () -> Unit,
     onFolderClick: (EvidenceFolder) -> Unit,
+    onFolderLongClick: (EvidenceFolder) -> Unit,
     onEvidenceClick: (Evidence) -> Unit,
-    onEvidenceLongClick: (Evidence) -> Unit,
-    onEmptyAction: () -> Unit
+    onEvidenceLongClick: (Evidence) -> Unit
 ) {
-    if (folders.isEmpty() && evidenceList.isEmpty()) {
-        EmptyState("No sub-folders or photos found.", Icons.Default.FolderSpecial, onEmptyAction)
-    } else {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(120.dp),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(120.dp),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Action Header
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            ActionRow(
+                onCreateFolder = onCreateFolder,
+                onTakeImages = onTakeImages,
+                onImportPhotos = onImportPhotos
+            )
+        }
+
+        if (folders.isEmpty() && evidenceList.isEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                EmptyState("No sub-folders or photos found.", Icons.Default.FolderSpecial)
+            }
+        } else {
             items(folders) { folder ->
                 FolderItem(
                     name = folder.name,
                     icon = Icons.Default.FolderSpecial,
                     date = folder.createdAt,
-                    onClick = { if (!isInSelectionMode) onFolderClick(folder) }
+                    isSelected = "fo:${folder.id}" in selectedIds,
+                    isInSelectionMode = isInSelectionMode,
+                    onClick = { onFolderClick(folder) },
+                    onLongClick = { onFolderLongClick(folder) }
                 )
             }
             items(evidenceList) { evidence ->
                 GalleryItem(
                     evidence = evidence,
-                    isSelected = evidence.id in selectedIds,
+                    isSelected = "ev:${evidence.id}" in selectedIds,
                     isInSelectionMode = isInSelectionMode,
                     onItemClick = { onEvidenceClick(it) },
                     onItemLongClick = { onEvidenceLongClick(it) }
@@ -374,51 +424,125 @@ fun SubFolderAndEvidenceGrid(
 }
 
 @Composable
-fun FolderItem(name: String, icon: androidx.compose.ui.graphics.vector.ImageVector, date: Date, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+fun ActionRow(
+    onCreateFolder: () -> Unit,
+    onTakeImages: () -> Unit,
+    onImportPhotos: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-            Text(text = sdf.format(date), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        ActionCard(
+            text = "Create Folder",
+            icon = Icons.Default.CreateNewFolder,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.weight(1f),
+            onClick = onCreateFolder
+        )
+        ActionCard(
+            text = "Take Images",
+            icon = Icons.Default.AddAPhoto,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.weight(1f),
+            onClick = onTakeImages
+        )
+        ActionCard(
+            text = "Import Photos",
+            icon = Icons.Default.FileUpload,
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+            modifier = Modifier.weight(1f),
+            onClick = onImportPhotos
+        )
     }
 }
 
 @Composable
-fun EvidenceGrid(
-    evidenceList: List<Evidence>, 
-    selectedIds: List<String>,
-    isInSelectionMode: Boolean,
-    onEvidenceClick: (Evidence) -> Unit,
-    onEvidenceLongClick: (Evidence) -> Unit,
-    onEmptyAction: () -> Unit
+fun ActionCard(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    if (evidenceList.isEmpty()) {
-        EmptyState("No evidence found in this folder", Icons.Default.PhotoLibrary, onEmptyAction)
-    } else {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(120.dp),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+    Card(
+        modifier = modifier
+            .height(80.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = color),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            items(evidenceList) { evidence ->
-                GalleryItem(
-                    evidence = evidence, 
-                    isSelected = evidence.id in selectedIds,
-                    isInSelectionMode = isInSelectionMode,
-                    onItemClick = { onEvidenceClick(it) }, 
-                    onItemLongClick = { onEvidenceLongClick(it) }
-                )
+            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun FolderItem(
+    name: String, 
+    icon: androidx.compose.ui.graphics.vector.ImageVector, 
+    date: Date, 
+    isSelected: Boolean = false,
+    isInSelectionMode: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+        ),
+        border = if (isSelected) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary), width = 3.dp) else null
+    ) {
+        Box {
+            Column(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+                Text(text = sdf.format(date), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            // Selection indicator
+            if (isInSelectionMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                }
             }
         }
     }
@@ -469,19 +593,36 @@ fun GalleryItem(
                     }
                 }
             }
+
+            if (evidence.hasStego) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Lock, 
+                        contentDescription = "Hidden Data", 
+                        tint = Color.White, 
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-fun EmptyState(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+fun EmptyState(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(icon, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
             Spacer(modifier = Modifier.height(16.dp))
             Text(text, style = MaterialTheme.typography.bodyLarge)
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onClick) { Text("Get Started") }
         }
     }
 }
@@ -492,8 +633,11 @@ fun EvidenceDetailDialog(
     onDismiss: () -> Unit,
     onMove: () -> Unit,
     onCopy: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    viewModel: EvidenceCaptureViewModel
 ) {
+    var showStegoDialog by remember { mutableStateOf(false) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -520,13 +664,27 @@ fun EvidenceDetailDialog(
                         .padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 24.dp)
                         .fillMaxWidth()
                 ) {
-                    val sdf = SimpleDateFormat("MMM dd, yyyy - HH:mm:ss", Locale.getDefault())
-                    Text(
-                        text = sdf.format(evidence.timestamp),
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val sdf = SimpleDateFormat("MMM dd, yyyy - HH:mm:ss", Locale.getDefault())
+                        Text(
+                            text = sdf.format(evidence.timestamp),
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        IconButton(onClick = { showStegoDialog = true }) {
+                            Icon(
+                                imageVector = if (evidence.hasStego) Icons.Default.LockOpen else Icons.Default.VpnKey,
+                                contentDescription = "Steganography Vault",
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
                     
                     if (evidence.latitude != null && evidence.longitude != null) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -595,7 +753,127 @@ fun EvidenceDetailDialog(
                 }
             }
         }
+
+        if (showStegoDialog) {
+            StegoVaultDialog(
+                evidence = evidence,
+                onDismiss = { showStegoDialog = false },
+                viewModel = viewModel
+            )
+        }
     }
+}
+
+@Composable
+fun StegoVaultDialog(
+    evidence: Evidence,
+    onDismiss: () -> Unit,
+    viewModel: EvidenceCaptureViewModel
+) {
+    var passphrase by remember { mutableStateOf("") }
+    var secretMessage by remember { mutableStateOf("") }
+    var revealedMessage by remember { mutableStateOf<String?>(null) }
+    var isRevealing by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    
+    val coroutineScope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.VpnKey, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.width(8.dp))
+                Text(if (evidence.hasStego) "Decrypt Vault" else "Secure Vault")
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (!evidence.hasStego) {
+                    Text(
+                        "Hide a secret message inside this photo. The image will be converted to PNG to preserve data.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = secretMessage,
+                        onValueChange = { secretMessage = it },
+                        label = { Text("Secret Message") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                } else if (revealedMessage != null) {
+                    Text("Decrypted Message:", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = revealedMessage!!,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+
+                if (revealedMessage == null) {
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = passphrase,
+                        onValueChange = { passphrase = it },
+                        label = { Text("Passphrase") },
+                        modifier = Modifier.fillMaxWidth(),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        singleLine = true
+                    )
+                }
+
+                error?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                }
+                
+                if (isRevealing) {
+                    Spacer(Modifier.height(16.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {
+            if (revealedMessage == null) {
+                Button(
+                    onClick = {
+                        if (evidence.hasStego) {
+                            isRevealing = true
+                            error = null
+                            coroutineScope.launch {
+                                val result = viewModel.revealData(evidence, passphrase)
+                                isRevealing = false
+                                if (result.isSuccess) {
+                                    revealedMessage = result.getOrNull()
+                                } else {
+                                    error = result.exceptionOrNull()?.message ?: "Decryption failed"
+                                }
+                            }
+                        } else {
+                            viewModel.hideData(evidence, secretMessage, passphrase)
+                            onDismiss()
+                        }
+                    },
+                    enabled = passphrase.isNotBlank() && (evidence.hasStego || secretMessage.isNotBlank()) && !isRevealing
+                ) {
+                    Text(if (evidence.hasStego) "Decrypt" else "Encrypt & Hide")
+                }
+            } else {
+                Button(onClick = onDismiss) { Text("Done") }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable

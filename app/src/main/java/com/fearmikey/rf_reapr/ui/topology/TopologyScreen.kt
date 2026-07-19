@@ -7,7 +7,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,11 +28,13 @@ import com.fearmikey.rf_reapr.ui.topology.components.NetworkNodeListState
 @Composable
 fun TopologyScreen(
     viewModel: TopologyViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val mappedGraph by viewModel.mappedGraph.collectAsState()
     val discoveryState by viewModel.discoveryState.collectAsState()
     val isAuditing by viewModel.isAuditing.collectAsState()
+    val isApiKeySet by viewModel.isApiKeySet.collectAsState()
     
     var isListView by remember { mutableStateOf(false) }
     var selectedNode by remember { mutableStateOf<NetworkNode?>(null) }
@@ -36,6 +42,13 @@ fun TopologyScreen(
     var showInfoDialog by remember { mutableStateOf(false) }
     var showDiscoveryWarning by remember { mutableStateOf(false) }
     var showAuditWarning by remember { mutableStateOf(false) }
+    var showApiKeyRecommendation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (!isApiKeySet) {
+            showApiKeyRecommendation = true
+        }
+    }
 
     if (showClearConfirmation) {
         AlertDialog(
@@ -255,6 +268,34 @@ fun TopologyScreen(
                     dismissButton = {
                         TextButton(onClick = { showAuditWarning = false }) {
                             Text("Cancel")
+                        }
+                    }
+                )
+            }
+
+            if (showApiKeyRecommendation) {
+                AlertDialog(
+                    onDismissRequest = { showApiKeyRecommendation = false },
+                    title = { Text("Boost Your Scan Results") },
+                    text = {
+                        Text(
+                            "Adding a free NIST NVD API key allows RF_REAPR to fetch vulnerability data more reliably and with higher rate limits.\n\n" +
+                            "Without a key, the NIST API may throttle requests, leading to missing CVE data during audits."
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showApiKeyRecommendation = false
+                                onNavigateToSettings()
+                            }
+                        ) {
+                            Text("Go to Settings")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showApiKeyRecommendation = false }) {
+                            Text("Maybe Later")
                         }
                     }
                 )

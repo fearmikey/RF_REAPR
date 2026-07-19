@@ -15,6 +15,8 @@ data class EvidenceEntity(
     val projectId: String?,
     val folderId: String?,
     val notes: String,
+    val hasStego: Boolean = false,
+    val stegoType: String? = null,
     val isDeleted: Boolean = false,
     val deletedAt: Long? = null
 )

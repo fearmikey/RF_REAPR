@@ -16,10 +16,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.WifiAccessPoint
+import com.fearmikey.rf_reapr.ui.theme.WifiOrange
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +43,13 @@ fun WifiFingerprintScreen(
                 val reader = stream.bufferedReader()
                 viewModel.setImportedData(reader.readText())
             }
+        }
+    }
+
+    // Auto-save scan on exit
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.stopScan()
         }
     }
 
@@ -74,7 +83,7 @@ fun WifiFingerprintScreen(
                             )
                         },
                         icon = {
-                            Icon(Icons.Default.Wifi, contentDescription = null)
+                            Icon(Icons.Default.Wifi, contentDescription = null, tint = if (selectedRange == range) WifiOrange else LocalContentColor.current)
                         }
                     )
                 }
@@ -93,7 +102,8 @@ fun WifiFingerprintScreen(
             Button(
                 onClick = { viewModel.startScan() },
                 enabled = !isScanning,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = WifiOrange, contentColor = Color.Black)
             ) {
                 Icon(Icons.Default.Wifi, contentDescription = null)
                 Spacer(Modifier.width(8.dp))

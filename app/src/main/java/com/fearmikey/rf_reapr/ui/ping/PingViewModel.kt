@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.PingRepository
 import com.fearmikey.rf_reapr.domain.repository.PingRepository.PingStatus
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
+import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,14 @@ class PingViewModel(
     private val gson = Gson()
     private var currentHost: String = ""
 
+    init {
+        viewModelScope.launch {
+            ActiveTaskMonitor.stopAllSignal.collect {
+                cancelPing()
+            }
+        }
+    }
+
     fun runPing(host: String, continuous: Boolean) {
         if (host.isBlank()) return
         
@@ -34,15 +43,22 @@ class PingViewModel(
         _pingLines.value = emptyList()
         currentHost = host
         
+        val taskName = "Ping ($host)"
+        ActiveTaskMonitor.addTask(taskName)
+
         pingJob = viewModelScope.launch {
-            val count = if (continuous) null else 4
-            repository.ping(host, count).collect { status ->
-                _uiState.value = status
-                if (status is PingStatus.Progress) {
-                    _pingLines.value = _pingLines.value + status.line
-                } else if (status is PingStatus.Success) {
-                    logPingResults()
+            try {
+                val count = if (continuous) null else 4
+                repository.ping(host, count).collect { status ->
+                    _uiState.value = status
+                    if (status is PingStatus.Progress) {
+                        _pingLines.value = _pingLines.value + status.line
+                    } else if (status is PingStatus.Success) {
+                        logPingResults()
+                    }
                 }
+            } finally {
+                ActiveTaskMonitor.removeTask(taskName)
             }
         }
     }

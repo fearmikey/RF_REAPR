@@ -11,8 +11,11 @@ import com.fearmikey.rf_reapr.domain.service.DeviceIdentificationService
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -21,8 +24,13 @@ class TopologyViewModel(
     private val scanSessionRepository: ScanSessionRepository,
     private val portScannerRepository: PortScannerRepository,
     private val vulnerabilityRepository: VulnerabilityRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isApiKeySet: StateFlow<Boolean> = settingsRepository.vulnerabilityApiKey
+        .map { it.isNotBlank() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     private val _mappedGraph = MutableStateFlow<MappedGraph?>(null)
     val mappedGraph: StateFlow<MappedGraph?> = _mappedGraph.asStateFlow()

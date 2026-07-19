@@ -9,25 +9,45 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockPerson
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.Nfc
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Router
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Usb
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.ui.navigation.Screen
 import androidx.compose.ui.tooling.preview.Preview
-import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
+import com.fearmikey.rf_reapr.ui.theme.*
 
-enum class ToolCategory(val title: String, val icon: ImageVector) {
-    NETWORK("Network Auditing", Icons.Default.Router),
-    WIRELESS("Wireless Auditing", Icons.Default.Wifi),
-    WEB("Web & Infrastructure", Icons.Default.Language),
-    PHYSICAL("Physical Access", Icons.Default.Nfc),
-    COMPLIANCE("Compliance & Reporting", Icons.AutoMirrored.Filled.Assignment),
-    LOGS("Log Exports", Icons.AutoMirrored.Filled.List)
+enum class ToolCategory(val title: String, val icon: ImageVector, val tint: Color) {
+    NETWORK("Network Auditing", Icons.Default.Router, NetworkGreen),
+    WIRELESS("Wireless Auditing", Icons.Default.Wifi, WifiOrange),
+    WEB("Web & Infrastructure", Icons.Default.Language, WebGold),
+    PHYSICAL("Physical Access", Icons.Default.Nfc, PhysicalRed),
+    COMPLIANCE("Compliance & Reporting", Icons.AutoMirrored.Filled.Assignment, ComplianceGold),
+    LOGS("Log Exports", Icons.AutoMirrored.Filled.List, LogGrey)
 }
 
 data class ToolkitTool(
@@ -35,7 +55,8 @@ data class ToolkitTool(
     val description: String,
     val icon: ImageVector,
     val route: String,
-    val category: ToolCategory
+    val category: ToolCategory,
+    val tint: Color? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,25 +92,49 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             ToolCategory.NETWORK
         ),
         ToolkitTool(
+            "IoT Service Discovery",
+            "Discover mDNS/Bonjour services on the network.",
+            Icons.Default.SettingsRemote,
+            Screen.ServiceDiscovery.route,
+            ToolCategory.NETWORK
+        ),
+        ToolkitTool(
+            "DNS Security Auditor",
+            "Detect DNS hijacking and security leaks.",
+            Icons.Default.LockPerson,
+            Screen.DnsAuditor.route,
+            ToolCategory.NETWORK
+        ),
+        ToolkitTool(
+            "Visual Traceroute",
+            "Map the path packets take to a destination.",
+            Icons.Default.Route,
+            Screen.Traceroute.route,
+            ToolCategory.NETWORK
+        ),
+        ToolkitTool(
             "Bluetooth Proximity Finder",
             "Consolidated auditor and locator for BLE devices.",
             Icons.Default.Bluetooth,
             Screen.BluetoothProximityFinder.route,
-            ToolCategory.WIRELESS
+            ToolCategory.WIRELESS,
+            BluetoothBlue
         ),
         ToolkitTool(
             "WiFi Spectrum Analyzer",
             "Interactive visualization of WiFi channel overlap and bandwidth.",
             Icons.Default.Wifi,
             Screen.WifiFingerprinter.route,
-            ToolCategory.WIRELESS
+            ToolCategory.WIRELESS,
+            WifiOrange
         ),
         ToolkitTool(
             "NFC Scanner",
             "Audit physical access tags and NDEF messages.",
             Icons.Default.Nfc,
             Screen.NfcScanner.route,
-            ToolCategory.WIRELESS
+            ToolCategory.WIRELESS, // Note: NFC is in Wireless category but using NfcPurple
+            NfcPurple
         ),
         ToolkitTool(
             "HID Injector",
@@ -119,12 +164,40 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             Screen.WebsiteInspector.route,
             ToolCategory.WEB
         ),
+        ToolkitTool(
+            "Subdomain Enumerator",
+            "Map attack surface via DNS brute-force.",
+            Icons.Default.Dns,
+            Screen.SubdomainFinder.route,
+            ToolCategory.WEB
+        ),
+        ToolkitTool(
+            "TLS Cipher Scanner",
+            "Identify weak protocols and supported cipher suites.",
+            Icons.Default.Lock,
+            Screen.TlsCipherScanner.route,
+            ToolCategory.WEB
+        ),
+        ToolkitTool(
+            "Cloud Asset Discovery",
+            "Search for public S3, GCS, and Azure buckets.",
+            Icons.Default.Cloud,
+            Screen.CloudAssetScanner.route,
+            ToolCategory.WEB
+        ),
         // Compliance Tools
         ToolkitTool(
             "Audit Checklists",
             "NIST, ISO 27001, and SOC2 automated audit checklists.",
             Icons.AutoMirrored.Filled.Assignment,
             Screen.ComplianceChecklists.route,
+            ToolCategory.COMPLIANCE
+        ),
+        ToolkitTool(
+            "Report Generator",
+            "Compile scan results and evidence into PDF/Word reports.",
+            Icons.AutoMirrored.Filled.Assignment,
+            Screen.ReportBuilder.route,
             ToolCategory.COMPLIANCE
         ),
         // Log Tools
@@ -233,7 +306,7 @@ fun CategoryCard(
         Column {
             ListItem(
                 headlineContent = { Text(category.title, fontWeight = FontWeight.Bold) },
-                leadingContent = { Icon(category.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                leadingContent = { Icon(category.icon, contentDescription = null, tint = category.tint) },
                 trailingContent = {
                     Icon(
                         imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -280,7 +353,7 @@ fun ToolItem(tool: ToolkitTool, onNavigate: (String) -> Unit) {
             imageVector = tool.icon,
             contentDescription = null,
             modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.secondary
+            tint = tool.tint ?: tool.category.tint
         )
         Spacer(modifier = Modifier.width(16.dp))
         Column {

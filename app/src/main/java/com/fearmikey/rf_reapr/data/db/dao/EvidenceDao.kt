@@ -26,6 +26,9 @@ interface EvidenceDao {
     @Query("SELECT * FROM evidence_projects WHERE isDeleted = 1 ORDER BY deletedAt DESC")
     fun getDeletedProjects(): Flow<List<EvidenceProjectEntity>>
 
+    @Query("SELECT * FROM evidence_folders WHERE isDeleted = 0 AND projectId = :projectId AND (parentFolderId = :parentFolderId OR (parentFolderId IS NULL AND :parentFolderId IS NULL)) ORDER BY createdAt DESC")
+    fun getFolders(projectId: String, parentFolderId: String?): Flow<List<EvidenceFolderEntity>>
+
     @Query("SELECT * FROM evidence_folders WHERE isDeleted = 0 AND projectId = :projectId ORDER BY createdAt DESC")
     fun getFoldersForProject(projectId: String): Flow<List<EvidenceFolderEntity>>
 
@@ -94,6 +97,27 @@ interface EvidenceDao {
 
     @Query("UPDATE evidence SET projectId = :targetProjectId, folderId = :targetFolderId WHERE id = :evidenceId")
     suspend fun updateEvidenceLocation(evidenceId: String, targetProjectId: String?, targetFolderId: String?)
+
+    @Query("UPDATE evidence SET folderId = :targetFolderId WHERE folderId = :sourceFolderId")
+    suspend fun updateEvidenceFolder(sourceFolderId: String, targetFolderId: String?)
+
+    @Query("UPDATE evidence_folders SET projectId = :targetProjectId, parentFolderId = :targetParentFolderId WHERE id = :folderId")
+    suspend fun updateFolderLocation(folderId: String, targetProjectId: String, targetParentFolderId: String?)
+
+    @Query("UPDATE evidence_folders SET projectId = :targetProjectId WHERE id = :folderId")
+    suspend fun updateFolderProject(folderId: String, targetProjectId: String)
+
+    @Query("UPDATE evidence SET projectId = :targetProjectId WHERE folderId = :folderId")
+    suspend fun updateEvidenceInFolderProject(folderId: String, targetProjectId: String)
+
+    @Query("SELECT * FROM evidence_folders WHERE id = :folderId")
+    suspend fun getFolderById(folderId: String): EvidenceFolderEntity?
+
+    @Query("SELECT * FROM evidence_projects WHERE id = :projectId")
+    suspend fun getProjectById(projectId: String): EvidenceProjectEntity?
+
+    @Query("SELECT * FROM evidence WHERE folderId = :folderId")
+    suspend fun getEvidenceInFolderSync(folderId: String): List<EvidenceEntity>
 
     @Query("SELECT * FROM evidence WHERE isDeleted = 1 AND deletedAt <= :threshold")
     suspend fun getEvidenceDeletedBefore(threshold: Long): List<EvidenceEntity>

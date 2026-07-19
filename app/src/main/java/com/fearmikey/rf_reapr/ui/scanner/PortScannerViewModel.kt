@@ -7,13 +7,18 @@ import com.fearmikey.rf_reapr.domain.model.RiskLevel
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.PortScannerRepository
 import com.fearmikey.rf_reapr.domain.repository.ScanSessionRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.repository.VulnerabilityRepository
 import com.fearmikey.rf_reapr.domain.scanner.NetworkScanner
+import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 import java.util.Locale
@@ -22,11 +27,22 @@ class PortScannerViewModel(
     private val portScannerRepository: PortScannerRepository,
     private val vulnerabilityRepository: VulnerabilityRepository,
     private val scanSessionRepository: ScanSessionRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
-    private val _scanState = MutableStateFlow<NetworkScanner.ScanResult<OpenPort>>(NetworkScanner.ScanResult.Idle)
-    val scanState: StateFlow<NetworkScanner.ScanResult<OpenPort>> = _scanState.asStateFlow()
+    val isApiKeySet: StateFlow<Boolean> = settingsRepository.vulnerabilityApiKey
+        .map { it.isNotBlank() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    private val _foundPorts = MutableStateFlow<List<OpenPort>>(emptyList())
+    val foundPorts: StateFlow<List<OpenPort>> = _foundPorts.asStateFlow()
+
+    private val _progress = MutableStateFlow(0f)
+    val progress: StateFlow<Float> = _progress.asStateFlow()
+
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
     private val _eta = MutableStateFlow<String?>(null)
     val eta: StateFlow<String?> = _eta.asStateFlow()
@@ -34,6 +50,14 @@ class PortScannerViewModel(
     private var scanJob: Job? = null
     private var startTime: Long = 0
     private val gson = Gson()
+
+    init {
+        viewModelScope.launch {
+            ActiveTaskMonitor.stopAllSignal.collect {
+                stopScan()
+            }
+        }
+    }
 
     companion object {
         val COMMON_PORTS = listOf(
@@ -66,25 +90,38 @@ class PortScannerViewModel(
     private fun initiateScan() {
         startTime = System.currentTimeMillis()
         _eta.value = "Calculating..."
+        _isScanning.value = true
+        _progress.value = 0f
+        _foundPorts.value = emptyList()
+        
+        val taskName = "Port Scan ($currentTargetIp)"
+        ActiveTaskMonitor.addTask(taskName)
+
         scanJob = viewModelScope.launch {
-            portScannerRepository.startScan().collect { result ->
-                when (result) {
-                    is NetworkScanner.ScanResult.Progress -> {
-                        calculateEta(result.progress)
-                        _scanState.value = result
-                    }
-                    is NetworkScanner.ScanResult.Finished -> {
-                        _eta.value = null
-                        performVulnerabilityAudit(currentTargetIp, result.foundData)
-                    }
-                    is NetworkScanner.ScanResult.Error -> {
-                        _eta.value = null
-                        _scanState.value = result
-                    }
-                    else -> {
-                        _scanState.value = result
+            try {
+                portScannerRepository.startScan().collect { result ->
+                    when (result) {
+                        is NetworkScanner.ScanResult.Progress -> {
+                            calculateEta(result.progress)
+                            _progress.value = result.progress
+                            _foundPorts.value = result.foundData
+                        }
+                        is NetworkScanner.ScanResult.Finished -> {
+                            _eta.value = null
+                            _isScanning.value = false
+                            _progress.value = 1f
+                            performVulnerabilityAudit(currentTargetIp, result.foundData)
+                        }
+                        is NetworkScanner.ScanResult.Error -> {
+                            _eta.value = null
+                            _isScanning.value = false
+                            // Error handling could be improved but keeping current behavior
+                        }
+                        else -> {}
                     }
                 }
+            } finally {
+                ActiveTaskMonitor.removeTask(taskName)
             }
         }
     }
@@ -105,7 +142,7 @@ class PortScannerViewModel(
             val vulns = vulnerabilityRepository.lookupVulnerabilities(port.serviceName, port.banner)
             port.copy(vulnerabilities = vulns)
         }
-        _scanState.value = NetworkScanner.ScanResult.Finished(auditedPorts)
+        _foundPorts.value = auditedPorts
         
         // Log results
         viewModelScope.launch {
@@ -140,16 +177,14 @@ class PortScannerViewModel(
     fun stopScan() {
         scanJob?.cancel()
         portScannerRepository.stopScan()
-        if (_scanState.value is NetworkScanner.ScanResult.Progress) {
-            val currentProgress = (_scanState.value as NetworkScanner.ScanResult.Progress).foundData
-            _scanState.value = NetworkScanner.ScanResult.Finished(currentProgress)
-        }
+        _isScanning.value = false
+        _eta.value = null
     }
 
     fun clearResults() {
         stopScan()
         currentTargetIp = ""
-        _scanState.value = NetworkScanner.ScanResult.Idle
-        _eta.value = null
+        _foundPorts.value = emptyList()
+        _progress.value = 0f
     }
 }

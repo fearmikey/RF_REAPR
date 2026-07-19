@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.NfcTagData
+import com.fearmikey.rf_reapr.ui.theme.NfcPurple
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +49,7 @@ fun NfcScannerScreen(
                     imageVector = Icons.Default.Nfc,
                     contentDescription = null,
                     modifier = Modifier.size(100.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    tint = NfcPurple.copy(alpha = 0.7f)
                 )
                 Text(
                     "Ready to scan",

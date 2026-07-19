@@ -5,6 +5,7 @@ import java.util.Date
 data class EvidenceFolder(
     val id: String,
     val projectId: String,
+    val parentFolderId: String? = null,
     val name: String,
     val createdAt: Date = Date(),
     val isDeleted: Boolean = false,

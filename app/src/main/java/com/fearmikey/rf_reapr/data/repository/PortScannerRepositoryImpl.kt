@@ -75,8 +75,8 @@ class PortScannerRepositoryImpl : PortScannerRepository {
                                 }
                                 val current = scannedCount.incrementAndGet()
                                 
-                                // Throttle UI updates:
-                                if (foundOpen || current % 100 == 0 || current == totalPorts) {
+                                // Throttle UI updates: Every 200 ports instead of 100
+                                if (foundOpen || current % 200 == 0 || current == totalPorts) {
                                     trySend(NetworkScanner.ScanResult.Progress(current.toFloat() / totalPorts, foundPorts.toList()))
                                 }
                             }

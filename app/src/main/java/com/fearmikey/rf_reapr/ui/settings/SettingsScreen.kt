@@ -1,5 +1,6 @@
 package com.fearmikey.rf_reapr.ui.settings
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -11,13 +12,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.fearmikey.rf_reapr.BuildConfig
 import com.fearmikey.rf_reapr.domain.model.ThemePreference
+import com.fearmikey.rf_reapr.ui.theme.WebGold
 
 @Preview(showBackground = true)
 @Composable
@@ -43,10 +48,11 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit
 ) {
-    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val currentTheme by viewModel.themePreference.collectAsState()
     val apiKey by viewModel.vulnerabilityApiKey.collectAsState()
     
+    var editedApiKey by remember(apiKey) { mutableStateOf(apiKey) }
     var expanded by remember { mutableStateOf(false) }
     var showApiKey by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -143,54 +149,66 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { viewModel.setVulnerabilityApiKey(it) },
-                label = { Text("NVD API Key (Optional)") },
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { showApiKey = !showApiKey }) {
-                        Icon(
-                            imageVector = if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (showApiKey) "Hide API Key" else "Show API Key"
-                        )
-                    }
-                },
-                supportingText = {
-                    Text("Optional key used to increase rate limits for global CVE synchronization.")
-                }
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "Diagnostics",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = { viewModel.exportLogs(context) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            ) {
-                Icon(Icons.Default.BugReport, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Export Debug Logs")
+            val fontSize = when {
+                editedApiKey.length > 35 -> 11.sp
+                editedApiKey.length > 25 -> 13.sp
+                else -> 16.sp
             }
 
-            Text(
-                text = "Share logs with the development team to help resolve issues. Logs contain scan results and system events.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = editedApiKey,
+                    onValueChange = { editedApiKey = it },
+                    label = { Text("NVD API Key (Optional)") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontSize = fontSize),
+                    visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showApiKey = !showApiKey }) {
+                            Icon(
+                                imageVector = if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (showApiKey) "Hide API Key" else "Show API Key"
+                            )
+                        }
+                    },
+                    supportingText = {
+                        Text("Optional key used to increase rate limits for global CVE synchronization.")
+                    }
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Button(
+                    onClick = { viewModel.setVulnerabilityApiKey(editedApiKey) },
+                    enabled = editedApiKey != apiKey,
+                    modifier = Modifier.padding(bottom = 16.dp) // Align with TextField body, above supporting text
+                ) {
+                    Text("Apply")
+                }
+            }
+
+            val darkTheme = when (currentTheme) {
+                ThemePreference.LIGHT -> false
+                ThemePreference.DARK -> true
+                ThemePreference.SYSTEM -> isSystemInDarkTheme()
+            }
+
+            TextButton(
+                onClick = { uriHandler.openUri("https://nvd.nist.gov/developers/request-an-api-key") },
+                modifier = Modifier.align(Alignment.End),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = if (darkTheme) WebGold else Color(0xFF8B6B00)
+                )
+            ) {
+                Text(
+                    text = "Get an API Key from NIST",
+                    textDecoration = TextDecoration.Underline
+                )
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 

@@ -17,6 +17,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
@@ -32,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.OpenPort
 import com.fearmikey.rf_reapr.domain.model.RiskLevel
 import com.fearmikey.rf_reapr.domain.scanner.NetworkScanner
+import com.fearmikey.rf_reapr.ui.theme.WebGold
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +43,7 @@ fun PortScannerScreen(
     viewModel: PortScannerViewModel,
     initialIp: String? = null,
     onBack: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     onUpdateTopology: (Map<String, List<OpenPort>>, String?) -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -48,14 +53,26 @@ fun PortScannerScreen(
     var startPort by remember { mutableStateOf("1") }
     var endPort by remember { mutableStateOf("65535") }
     
-    val scanState by viewModel.scanState.collectAsState()
+    val foundPorts by viewModel.foundPorts.collectAsState()
+    val progress by viewModel.progress.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
     val eta by viewModel.eta.collectAsState()
+    val isApiKeySet by viewModel.isApiKeySet.collectAsState()
 
     var showWarningDialog by remember { mutableStateOf(false) }
     var showManualPortDialog by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showApiKeyRecommendation by remember { mutableStateOf(false) }
     var selectedPortDetails by remember { mutableStateOf<OpenPort?>(null) }
     var pendingScanType by remember { mutableStateOf<ScanType?>(null) }
+
+    val onPortClick = remember { { port: OpenPort -> selectedPortDetails = port } }
+
+    LaunchedEffect(Unit) {
+        if (!isApiKeySet) {
+            showApiKeyRecommendation = true
+        }
+    }
 
     LaunchedEffect(initialIp) {
         if (initialIp != null) {
@@ -69,12 +86,9 @@ fun PortScannerScreen(
         }
     }
 
-    LaunchedEffect(scanState) {
-        if (scanState is NetworkScanner.ScanResult.Finished) {
-            val results = (scanState as NetworkScanner.ScanResult.Finished).foundData
-            // For now, we only scan one IP, so we map it. 
-            // In a real subnet scanner, we'd have multiple IPs.
-            onUpdateTopology(mapOf(ipAddress.text to results), null)
+    LaunchedEffect(isScanning, foundPorts) {
+        if (!isScanning && foundPorts.isNotEmpty()) {
+            onUpdateTopology(mapOf(ipAddress.text to foundPorts), null)
         }
     }
 
@@ -175,7 +189,7 @@ fun PortScannerScreen(
                         pendingScanType = ScanType.Common
                         showWarningDialog = true
                     },
-                    enabled = scanState !is NetworkScanner.ScanResult.Progress,
+                    enabled = !isScanning,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Common Ports")
@@ -186,7 +200,7 @@ fun PortScannerScreen(
                         keyboardController?.hide()
                         showManualPortDialog = true
                     },
-                    enabled = scanState !is NetworkScanner.ScanResult.Progress,
+                    enabled = !isScanning,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Manual Selection")
@@ -197,15 +211,14 @@ fun PortScannerScreen(
 
             Button(
                 onClick = { viewModel.stopScan() },
-                enabled = scanState is NetworkScanner.ScanResult.Progress,
+                enabled = isScanning,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Stop Scan")
             }
             
-            if (scanState is NetworkScanner.ScanResult.Progress) {
-                val progress = (scanState as NetworkScanner.ScanResult.Progress).progress
+            if (isScanning) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
                     progress = { progress },
@@ -221,6 +234,9 @@ fun PortScannerScreen(
                     }
                 }
             }
+            
+            // ... (Alert dialogs omitted for brevity in replace_file_content but I will keep them)
+            // Wait, I should include the rest of the logic.
 
             if (showManualPortDialog) {
                 AlertDialog(
@@ -352,23 +368,41 @@ fun PortScannerScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            val foundPorts = when (val state = scanState) {
-                is NetworkScanner.ScanResult.Progress -> state.foundData
-                is NetworkScanner.ScanResult.Finished -> state.foundData
-                else -> emptyList()
+            if (showApiKeyRecommendation) {
+                AlertDialog(
+                    onDismissRequest = { showApiKeyRecommendation = false },
+                    title = { Text("Boost Your Scan Results") },
+                    text = {
+                        Text(
+                            "Adding a free NIST NVD API key allows RF_REAPR to fetch vulnerability data more reliably and with higher rate limits.\n\n" +
+                            "Without a key, the NIST API may throttle requests, leading to missing CVE data during audits."
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showApiKeyRecommendation = false
+                                onNavigateToSettings()
+                            }
+                        ) {
+                            Text("Go to Settings")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showApiKeyRecommendation = false }) {
+                            Text("Maybe Later")
+                        }
+                    }
+                )
             }
 
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(foundPorts) { port ->
-                    AuditResultCard(
-                        ipAddress = ipAddress.text,
-                        port = port,
-                        onClick = { selectedPortDetails = port }
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            PortResultsList(
+                foundPorts = foundPorts,
+                ipAddress = ipAddress.text,
+                onPortClick = onPortClick
+            )
         }
 
         selectedPortDetails?.let { port ->
@@ -382,6 +416,63 @@ fun PortScannerScreen(
 }
 
 @Composable
+fun PortResultsList(
+    foundPorts: List<OpenPort>,
+    ipAddress: String,
+    onPortClick: (OpenPort) -> Unit
+) {
+    val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    LazyColumn(
+        state = scrollState,
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScrollbar(scrollState)
+    ) {
+        items(
+            items = foundPorts,
+            key = { it.port },
+            contentType = { "port" }
+        ) { port ->
+            AuditResultCard(
+                ipAddress = ipAddress,
+                port = port,
+                onClick = { onPortClick(port) }
+            )
+        }
+    }
+}
+
+fun Modifier.verticalScrollbar(
+    state: androidx.compose.foundation.lazy.LazyListState,
+    width: androidx.compose.ui.unit.Dp = 4.dp
+): Modifier = this.then(Modifier.drawWithContent {
+    drawContent()
+
+    val layoutInfo = state.layoutInfo
+    val visibleItemsInfo = layoutInfo.visibleItemsInfo
+    if (visibleItemsInfo.isEmpty()) return@drawWithContent
+
+    val totalItemsCount = layoutInfo.totalItemsCount
+    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+    if (viewportHeight <= 0) return@drawWithContent
+
+    val firstVisibleItem = visibleItemsInfo.first()
+
+    val totalHeight = (viewportHeight.toFloat() / visibleItemsInfo.size) * totalItemsCount
+    val scrollbarHeight = (viewportHeight.toFloat() / totalHeight) * viewportHeight
+    val scrollOffset = (firstVisibleItem.index.toFloat() / totalItemsCount) * viewportHeight
+
+    drawRect(
+        color = Color.Gray.copy(alpha = 0.5f),
+        topLeft = Offset(size.width - width.toPx(), scrollOffset),
+        size = Size(width.toPx(), scrollbarHeight),
+    )
+})
+
+
+
+@Composable
 fun AuditResultCard(
     ipAddress: String,
     port: OpenPort,
@@ -389,17 +480,16 @@ fun AuditResultCard(
 ) {
     val uriHandler = LocalUriHandler.current
     val isWeb = isWebService(port.port, port.serviceName, port.banner)
+    val hasVulns = port.vulnerabilities.isNotEmpty()
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = if (port.vulnerabilities.isNotEmpty()) 
-                MaterialTheme.colorScheme.errorContainer 
-            else MaterialTheme.colorScheme.surfaceVariant
-        )
+            .padding(vertical = 4.dp)
+            .clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.medium,
+        color = if (hasVulns) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = if (hasVulns) 0.dp else 1.dp
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -407,9 +497,16 @@ fun AuditResultCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text("Port: ${port.port}", fontWeight = FontWeight.Bold)
-                    Text("Service: ${port.serviceName}", style = MaterialTheme.typography.bodyMedium)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Port: ${port.port}", 
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Service: ${port.serviceName}", 
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
                 
                 if (isWeb) {
@@ -422,54 +519,40 @@ fun AuditResultCard(
                         Icon(
                             imageVector = Icons.Default.Language,
                             contentDescription = "Open in Browser",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = WebGold,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
             }
 
             if (port.banner != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Surface(
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                    shape = MaterialTheme.shapes.extraSmall,
-                    modifier = Modifier.fillMaxWidth()
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
+                            shape = MaterialTheme.shapes.extraSmall
+                        )
+                        .padding(8.dp)
                 ) {
                     Text(
                         text = "Banner: ${port.banner}",
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(6.dp),
                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                     )
                 }
             }
             
-            if (port.vulnerabilities.isNotEmpty()) {
+            if (hasVulns) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Vulnerabilities Found:", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
-                port.vulnerabilities.forEach { vuln ->
-                    val annotatedLink = buildAnnotatedString {
-                        append("• ")
-                        withStyle(style = SpanStyle(
-                            color = MaterialTheme.colorScheme.primary,
-                            textDecoration = TextDecoration.Underline,
-                            fontWeight = FontWeight.Bold
-                        )) {
-                            append(vuln.cveId)
-                        }
-                        append(": ${vuln.description}")
-                    }
-                    Text(
-                        text = annotatedLink,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.clickable {
-                            uriHandler.openUri("https://cve.mitre.org/cgi-bin/cvename.cgi?name=${vuln.cveId}")
-                        }
-                    )
-                    SeverityBadge(vuln.severity)
-                }
-            } else {
-                Text("No known vulnerabilities detected.", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "Vulnerabilities detected", 
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold, 
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
     }
