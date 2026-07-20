@@ -16,6 +16,7 @@ sealed class Screen(val route: String) {
     data object SubdomainFinder : Screen("subdomain_finder")
     data object TlsCipherScanner : Screen("tls_cipher_scanner")
     data object CloudAssetScanner : Screen("cloud_asset_scanner")
+    data object HibpChecker : Screen("hibp_checker")
     data object PingTool : Screen("ping_tool")
     
     // New Physical Access & Wireless Tools
@@ -30,6 +31,9 @@ sealed class Screen(val route: String) {
     data object ServiceDiscovery : Screen("service_discovery")
     data object DnsAuditor : Screen("dns_auditor")
     data object Traceroute : Screen("traceroute")
+    data object ArpDetector : Screen("arp_detector")
+    data object UpnpAuditor : Screen("upnp_auditor")
+    data object CredentialTester : Screen("credential_tester")
 
     data object ComplianceChecklists : Screen("compliance_checklists")
     data object AuditChecklist : Screen("audit_checklist/{frameworkId}") {

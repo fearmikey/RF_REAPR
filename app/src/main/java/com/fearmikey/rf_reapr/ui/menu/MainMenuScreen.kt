@@ -92,10 +92,24 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             ToolCategory.NETWORK
         ),
         ToolkitTool(
-            "IoT Service Discovery",
+            "Service Discovery",
             "Discover mDNS/Bonjour services on the network.",
             Icons.Default.SettingsRemote,
             Screen.ServiceDiscovery.route,
+            ToolCategory.NETWORK
+        ),
+        ToolkitTool(
+            "UPnP/NAT-PMP Auditor",
+            "Audit router port mapping vulnerabilities.",
+            Icons.Default.Router,
+            Screen.UpnpAuditor.route,
+            ToolCategory.NETWORK
+        ),
+        ToolkitTool(
+            "Credential Tester",
+            "Test services for default or weak credentials.",
+            Icons.Default.LockPerson,
+            Screen.CredentialTester.route,
             ToolCategory.NETWORK
         ),
         ToolkitTool(
@@ -110,6 +124,13 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             "Map the path packets take to a destination.",
             Icons.Default.Route,
             Screen.Traceroute.route,
+            ToolCategory.NETWORK
+        ),
+        ToolkitTool(
+            "ARP Spoofing Detector",
+            "Monitor network for ARP spoofing attempts.",
+            Icons.Default.NotificationsActive,
+            Screen.ArpDetector.route,
             ToolCategory.NETWORK
         ),
         ToolkitTool(
@@ -183,6 +204,13 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             "Search for public S3, GCS, and Azure buckets.",
             Icons.Default.Cloud,
             Screen.CloudAssetScanner.route,
+            ToolCategory.WEB
+        ),
+        ToolkitTool(
+            "HaveIBeenPwned Checker",
+            "Check if accounts are in known data breaches.",
+            Icons.Default.LockPerson,
+            Screen.HibpChecker.route,
             ToolCategory.WEB
         ),
         // Compliance Tools

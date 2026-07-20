@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.2] - 2026-07-19
+
+### Added
+- **Auditing Modules**:
+    - HaveIBeenPwned Checker for account breach analysis.
+    - UPnP/NAT-PMP Auditor for discovering router port mapping vulnerabilities.
+    - Service Credential Tester for non-destructive default password checks.
+    - ARP Spoofing Detector for monitoring network gateway security.
+- **Settings**:
+    - Integration for HaveIBeenPwned API key persistence.
+
+### Changed
+- **UI/UX**: Renamed HIBP references to full HaveIBeenPwned name for better clarity.
+- **Maintenance**: Resolved various deprecation warnings in ArpDetector and CredentialTester UI.
+
 ## [1.4.1] - 2026-07-19
 
 ### Added

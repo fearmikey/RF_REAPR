@@ -53,7 +53,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.3.0.apk` from the root of this repository.
+1.  Download the latest `RF_REAPR_v1.4.2.apk` from the root of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)

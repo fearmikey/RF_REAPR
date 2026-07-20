@@ -1,4 +1,4 @@
-- `[ ]` Update app version in `app/build.gradle.kts`
-- `[ ]` Update `CHANGELOG.md` for version 1.4.1
-- `[ ]` Stage all changes
-- `[ ]` Commit all changes to Git
+- `[x]` Update app version in `app/build.gradle.kts`
+- `[x]` Update `CHANGELOG.md` for version 1.4.1
+- `[x]` Stage all changes
+- `[x]` Commit all changes to Git

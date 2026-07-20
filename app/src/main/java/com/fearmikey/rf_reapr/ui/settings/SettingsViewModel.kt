@@ -34,6 +34,20 @@ class SettingsViewModel(
             initialValue = ""
         )
 
+    val hibpApiKey: StateFlow<String> = repository.hibpApiKey
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ""
+        )
+
+    val isCameraShortcutEnabled: StateFlow<Boolean> = repository.isCameraShortcutEnabled
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
     fun setThemePreference(preference: ThemePreference) {
         viewModelScope.launch {
             repository.setThemePreference(preference)
@@ -43,6 +57,18 @@ class SettingsViewModel(
     fun setVulnerabilityApiKey(key: String) {
         viewModelScope.launch {
             repository.setVulnerabilityApiKey(key)
+        }
+    }
+
+    fun setHibpApiKey(key: String) {
+        viewModelScope.launch {
+            repository.setHibpApiKey(key)
+        }
+    }
+
+    fun setCameraShortcutEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setCameraShortcutEnabled(enabled)
         }
     }
 }

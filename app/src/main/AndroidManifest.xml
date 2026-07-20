@@ -42,6 +42,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name=".CameraShortcutActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:enabled="true">
             <intent-filter>
                 <action android:name="android.media.action.STILL_IMAGE_CAMERA" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -54,7 +61,7 @@
                 <action android:name="android.media.action.IMAGE_CAPTURE" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <provider
             android:name="androidx.core.content.FileProvider"

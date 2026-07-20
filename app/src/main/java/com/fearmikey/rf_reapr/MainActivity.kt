@@ -52,6 +52,8 @@ import com.fearmikey.rf_reapr.ui.ping.PingViewModel
 import com.fearmikey.rf_reapr.ui.web.*
 import com.fearmikey.rf_reapr.ui.scanner.PortScannerScreen
 import com.fearmikey.rf_reapr.ui.scanner.PortScannerViewModel
+import com.fearmikey.rf_reapr.ui.scanner.CredentialTesterScreen
+import com.fearmikey.rf_reapr.ui.scanner.CredentialTesterViewModel
 import com.fearmikey.rf_reapr.ui.settings.SettingsScreen
 import com.fearmikey.rf_reapr.ui.settings.SettingsViewModel
 import com.fearmikey.rf_reapr.ui.splash.SplashScreen
@@ -73,6 +75,7 @@ import com.fearmikey.rf_reapr.data.repository.BleProximityRepositoryImpl
 import com.fearmikey.rf_reapr.ui.dns.*
 import com.fearmikey.rf_reapr.ui.mdns.*
 import com.fearmikey.rf_reapr.ui.traceroute.*
+import com.fearmikey.rf_reapr.ui.arp.*
 import com.fearmikey.rf_reapr.ui.report.*
 import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
 import okhttp3.OkHttpClient
@@ -138,6 +141,7 @@ class MainActivity : ComponentActivity() {
         val subdomainFinderRepository = SubdomainFinderRepositoryImpl(okHttpClient)
         val tlsCipherScannerRepository = TlsCipherScannerRepositoryImpl()
         val cloudAssetScannerRepository = CloudAssetScannerRepositoryImpl(okHttpClient)
+        val hibpRepository = HibpRepositoryImpl(okHttpClient, settingsRepository)
         val pingRepository = PingRepositoryImpl()
         val logRepository = LogRepositoryImpl(database.eventLogDao())
         val complianceRepository = ComplianceRepositoryImpl(database.complianceDao())
@@ -157,6 +161,9 @@ class MainActivity : ComponentActivity() {
         val serviceDiscoveryRepository = ServiceDiscoveryRepositoryImpl(this)
         val dnsAuditorRepository = DnsAuditorRepositoryImpl(this, okHttpClient)
         val tracerouteRepository = TracerouteRepositoryImpl()
+        val arpDetectorRepository = ArpDetectorRepositoryImpl(this)
+        val upnpScannerRepository = UpnpScannerRepositoryImpl()
+        val credentialTesterRepository = CredentialTesterRepositoryImpl(okHttpClient)
         val hidRepository = LocalHidRepository(database.hidScriptDao())
         val hidAssetRepository = LocalHidAssetRepository(this, database.hidAssetDao())
         val hidParser = DuckyScriptParser()
@@ -248,6 +255,9 @@ class MainActivity : ComponentActivity() {
                     val cloudAssetScannerViewModel: CloudAssetScannerViewModel = viewModel {
                         CloudAssetScannerViewModel(cloudAssetScannerRepository, logRepository)
                     }
+                    val hibpViewModel: HibpViewModel = viewModel {
+                        HibpViewModel(hibpRepository, settingsRepository)
+                    }
                     val pingViewModel: PingViewModel = viewModel {
                         PingViewModel(pingRepository, logRepository)
                     }
@@ -281,6 +291,15 @@ class MainActivity : ComponentActivity() {
                     }
                     val tracerouteViewModel: TracerouteViewModel = viewModel {
                         TracerouteViewModel(tracerouteRepository, logRepository)
+                    }
+                    val arpDetectorViewModel: ArpDetectorViewModel = viewModel {
+                        ArpDetectorViewModel(arpDetectorRepository)
+                    }
+                    val upnpScannerViewModel: UpnpScannerViewModel = viewModel {
+                        UpnpScannerViewModel(upnpScannerRepository)
+                    }
+                    val credentialTesterViewModel: CredentialTesterViewModel = viewModel {
+                        CredentialTesterViewModel(credentialTesterRepository)
                     }
                     val hidInjectorViewModel: HidInjectorViewModel = viewModel {
                         HidInjectorViewModel(hidRepository, hidAssetRepository, hidParser)
@@ -394,6 +413,11 @@ class MainActivity : ComponentActivity() {
                                 viewModel = cloudAssetScannerViewModel,
                             ) { navController.popBackStack() }
                         }
+                        composable(Screen.HibpChecker.route) {
+                            HibpScreen(
+                                viewModel = hibpViewModel,
+                            ) { navController.popBackStack() }
+                        }
                         composable(Screen.PingTool.route) {
                             PingScreen(
                                 viewModel = pingViewModel,
@@ -495,6 +519,21 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Traceroute.route) {
                             TracerouteScreen(
                                 viewModel = tracerouteViewModel,
+                            ) { navController.popBackStack() }
+                        }
+                        composable(Screen.ArpDetector.route) {
+                            ArpDetectorScreen(
+                                viewModel = arpDetectorViewModel,
+                            ) { navController.popBackStack() }
+                        }
+                        composable(Screen.UpnpAuditor.route) {
+                            UpnpAuditorScreen(
+                                viewModel = upnpScannerViewModel,
+                            ) { navController.popBackStack() }
+                        }
+                        composable(Screen.CredentialTester.route) {
+                            CredentialTesterScreen(
+                                viewModel = credentialTesterViewModel,
                             ) { navController.popBackStack() }
                         }
                         
