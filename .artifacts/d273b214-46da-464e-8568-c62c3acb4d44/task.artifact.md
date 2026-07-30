@@ -1,0 +1,2 @@
+- [ ] Reduce Splash Screen duration in `SplashScreen.kt`
+- [ ] Verify change

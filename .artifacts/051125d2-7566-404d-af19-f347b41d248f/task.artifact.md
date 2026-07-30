@@ -1,0 +1,8 @@
+- [ ] Build Configuration: Add JTransforms dependency
+- [ ] Domain Layer: Create SdrConfig, FftData, and SdrRepository interface
+- [ ] Data Layer: Implement RtlTcpRepositoryImpl with DSP logic
+- [ ] UI Components: Implement WaterfallView custom drawing
+- [ ] UI Screen: Create SdrViewModel and SdrScreen
+- [ ] Navigation: Add SdrController to Screen.kt and MainMenuScreen.kt
+- [ ] Integration: Register repository and ViewModel in MainActivity.kt
+- [ ] Verification: Test connectivity and DSP output

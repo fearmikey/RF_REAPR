@@ -1,0 +1,6 @@
+- [x] Research common default credentials
+- [x] Create `DefaultCredentials.kt` with comprehensive list
+- [x] Update `CredentialTesterViewModel.kt` to use the new list
+- [x] Clean up unused imports
+- [x] Verify build and changes
+- [x] Create walkthrough

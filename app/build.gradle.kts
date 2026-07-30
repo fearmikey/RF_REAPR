@@ -15,8 +15,8 @@ android {
         applicationId = "com.fearmikey.rf_reapr"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.4.2"
+        versionCode = 8
+        versionName = "1.4.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -117,6 +117,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.accompanist.permissions)
     implementation(libs.poi.ooxml)
+    implementation(libs.jtransforms)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.3] - 2026-07-30
+
+### Added
+- **Wireless Auditing**: SDR Controller module for real-time spectrum analysis and waterfall display via RTL-SDR (rtl_tcp).
+- **SDR Controller**: Frequency presets for FM Radio, Airband, NOAA Weather, and more.
+
+### Fixed
+- **SDR Controller**: Improved driver launch mechanism and package visibility for Android 11+.
+- **SDR Controller**: Enhanced frequency tuning with MHz input support.
+
 ## [1.4.2] - 2026-07-19
 
 ### Added
