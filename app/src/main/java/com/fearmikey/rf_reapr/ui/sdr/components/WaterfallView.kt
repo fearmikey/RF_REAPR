@@ -22,13 +22,14 @@ fun WaterfallView(
     if (fftSize == 0) return
 
     val height = 300
-    val bitmap = remember { Bitmap.createBitmap(fftSize, height, Bitmap.Config.ARGB_8888) }
-    val canvasBitmap = remember { android.graphics.Canvas(bitmap) }
+    // Use remember for long-lived objects
+    val bitmap = remember(fftSize) { Bitmap.createBitmap(fftSize, height, Bitmap.Config.ARGB_8888) }
+    val canvasBitmap = remember(bitmap) { android.graphics.Canvas(bitmap) }
+    val linePixels = remember(fftSize) { IntArray(fftSize) }
     
-    // Color map logic
+    // Color map logic - pre-calculate or keep it simple
     fun getWaterfallColor(magnitude: Float): Int {
-        val normalized = ((magnitude + 100) / 100).coerceIn(0f, 1f)
-        // Simple jet-like color map: Blue -> Cyan -> Green -> Yellow -> Red
+        val normalized = ((magnitude + 80) / 100).coerceIn(0f, 1f)
         return when {
             normalized < 0.25f -> Color.rgb(0, 0, (normalized * 4 * 255).toInt())
             normalized < 0.5f -> Color.rgb(0, ((normalized - 0.25f) * 4 * 255).toInt(), 255)
@@ -37,17 +38,18 @@ fun WaterfallView(
         }
     }
 
-    LaunchedEffect(fftData) {
-        // Shift existing lines down
-        val tempBitmap = Bitmap.createBitmap(bitmap, 0, 0, fftSize, height - 1)
-        canvasBitmap.drawBitmap(tempBitmap, 0f, 1f, null)
+    // Effect to update the bitmap when new data arrives
+    SideEffect {
+        // Shift existing pixels down by drawing the bitmap onto itself
+        canvasBitmap.drawBitmap(bitmap, 0f, 1f, null)
         
-        // Draw new line at top
-        val pixels = IntArray(fftSize)
+        // Prepare new line pixels
         for (i in 0 until fftSize) {
-            pixels[i] = getWaterfallColor(fftData.magnitudes[i])
+            linePixels[i] = getWaterfallColor(fftData.magnitudes[i])
         }
-        bitmap.setPixels(pixels, 0, fftSize, 0, 0, fftSize, 1)
+        
+        // Update top line
+        bitmap.setPixels(linePixels, 0, fftSize, 0, 0, fftSize, 1)
     }
 
     Canvas(modifier = modifier

@@ -32,7 +32,7 @@ fun SplashScreenPreview() {
 @Composable
 fun SplashScreen(versionName: String, onTimeout: () -> Unit) {
     LaunchedEffect(Unit) {
-        delay(4000.milliseconds)
+        delay(3000.milliseconds)
         onTimeout()
     }
 

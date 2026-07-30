@@ -1,25 +1,24 @@
-# Walkthrough - Comprehensive Credential Suite
+# Walkthrough - SSL Resilience & Enhanced Discovery (Iteration 4)
 
-I have expanded the Credential Tester module with a comprehensive suite of common default usernames and passwords.
+I have implemented advanced diagnostics and SSL bypass to resolve the issue where the switch's login page was not being detected.
 
 ## Changes Made
 
-### Data Layer
-- [NEW] [DefaultCredentials.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/data/repository/DefaultCredentials.kt): Created a central repository for default credentials, categorized by:
-    - **Generic**: Standard admin/root pairs.
-    - **Networking**: Vendor-specific defaults (Cisco, Ubiquiti, MikroTik).
-    - **Databases**: Common DB admin credentials (PostgreSQL, Oracle, MySQL).
-    - **IoT / Embedded**: Raspberry Pi, Telnet, and common numeric pins.
-    - **Industrial / PLC**: Common industrial control system defaults.
-    - **Vendor Specific**: Specific hardware and testing environment (e.g., Metasploitable) defaults.
-
-### UI Layer
-- [MODIFY] [CredentialTesterViewModel.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/ui/scanner/CredentialTesterViewModel.kt): Updated the `runTest` function to use the new `DefaultCredentials.common` list, replacing the previous small hardcoded set. Removed unused imports.
+### Credential Tester (Infrastructure & Discovery)
+- [MODIFY] [CredentialTesterRepositoryImpl.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/data/repository/CredentialTesterRepositoryImpl.kt):
+    - **SSL Bypass**: The scanner now trusts all SSL certificates. This is critical for networking hardware (like TP-Link switches) that often uses self-signed HTTPS certificates which Android usually blocks.
+    - **Smart Path Resolution**: Replaced fragile string concatenation with `HttpUrl.resolve()`. This ensures that relative URLs in form actions are correctly converted into full URLs without double-slashes or path errors.
+    - **Expanded Discovery**: Added more common paths like `/admin` and `/logon.htm` to the probe list.
+    - **Deep Diagnostics**:
+        - If a page is reached but no login form is found, it now logs a **Body Snippet** of the first 200 characters. This tells us exactly what the switch is serving (e.g., a "Session Expired" page or a JavaScript loader).
+        - Added logs for the exact URL and headers used for authentication.
 
 ## Verification Results
 
 ### Automated Tests
-- Verified that the project builds successfully with the new files and changes.
+- Ran `gradle assembleDebug` - **Build Successful**.
 
 ### Manual Verification
-- The Credential Tester screen now cycles through a much larger set of credentials during a test, increasing the likelihood of identifying vulnerable default configurations.
+- Re-run the test on your switch.
+- **SSL**: If the switch uses HTTPS, it should now connect immediately without a "Handshake" error.
+- **Logs**: If it still fails to find the form, look for the `[DEBUG] Body Snippet: ...` log in the terminal. This snippet will be the final piece of the puzzle.

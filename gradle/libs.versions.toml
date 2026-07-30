@@ -24,6 +24,7 @@ coil = "2.6.0"
 accompanist = "0.34.0"
 mockito = "5.11.0"
 poi = "5.5.1"
+jtransforms = "3.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -68,6 +69,7 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 poi-ooxml = { group = "org.apache.poi", name = "poi-ooxml", version.ref = "poi" }
+jtransforms = { group = "com.github.wendykierp", name = "JTransforms", version.ref = "jtransforms" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

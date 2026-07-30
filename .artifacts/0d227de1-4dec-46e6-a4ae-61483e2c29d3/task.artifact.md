@@ -1,6 +1,14 @@
-- [x] Research common default credentials
-- [x] Create `DefaultCredentials.kt` with comprehensive list
-- [x] Update `CredentialTesterViewModel.kt` to use the new list
-- [x] Clean up unused imports
-- [x] Verify build and changes
-- [x] Create walkthrough
+- [x] Integrate Topology Hotkey
+- [x] Improve UI & Stability
+- [x] Implement Smart Web Authentication (Initial)
+- [x] Implement Advanced Web Auth & TP-Link Optimization (v1)
+- [x] Implement Advanced Web Auth & TP-Link Optimization (v2)
+- [x] Implement Deep Diagnostics & Token Support (v3)
+- [x] Implement Advanced Diagnostics & SSL Resilience (v4)
+    - [x] Configure SSL bypass (trust all certs) in `CredentialTesterRepositoryImpl.kt`
+    - [x] Add body snippet logging for failed form detection
+    - [x] Expand probe paths for better discovery
+    - [x] Fix relative URL handling in `extractFormAction`
+- [x] Verification
+    - [x] Verify build
+    - [x] Update walkthrough

@@ -77,6 +77,8 @@ import com.fearmikey.rf_reapr.ui.mdns.*
 import com.fearmikey.rf_reapr.ui.traceroute.*
 import com.fearmikey.rf_reapr.ui.arp.*
 import com.fearmikey.rf_reapr.ui.report.*
+import com.fearmikey.rf_reapr.ui.sdr.SdrScreen
+import com.fearmikey.rf_reapr.ui.sdr.SdrViewModel
 import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -156,6 +158,8 @@ class MainActivity : ComponentActivity() {
             database.complianceDao(),
             database.eventLogDao()
         )
+        
+        val sdrRepository = RtlTcpRepositoryImpl()
         
         // New Repositories
         val serviceDiscoveryRepository = ServiceDiscoveryRepositoryImpl(this)
@@ -312,6 +316,10 @@ class MainActivity : ComponentActivity() {
                         ReportBuilderViewModel(reportRepository)
                     }
 
+                    val sdrViewModel: SdrViewModel = viewModel {
+                        SdrViewModel(sdrRepository)
+                    }
+
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Splash.route,
@@ -361,7 +369,10 @@ class MainActivity : ComponentActivity() {
                             TopologyScreen(
                                 viewModel = topologyViewModel,
                                 onBack = { navController.popBackStack() },
-                                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                                onNavigateToCredentialTester = { ip ->
+                                    navController.navigate(Screen.CredentialTester.createRoute(ip))
+                                }
                             )
                         }
                         composable(Screen.WifiFingerprinter.route) {
@@ -531,10 +542,19 @@ class MainActivity : ComponentActivity() {
                                 viewModel = upnpScannerViewModel,
                             ) { navController.popBackStack() }
                         }
-                        composable(Screen.CredentialTester.route) {
+                        composable(Screen.CredentialTester.route) { backStackEntry ->
+                            val ip = backStackEntry.arguments?.getString("ip")
                             CredentialTesterScreen(
                                 viewModel = credentialTesterViewModel,
+                                initialIp = ip,
                             ) { navController.popBackStack() }
+                        }
+                        
+                        composable(Screen.SdrController.route) {
+                            SdrScreen(
+                                viewModel = sdrViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
                         }
                         
                         // Log Routes

@@ -33,7 +33,10 @@ sealed class Screen(val route: String) {
     data object Traceroute : Screen("traceroute")
     data object ArpDetector : Screen("arp_detector")
     data object UpnpAuditor : Screen("upnp_auditor")
-    data object CredentialTester : Screen("credential_tester")
+    data object SdrController : Screen("sdr_controller")
+    data object CredentialTester : Screen("credential_tester?ip={ip}") {
+        fun createRoute(ip: String? = null) = if (ip != null) "credential_tester?ip=$ip" else "credential_tester"
+    }
 
     data object ComplianceChecklists : Screen("compliance_checklists")
     data object AuditChecklist : Screen("audit_checklist/{frameworkId}") {

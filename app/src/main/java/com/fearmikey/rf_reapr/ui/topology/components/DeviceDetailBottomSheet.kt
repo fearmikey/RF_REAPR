@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,7 +34,8 @@ fun DeviceDetailBottomSheet(
     allNodes: List<NetworkNode> = emptyList(),
     onDismiss: () -> Unit,
     onTypeChange: (DeviceType) -> Unit = {},
-    onParentChange: (String?) -> Unit = {}
+    onParentChange: (String?) -> Unit = {},
+    onNavigateToCredentialTester: (String) -> Unit = {}
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -84,6 +86,21 @@ fun DeviceDetailBottomSheet(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 SeverityBadge(severity = node.riskLevel)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = { onNavigateToCredentialTester(node.ipAddress) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            ) {
+                Icon(Icons.Default.VpnKey, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Test Credentials")
             }
 
             Spacer(modifier = Modifier.height(24.dp))

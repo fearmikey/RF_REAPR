@@ -1,8 +1,14 @@
-- [ ] Build Configuration: Add JTransforms dependency
-- [ ] Domain Layer: Create SdrConfig, FftData, and SdrRepository interface
-- [ ] Data Layer: Implement RtlTcpRepositoryImpl with DSP logic
-- [ ] UI Components: Implement WaterfallView custom drawing
-- [ ] UI Screen: Create SdrViewModel and SdrScreen
-- [ ] Navigation: Add SdrController to Screen.kt and MainMenuScreen.kt
-- [ ] Integration: Register repository and ViewModel in MainActivity.kt
-- [ ] Verification: Test connectivity and DSP output
+- [x] Build Configuration: Add JTransforms dependency
+- [x] Domain Layer: Create SdrConfig, FftData, and SdrRepository interface
+- [x] Data Layer: Implement RtlTcpRepositoryImpl with DSP logic
+- [x] UI Components: Implement WaterfallView custom drawing
+- [x] UI Screen: Create SdrViewModel and SdrScreen
+- [x] Navigation: Add SdrController to Screen.kt and MainMenuScreen.kt
+- [x] Integration: Register repository and ViewModel in MainActivity.kt
+- [x] Verification: Test connectivity and DSP output
+- [x] UI Polish & Driver Integration:
+    - [x] Update SdrRepository and RtlTcpRepositoryImpl with error handling
+    - [x] Update SdrViewModel with error state and launchDriver helper
+    - [x] Redesign SdrScreen with presets, MHz input, and "Launch Driver" button
+- [x] Bug Fix: Fix broken driver launch link (Package Visibility)
+- [x] Bug Fix: Robust Driver Launch & F-Droid Integration

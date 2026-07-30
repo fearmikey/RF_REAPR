@@ -1,83 +1,37 @@
-# Implementation Plan - SDR Controller Module
+# Implementation Plan - SDR Driver Launch Fix
 
-Implement a Software Defined Radio (SDR) Controller module for the `RF_REAPR` app. This module will interface with RTL-SDR dongles via the `rtl_tcp` protocol, providing real-time spectrum visualization and waterfall display.
+Fix the "broken links" for the SDR driver launch by implementing a more robust detection and launch mechanism, handling F-Droid specifically, and addressing Android 11+ package visibility more comprehensively.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> This implementation relies on the `rtl_tcp` protocol. To use it with a local USB dongle, the user will need to have an RTL-SDR driver app (like the "RTL2832U driver" on Play Store) installed on their device. This is the standard approach for non-root Android SDR apps to ensure stable USB access and lifecycle management.
+> I will update the driver launch logic to specifically support F-Droid and try multiple launch methods (Launcher Intent, Explicit Activity, and F-Droid deep links). This should resolve the "broken link" issue even if the standard Play Store isn't available or the package name isn't indexed by the `market://` scheme in F-Droid.
 
 ## Proposed Changes
 
 ### Build Configuration
 
-#### [MODIFY] [libs.versions.toml](file:///home/michael/AndroidStudioProjects/RF_REAPR/gradle/libs.versions.toml)
-- Add `jtransforms` version and library definition for FFT processing.
-
-#### [MODIFY] [app/build.gradle.kts](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/build.gradle.kts)
-- Add `jtransforms` dependency.
-
----
-
-### Domain Layer
-
-#### [NEW] [SdrConfig.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/domain/model/SdrConfig.kt)
-- Data class for SDR parameters: `frequency`, `sampleRate`, `gain`, `ppm`.
-
-#### [NEW] [FftData.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/domain/model/FftData.kt)
-- Data class for FFT results: `magnitudes` (FloatArray), `centerFrequency`, `bandwidth`.
-
-#### [NEW] [SdrRepository.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/domain/repository/SdrRepository.kt)
-- Interface for SDR operations: `connect()`, `disconnect()`, `setFrequency()`, `setGain()`, and a `Flow<FftData>`.
-
----
-
-### Data Layer
-
-#### [NEW] [RtlTcpRepositoryImpl.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/data/repository/RtlTcpRepositoryImpl.kt)
-- Implementation using `java.net.Socket`.
-- Implements the `rtl_tcp` binary protocol.
-- Performs real-time DSP:
-    - IQ Sample normalization.
-    - FFT computation using JTransforms.
-    - Magnitude calculation and smoothing.
+#### [MODIFY] [AndroidManifest.xml](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/AndroidManifest.xml)
+- Expand `<queries>` to include common intent patterns and more package names.
 
 ---
 
 ### UI Layer
 
-#### [NEW] [SdrScreen.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/ui/sdr/SdrScreen.kt)
-- Main screen with Spectrogram (top) and Waterfall (bottom).
-- Tuning overlay for frequency and gain.
+#### [MODIFY] [SdrViewModel.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/ui/sdr/SdrViewModel.kt)
+- **Robust Launching**:
+    1. Try `getLaunchIntentForPackage`.
+    2. Try explicit `MainActivity` launch for known drivers.
+    3. If neither works, provide a choice or a smarter fallback.
+- **F-Droid Integration**: Add `org.fdroid.fdroid` to queries and support opening the app page directly in F-Droid using `fdroid.app://details?id=...` or a web fallback that F-Droid can intercept.
 
-#### [NEW] [SdrViewModel.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/ui/sdr/SdrViewModel.kt)
-- Manages connection state, tuning logic, and FFT data flow.
-
-#### [NEW] [WaterfallView.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/ui/sdr/components/WaterfallView.kt)
-- High-performance custom `Canvas` component.
-- Uses a `Bitmap` or `ImageBitmap` buffer to efficiently draw the rolling waterfall.
-
----
-
-### Integration
-
-#### [MODIFY] [Screen.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/ui/navigation/Screen.kt)
-- Add `SdrController` route.
-
-#### [MODIFY] [MainMenuScreen.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/ui/menu/MainMenuScreen.kt)
-- Add "SDR Controller" to the "Wireless & RF" section.
-
-#### [MODIFY] [MainActivity.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/MainActivity.kt)
-- Instantiate `RtlTcpRepositoryImpl` and provide it to the `SdrViewModel`.
+#### [MODIFY] [SdrScreen.kt](file:///home/michael/AndroidStudioProjects/RF_REAPR/app/src/main/java/com/fearmikey/rf_reapr/ui/sdr/SdrScreen.kt)
+- Update the "Launch Driver" button to provide better feedback if the driver is not found.
+- Add a "Manual Config" hint if the user wants to use a remote SDR or a driver I didn't detect.
 
 ## Verification Plan
 
-### Automated Tests
-- **RtlTcpProtocolTest**: Verify command byte generation.
-- **DspTest**: Verify FFT magnitude calculation with known signals (sine waves).
-
 ### Manual Verification
-- Connect to `127.0.0.1:1234` with an RTL-SDR dongle attached.
-- Tune to a known local FM station (e.g., 100.1 MHz).
-- Verify the FM carrier is visible in the spectrogram.
-- Observe the waterfall "scrolling" with signal history.
+- **Scenario 1: Driver Installed (F-Droid)**: Tap "Launch Driver" -> Verify it opens the Martin Marinov app directly without going to the Play Store.
+- **Scenario 2: Driver Missing**: Tap "Launch Driver" -> Verify it opens F-Droid (if installed) or the browser to the F-Droid/Play Store page.
+- **Scenario 3: Manual Trigger**: Verify that entering a host/port still works even if the "Launch" button fails (ensures no hard dependency on the button).

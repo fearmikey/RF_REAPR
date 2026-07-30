@@ -150,6 +150,14 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             WifiOrange
         ),
         ToolkitTool(
+            "SDR Controller",
+            "Real-time spectrum analysis via RTL-SDR (rtl_tcp).",
+            Icons.Default.Waves,
+            Screen.SdrController.route,
+            ToolCategory.WIRELESS,
+            NetworkGreen
+        ),
+        ToolkitTool(
             "NFC Scanner",
             "Audit physical access tags and NDEF messages.",
             Icons.Default.Nfc,

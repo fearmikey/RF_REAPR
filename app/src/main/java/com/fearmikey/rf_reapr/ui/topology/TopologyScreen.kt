@@ -29,7 +29,8 @@ import com.fearmikey.rf_reapr.ui.topology.components.NetworkNodeListState
 fun TopologyScreen(
     viewModel: TopologyViewModel,
     onBack: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToCredentialTester: (String) -> Unit
 ) {
     val mappedGraph by viewModel.mappedGraph.collectAsState()
     val discoveryState by viewModel.discoveryState.collectAsState()
@@ -362,6 +363,10 @@ fun TopologyScreen(
                 },
                 onParentChange = { newParentId ->
                     viewModel.updateParent(node, newParentId)
+                },
+                onNavigateToCredentialTester = { ip ->
+                    selectedNode = null
+                    onNavigateToCredentialTester(ip)
                 }
             )
         }

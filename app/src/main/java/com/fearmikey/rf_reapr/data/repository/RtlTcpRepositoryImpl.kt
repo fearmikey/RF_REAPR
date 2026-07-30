@@ -24,6 +24,9 @@ class RtlTcpRepositoryImpl : SdrRepository {
     private val _fftData = MutableStateFlow(FftData(FloatArray(0), 0, 0))
     override val fftData: StateFlow<FftData> = _fftData.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    override val error: StateFlow<String?> = _error.asStateFlow()
+
     private var socket: Socket? = null
     private var outputStream: OutputStream? = null
     private var inputStream: InputStream? = null
@@ -37,9 +40,11 @@ class RtlTcpRepositoryImpl : SdrRepository {
     private val complexBuffer = FloatArray(fftSize * 2)
 
     override suspend fun connect(host: String, port: Int) {
+        _error.value = null
         withContext(Dispatchers.IO) {
             try {
-                socket = Socket(host, port)
+                socket = Socket()
+                socket?.connect(java.net.InetSocketAddress(host, port), 3000) // 3s timeout
                 outputStream = socket?.getOutputStream()
                 inputStream = socket?.getInputStream()
                 _config.value = _config.value.copy(isConnected = true)
@@ -51,7 +56,7 @@ class RtlTcpRepositoryImpl : SdrRepository {
 
                 startDataCollection()
             } catch (e: Exception) {
-                e.printStackTrace()
+                _error.value = "Connection failed: ${e.localizedMessage ?: "Unknown error"}"
                 disconnect()
             }
         }
@@ -76,7 +81,7 @@ class RtlTcpRepositoryImpl : SdrRepository {
                     if (read == iqBuffer.size) {
                         processIqData(iqBuffer)
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     if (isActive) {
                         disconnect()
                     }
@@ -100,7 +105,7 @@ class RtlTcpRepositoryImpl : SdrRepository {
         // Convert to complex float (interleaved I, Q)
         for (i in 0 until fftSize) {
             complexBuffer[2 * i] = (data[2 * i].toInt() and 0xFF).toFloat() - 127.5f
-            complexBuffer[2 * i + 1] = (data[2 * i + 1].toInt() and 0xFF).toFloat() - 127.5f
+            complexBuffer[(2 * i) + 1] = (data[(2 * i) + 1].toInt() and 0xFF).toFloat() - 127.5f
         }
 
         // Apply FFT
@@ -125,7 +130,7 @@ class RtlTcpRepositoryImpl : SdrRepository {
         _fftData.value = FftData(
             magnitudes = shiftedMagnitudes,
             centerFrequency = _config.value.frequency,
-            bandwidth = _config.value.sampleRate
+            bandwidth = _config.value.sampleRate,
         )
     }
 
