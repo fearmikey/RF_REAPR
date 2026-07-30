@@ -5,18 +5,25 @@ import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.PingRepository
 import com.fearmikey.rf_reapr.domain.repository.PingRepository.PingStatus
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class PingViewModel(
     private val repository: PingRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _uiState = MutableStateFlow<PingStatus>(PingStatus.Idle)
     val uiState: StateFlow<PingStatus> = _uiState.asStateFlow()
@@ -37,7 +44,7 @@ class PingViewModel(
     }
 
     fun runPing(host: String, continuous: Boolean) {
-        if (host.isBlank()) return
+        if (host.isBlank() || isPassiveMode.value) return
         
         cancelPing()
         _pingLines.value = emptyList()

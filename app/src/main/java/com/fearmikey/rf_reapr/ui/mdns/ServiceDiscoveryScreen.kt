@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +23,7 @@ fun ServiceDiscoveryScreen(
     onBackClick: () -> Unit
 ) {
     val services by viewModel.services.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
 
     Scaffold(
@@ -41,8 +43,15 @@ fun ServiceDiscoveryScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     } else {
-                        IconButton(onClick = { viewModel.startDiscovery() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        IconButton(
+                            onClick = { viewModel.startDiscovery() },
+                            enabled = !isPassiveMode
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                tint = if (isPassiveMode) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                 }
@@ -55,6 +64,27 @@ fun ServiceDiscoveryScreen(
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
+            if (isPassiveMode) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            "Passive Mode (Stealth). Active service discovery is inhibited to avoid detection.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+
             if (services.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {

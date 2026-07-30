@@ -1,45 +1,36 @@
 package com.fearmikey.rf_reapr.ui.menu
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockPerson
-import androidx.compose.material.icons.filled.NetworkCheck
-import androidx.compose.material.icons.filled.Nfc
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Router
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SettingsRemote
-import androidx.compose.material.icons.filled.Usb
-import androidx.compose.material.icons.filled.Waves
-import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.ui.navigation.Screen
 import androidx.compose.ui.tooling.preview.Preview
+import com.fearmikey.rf_reapr.ui.settings.SettingsViewModel
 import com.fearmikey.rf_reapr.ui.theme.*
+import kotlinx.coroutines.launch
 
 enum class ToolCategory(val title: String, val icon: ImageVector, val tint: Color) {
     NETWORK("Network Auditing", Icons.Default.Router, NetworkGreen),
@@ -56,75 +47,96 @@ data class ToolkitTool(
     val icon: ImageVector,
     val route: String,
     val category: ToolCategory,
-    val tint: Color? = null
+    val tint: Color? = null,
+    val isAggressive: Boolean = false
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainMenuScreen(onNavigate: (String) -> Unit) {
+fun MainMenuScreen(
+    settingsViewModel: SettingsViewModel? = null,
+    onNavigate: (String) -> Unit
+) {
+    val isPassiveMode by settingsViewModel?.isPassiveMode?.collectAsState() ?: remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+    val highlightAlpha = remember { Animatable(0f) }
+    var showActiveWarning by remember { mutableStateOf(false) }
+
+    val onInhibitedClick: () -> Unit = {
+        scope.launch {
+            listState.animateScrollToItem(0)
+            repeat(3) {
+                highlightAlpha.animateTo(0.6f, animationSpec = tween(300))
+                highlightAlpha.animateTo(0f, animationSpec = tween(300))
+            }
+        }
+    }
+
     val allTools = listOf(
         ToolkitTool(
             "Port Scanner",
             "Identify open TCP ports and services.",
             Icons.Default.Search,
             Screen.PortScanner.route,
-            ToolCategory.NETWORK
+            ToolCategory.NETWORK,
+            isAggressive = true
         ),
         ToolkitTool(
             "Network Topology",
             "Visualize the network graph and risk levels.",
             Icons.AutoMirrored.Filled.List,
             Screen.TopologyMap.route,
-            ToolCategory.NETWORK
+            ToolCategory.NETWORK,
+            isAggressive = true
         ),
         ToolkitTool(
             "DHCP Monitor",
             "Detect rogue devices and new hardware.",
             Icons.Default.NotificationsActive,
             Screen.DhcpMonitor.route,
-            ToolCategory.NETWORK
+            ToolCategory.NETWORK,
+            isAggressive = true
         ),
         ToolkitTool(
             "Ping Tool",
             "Send ICMP echo requests to a host or IP.",
             Icons.Default.NetworkCheck,
             Screen.PingTool.route,
-            ToolCategory.NETWORK
+            ToolCategory.NETWORK,
+            isAggressive = true
         ),
         ToolkitTool(
             "Service Discovery",
             "Discover mDNS/Bonjour services on the network.",
             Icons.Default.SettingsRemote,
             Screen.ServiceDiscovery.route,
-            ToolCategory.NETWORK
+            ToolCategory.NETWORK,
+            isAggressive = true
         ),
         ToolkitTool(
             "UPnP/NAT-PMP Auditor",
             "Audit router port mapping vulnerabilities.",
             Icons.Default.Router,
             Screen.UpnpAuditor.route,
-            ToolCategory.NETWORK
-        ),
-        ToolkitTool(
-            "Credential Tester",
-            "Test services for default or weak credentials.",
-            Icons.Default.LockPerson,
-            Screen.CredentialTester.route,
-            ToolCategory.NETWORK
+            ToolCategory.NETWORK,
+            isAggressive = true
         ),
         ToolkitTool(
             "DNS Security Auditor",
             "Detect DNS hijacking and security leaks.",
             Icons.Default.LockPerson,
             Screen.DnsAuditor.route,
-            ToolCategory.NETWORK
+            ToolCategory.NETWORK,
+            isAggressive = true
         ),
         ToolkitTool(
             "Visual Traceroute",
             "Map the path packets take to a destination.",
             Icons.Default.Route,
             Screen.Traceroute.route,
-            ToolCategory.NETWORK
+            ToolCategory.NETWORK,
+            isAggressive = true
         ),
         ToolkitTool(
             "ARP Spoofing Detector",
@@ -170,7 +182,8 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             "Deploy keystroke payloads via USB HID emulation.",
             Icons.Default.Usb,
             Screen.HidInjector.route,
-            ToolCategory.PHYSICAL
+            ToolCategory.PHYSICAL,
+            isAggressive = true
         ),
         ToolkitTool(
             "Evidence Capture",
@@ -191,28 +204,32 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             "Combined HTTP, TLS, DNS, and RDAP audit tool.",
             Icons.Default.Language,
             Screen.WebsiteInspector.route,
-            ToolCategory.WEB
+            ToolCategory.WEB,
+            isAggressive = true
         ),
         ToolkitTool(
             "Subdomain Enumerator",
             "Map attack surface via DNS brute-force.",
             Icons.Default.Dns,
             Screen.SubdomainFinder.route,
-            ToolCategory.WEB
+            ToolCategory.WEB,
+            isAggressive = true
         ),
         ToolkitTool(
             "TLS Cipher Scanner",
             "Identify weak protocols and supported cipher suites.",
             Icons.Default.Lock,
             Screen.TlsCipherScanner.route,
-            ToolCategory.WEB
+            ToolCategory.WEB,
+            isAggressive = true
         ),
         ToolkitTool(
             "Cloud Asset Discovery",
             "Search for public S3, GCS, and Azure buckets.",
             Icons.Default.Cloud,
             Screen.CloudAssetScanner.route,
-            ToolCategory.WEB
+            ToolCategory.WEB,
+            isAggressive = true
         ),
         ToolkitTool(
             "HaveIBeenPwned Checker",
@@ -288,6 +305,44 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             TopAppBar(
                 title = { Text("RF_REAPR Toolkit") },
                 actions = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.extraLarge)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha.value))
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isPassiveMode) "STEALTH" else "DETECTABLE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isPassiveMode) NetworkGreen else PhysicalRed,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Switch(
+                            checked = !isPassiveMode,
+                            onCheckedChange = { active ->
+                                if (active) {
+                                    showActiveWarning = true
+                                } else {
+                                    settingsViewModel?.setPassiveMode(true)
+                                }
+                            },
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            thumbContent = {
+                                Icon(
+                                    imageVector = if (isPassiveMode) Icons.Default.Lock else Icons.Default.NotificationsActive,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = PhysicalRed,
+                                checkedTrackColor = PhysicalRed.copy(alpha = 0.5f),
+                                uncheckedThumbColor = NetworkGreen,
+                                uncheckedTrackColor = NetworkGreen.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
                     IconButton(onClick = { onNavigate(Screen.Settings.route) }) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
@@ -296,6 +351,7 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
         }
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -303,11 +359,28 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text(
-                    "Security Audit Categories",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Security Audit Categories",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Surface(
+                        color = (if (isPassiveMode) NetworkGreen else PhysicalRed).copy(alpha = 0.1f),
+                        shape = MaterialTheme.shapes.extraSmall,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isPassiveMode) NetworkGreen else PhysicalRed)
+                    ) {
+                        Text(
+                            if (isPassiveMode) "Passive Mode (Stealth)" else "Active Mode (Detectable)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isPassiveMode) NetworkGreen else PhysicalRed,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
 
             ToolCategory.entries.forEach { category ->
@@ -319,11 +392,44 @@ fun MainMenuScreen(onNavigate: (String) -> Unit) {
                             expandedCategory = if (expandedCategory == category) null else category
                         },
                         tools = allTools.filter { it.category == category },
-                        onNavigate = onNavigate
+                        isPassiveMode = isPassiveMode,
+                        onNavigate = onNavigate,
+                        onInhibitedClick = onInhibitedClick
                     )
                 }
             }
         }
+    }
+
+    if (showActiveWarning) {
+        AlertDialog(
+            onDismissRequest = { showActiveWarning = false },
+            title = { Text("Warning: Active Mode") },
+            text = {
+                Text(
+                    "Switching to Active Mode (Detectable) allows the use of aggressive tools. " +
+                    "Your activities will be detectable by security systems such as IDS and IPS. " +
+                    "Proceed with caution.",
+                    textAlign = TextAlign.Start
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        settingsViewModel?.setPassiveMode(false)
+                        showActiveWarning = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PhysicalRed)
+                ) {
+                    Text("Enable Active Mode")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showActiveWarning = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -333,7 +439,9 @@ fun CategoryCard(
     isExpanded: Boolean,
     onClick: () -> Unit,
     tools: List<ToolkitTool>,
-    onNavigate: (String) -> Unit
+    isPassiveMode: Boolean,
+    onNavigate: (String) -> Unit,
+    onInhibitedClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -362,7 +470,7 @@ fun CategoryCard(
                         .fillMaxWidth()
                 ) {
                     tools.forEach { tool ->
-                        ToolItem(tool, onNavigate)
+                        ToolItem(tool, isPassiveMode, onNavigate, onInhibitedClick)
                         if (tool != tools.last()) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 4.dp),
@@ -377,27 +485,49 @@ fun CategoryCard(
 }
 
 @Composable
-fun ToolItem(tool: ToolkitTool, onNavigate: (String) -> Unit) {
+fun ToolItem(
+    tool: ToolkitTool,
+    isPassiveMode: Boolean,
+    onNavigate: (String) -> Unit,
+    onInhibitedClick: () -> Unit
+) {
+    val isInhibited = isPassiveMode && tool.isAggressive
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onNavigate(tool.route) }
-            .padding(vertical = 8.dp),
+            .clickable { 
+                if (isInhibited) onInhibitedClick() else onNavigate(tool.route)
+            }
+            .padding(vertical = 8.dp)
+            .alpha(if (isInhibited) 0.5f else 1f),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = tool.icon,
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            tint = tool.tint ?: tool.category.tint
-        )
+        Box {
+            Icon(
+                imageVector = tool.icon,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = tool.tint ?: tool.category.tint
+            )
+            if (isInhibited) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(12.dp)
+                        .align(Alignment.BottomEnd),
+                    tint = PhysicalRed
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(16.dp))
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(text = tool.name, style = MaterialTheme.typography.labelLarge)
             Text(
-                text = tool.description,
+                text = if (isInhibited) "Inhibited in Passive Mode" else tool.description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (isInhibited) PhysicalRed else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

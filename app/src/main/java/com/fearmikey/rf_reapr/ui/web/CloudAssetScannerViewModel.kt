@@ -5,16 +5,23 @@ import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.CloudAssetScannerRepository
 import com.fearmikey.rf_reapr.domain.repository.CloudAssetScannerRepository.CloudScanResult
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class CloudAssetScannerViewModel(
     private val repository: CloudAssetScannerRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _uiState = MutableStateFlow(CloudScanResult())
     val uiState: StateFlow<CloudScanResult> = _uiState.asStateFlow()
@@ -28,7 +35,7 @@ class CloudAssetScannerViewModel(
     }
 
     fun scanAssets(domain: String) {
-        if (domain.isBlank()) return
+        if (domain.isBlank() || isPassiveMode.value) return
         
         val taskName = "Cloud Discovery ($domain)"
         ActiveTaskMonitor.addTask(taskName)

@@ -8,5 +8,6 @@ interface ScanSessionRepository {
     suspend fun saveDiscoveredNodes(nodes: List<NetworkNode>, networkName: String?, gatewayIp: String?)
     suspend fun updateNodeDetails(node: NetworkNode)
     suspend fun getNodeByIp(ip: String): NetworkNode?
+    suspend fun getLastSessionGatewayIp(): String?
     suspend fun clearAllData()
 }

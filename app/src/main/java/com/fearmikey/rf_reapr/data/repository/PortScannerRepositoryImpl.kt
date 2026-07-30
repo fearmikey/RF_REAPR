@@ -27,11 +27,19 @@ class PortScannerRepositoryImpl : PortScannerRepository {
         53 to "DNS",
         80 to "HTTP",
         110 to "POP3",
+        111 to "SunRPC",
+        135 to "RPC",
+        139 to "NetBIOS",
         143 to "IMAP",
         443 to "HTTPS",
+        445 to "SMB",
+        1433 to "MSSQL",
         3306 to "MySQL",
+        3389 to "RDP",
         5432 to "PostgreSQL",
         8080 to "HTTP-Proxy",
+        8443 to "HTTPS-Alt",
+        8843 to "HTTPS-Alt",
     )
 
     override fun setConfig(ipAddress: String, portRange: IntRange) {

@@ -5,15 +5,22 @@ import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.DnsAuditResult
 import com.fearmikey.rf_reapr.domain.repository.DnsAuditorRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class DnsAuditorViewModel(
     private val repository: DnsAuditorRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _auditResult = MutableStateFlow<DnsAuditResult?>(null)
     val auditResult: StateFlow<DnsAuditResult?> = _auditResult.asStateFlow()
@@ -22,6 +29,7 @@ class DnsAuditorViewModel(
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     fun runAudit() {
+        if (isPassiveMode.value) return
         viewModelScope.launch {
             _isLoading.value = true
             val result = repository.auditDns()

@@ -31,6 +31,7 @@ fun TlsCipherScannerScreen(
 ) {
     var url by remember { mutableStateOf("https://google.com") }
     val uiState by viewModel.uiState.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val clipboardManager = LocalClipboardManager.current
 
@@ -57,6 +58,7 @@ fun TlsCipherScannerScreen(
                 onValueChange = { url = it },
                 label = { Text("Target URL") },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isPassiveMode,
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Uri,
@@ -65,13 +67,22 @@ fun TlsCipherScannerScreen(
                 ),
                 keyboardActions = KeyboardActions(
                     onSearch = {
-                        if (url.isNotBlank()) {
+                        if (url.isNotBlank() && !isPassiveMode) {
                             viewModel.startScan(url)
                             keyboardController?.hide()
                         }
                     }
                 )
             )
+
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). TLS scanning inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -81,7 +92,7 @@ fun TlsCipherScannerScreen(
                     keyboardController?.hide()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.progress == 0f || uiState.isFinished
+                enabled = (uiState.progress == 0f || uiState.isFinished) && !isPassiveMode
             ) {
                 Icon(Icons.Default.Search, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

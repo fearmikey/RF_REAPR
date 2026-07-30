@@ -40,7 +40,7 @@ import com.fearmikey.rf_reapr.data.db.entity.SessionNodeCrossRef
         HidScriptEntity::class,
         HidAssetEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)

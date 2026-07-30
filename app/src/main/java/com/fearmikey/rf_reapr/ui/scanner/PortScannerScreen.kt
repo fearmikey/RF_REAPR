@@ -56,6 +56,7 @@ fun PortScannerScreen(
     val foundPorts by viewModel.foundPorts.collectAsState()
     val progress by viewModel.progress.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val eta by viewModel.eta.collectAsState()
     val isApiKeySet by viewModel.isApiKeySet.collectAsState()
 
@@ -189,7 +190,7 @@ fun PortScannerScreen(
                         pendingScanType = ScanType.Common
                         showWarningDialog = true
                     },
-                    enabled = !isScanning,
+                    enabled = !isScanning && !isPassiveMode,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Common Ports")
@@ -200,7 +201,7 @@ fun PortScannerScreen(
                         keyboardController?.hide()
                         showManualPortDialog = true
                     },
-                    enabled = !isScanning,
+                    enabled = !isScanning && !isPassiveMode,
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Manual Selection")
@@ -401,6 +402,7 @@ fun PortScannerScreen(
             PortResultsList(
                 foundPorts = foundPorts,
                 ipAddress = ipAddress.text,
+                isPassiveMode = isPassiveMode,
                 onPortClick = onPortClick
             )
         }
@@ -411,6 +413,14 @@ fun PortScannerScreen(
                 port = port,
                 onDismiss = { selectedPortDetails = null }
             )
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). Scanning is inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
     }
 }
@@ -419,6 +429,7 @@ fun PortScannerScreen(
 fun PortResultsList(
     foundPorts: List<OpenPort>,
     ipAddress: String,
+    isPassiveMode: Boolean,
     onPortClick: (OpenPort) -> Unit
 ) {
     val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -437,8 +448,17 @@ fun PortResultsList(
             AuditResultCard(
                 ipAddress = ipAddress,
                 port = port,
+                isPassiveMode = isPassiveMode,
                 onClick = { onPortClick(port) }
             )
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). Scanning is inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
     }
 }
@@ -476,11 +496,14 @@ fun Modifier.verticalScrollbar(
 fun AuditResultCard(
     ipAddress: String,
     port: OpenPort,
+    isPassiveMode: Boolean,
     onClick: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
     val isWeb = isWebService(port.port, port.serviceName, port.banner)
-    val hasVulns = port.vulnerabilities.isNotEmpty()
+    val vulns = port.vulnerabilities
+    val hasVulns = vulns.isNotEmpty()
+    val allUnconfirmed = hasVulns && vulns.all { !it.isConfirmed }
 
     Surface(
         modifier = Modifier
@@ -488,7 +511,11 @@ fun AuditResultCard(
             .padding(vertical = 4.dp)
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
-        color = if (hasVulns) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
+        color = when {
+            allUnconfirmed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+            hasVulns -> MaterialTheme.colorScheme.errorContainer
+            else -> MaterialTheme.colorScheme.surfaceVariant
+        },
         tonalElevation = if (hasVulns) 0.dp else 1.dp
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -548,10 +575,18 @@ fun AuditResultCard(
             if (hasVulns) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "Vulnerabilities detected", 
+                    text = if (allUnconfirmed) "Potential vulnerabilities detected" else "Vulnerabilities detected", 
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold, 
-                    color = MaterialTheme.colorScheme.error
+                    color = if (allUnconfirmed) MaterialTheme.colorScheme.error.copy(alpha = 0.7f) else MaterialTheme.colorScheme.error
+                )
+            }
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). Scanning is inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }
@@ -614,6 +649,9 @@ fun PortDetailsDialog(
                             )) {
                                 append(vuln.cveId)
                             }
+                            if (!vuln.isConfirmed) {
+                                append(" (Potential)")
+                            }
                             append(": ${vuln.description}")
                         }
                         Text(
@@ -625,6 +663,15 @@ fun PortDetailsDialog(
                         )
                         SeverityBadge(vuln.severity)
                         Spacer(modifier = Modifier.height(4.dp))
+                    }
+
+                    if (port.vulnerabilities.any { !it.isConfirmed }) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "* Potential vulnerabilities are matched by service name only because no version banner was detected.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

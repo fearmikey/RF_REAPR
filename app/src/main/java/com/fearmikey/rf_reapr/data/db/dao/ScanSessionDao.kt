@@ -30,6 +30,9 @@ interface ScanSessionDao {
         }
     }
 
+    @Query("SELECT gatewayIp FROM scan_sessions ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLastSessionGatewayIp(): String?
+
     @Query("DELETE FROM scan_sessions")
     suspend fun deleteAllSessions()
 

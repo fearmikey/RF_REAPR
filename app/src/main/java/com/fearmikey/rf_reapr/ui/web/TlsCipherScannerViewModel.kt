@@ -3,18 +3,25 @@ package com.fearmikey.rf_reapr.ui.web
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.repository.TlsCipherScannerRepository
 import com.fearmikey.rf_reapr.domain.repository.TlsCipherScannerRepository.TlsScanResult
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class TlsCipherScannerViewModel(
     private val repository: TlsCipherScannerRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _uiState = MutableStateFlow(TlsScanResult())
     val uiState: StateFlow<TlsScanResult> = _uiState.asStateFlow()
@@ -28,7 +35,7 @@ class TlsCipherScannerViewModel(
     }
 
     fun startScan(url: String) {
-        if (url.isBlank()) return
+        if (url.isBlank() || isPassiveMode.value) return
         
         val taskName = "TLS Audit ($url)"
         ActiveTaskMonitor.addTask(taskName)

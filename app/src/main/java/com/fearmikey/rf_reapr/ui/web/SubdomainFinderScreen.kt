@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
@@ -38,11 +39,13 @@ import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository.Discov
 @Composable
 fun SubdomainFinderScreen(
     viewModel: SubdomainFinderViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToCloudScanner: (String) -> Unit
 ) {
     var domain by remember { mutableStateOf("google.com") }
     val subdomains by viewModel.subdomains.collectAsState()
     val progress by viewModel.progress.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val isFinished by viewModel.isFinished.collectAsState()
     
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -80,6 +83,7 @@ fun SubdomainFinderScreen(
                 onValueChange = { domain = it },
                 label = { Text("Target Domain") },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isPassiveMode,
                 leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Uri,
@@ -88,13 +92,22 @@ fun SubdomainFinderScreen(
                 ),
                 keyboardActions = KeyboardActions(
                     onSearch = {
-                        if (domain.isNotBlank()) {
+                        if (domain.isNotBlank() && !isPassiveMode) {
                             viewModel.startSearch(domain)
                             keyboardController?.hide()
                         }
                     }
                 )
             )
+
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). Enumeration inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -104,7 +117,7 @@ fun SubdomainFinderScreen(
                     keyboardController?.hide()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = progress == 0f || isFinished
+                enabled = (progress == 0f || isFinished) && !isPassiveMode
             ) {
                 Icon(Icons.Default.Search, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -122,7 +135,8 @@ fun SubdomainFinderScreen(
                 subdomains = subdomains,
                 isFinished = isFinished,
                 onCopy = onCopy,
-                onOpen = onOpen
+                onOpen = onOpen,
+                onCloudScan = onNavigateToCloudScanner
             )
         }
     }
@@ -133,7 +147,8 @@ fun SubdomainResultsList(
     subdomains: SubdomainFinderRepository.SubdomainListWrapper,
     isFinished: Boolean,
     onCopy: (String) -> Unit,
-    onOpen: (String) -> Unit
+    onOpen: (String) -> Unit,
+    onCloudScan: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -161,7 +176,8 @@ fun SubdomainResultsList(
                 SubdomainItemRow(
                     item = item,
                     onCopy = onCopy,
-                    onOpen = onOpen
+                    onOpen = onOpen,
+                    onCloudScan = onCloudScan
                 )
             }
             
@@ -182,7 +198,8 @@ fun SubdomainResultsList(
 fun SubdomainItemRow(
     item: SubdomainFinderRepository.SubdomainItem,
     onCopy: (String) -> Unit,
-    onOpen: (String) -> Unit
+    onOpen: (String) -> Unit,
+    onCloudScan: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -244,6 +261,14 @@ fun SubdomainItemRow(
                     modifier = Modifier
                         .size(18.dp)
                         .clickable { onOpen(item.hostname) },
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Icon(
+                    imageVector = Icons.Default.Cloud, 
+                    contentDescription = "Cloud Discovery",
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clickable { onCloudScan(item.hostname) },
                     tint = MaterialTheme.colorScheme.primary
                 )
             }

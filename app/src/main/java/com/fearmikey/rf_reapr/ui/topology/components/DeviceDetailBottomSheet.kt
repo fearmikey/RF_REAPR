@@ -10,7 +10,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +18,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.DeviceType
 import com.fearmikey.rf_reapr.domain.model.NetworkNode
@@ -35,15 +36,28 @@ fun DeviceDetailBottomSheet(
     onDismiss: () -> Unit,
     onTypeChange: (DeviceType) -> Unit = {},
     onParentChange: (String?) -> Unit = {},
-    onNavigateToCredentialTester: (String) -> Unit = {}
+    onScanPorts: (NetworkNode) -> Unit = {},
+    isPassiveMode: Boolean = false
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     var selectedPortDetails by remember { mutableStateOf<OpenPort?>(null) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+
+    // Auto-expand the sheet when ports are discovered
+    LaunchedEffect(node.openPorts.size) {
+        if (node.openPorts.isNotEmpty()) {
+            // Delay slightly to allow the LazyColumn to be measured and the sheet to update its internal constraints
+            kotlinx.coroutines.delay(300)
+            if (sheetState.currentValue != SheetValue.Expanded) {
+                sheetState.expand()
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState()
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -58,11 +72,13 @@ fun DeviceDetailBottomSheet(
                     modifier = Modifier.size(48.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = node.hostname ?: "Unknown Device",
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -84,23 +100,38 @@ fun DeviceDetailBottomSheet(
                         Text(text = "MAC: $it", style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.width(8.dp))
                 SeverityBadge(severity = node.riskLevel)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = { onNavigateToCredentialTester(node.ipAddress) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.VpnKey, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Test Credentials")
+                Button(
+                    onClick = { onScanPorts(node) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    enabled = !isPassiveMode,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Scan Ports", 
+                        style = MaterialTheme.typography.labelLarge,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -186,13 +217,14 @@ fun DeviceDetailBottomSheet(
                 )
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(node.openPorts) { port ->
                         AuditResultCard(
                             ipAddress = node.ipAddress,
                             port = port,
+                            isPassiveMode = isPassiveMode,
                             onClick = { selectedPortDetails = port }
                         )
                     }

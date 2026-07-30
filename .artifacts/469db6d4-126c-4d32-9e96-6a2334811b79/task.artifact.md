@@ -1,0 +1,3 @@
+- [x] Remove Credential Tester from `DeviceDetailBottomSheet.kt`
+- [x] Delete Credential Tester source files
+- [x] Verify build

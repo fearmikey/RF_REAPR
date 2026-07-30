@@ -5,17 +5,24 @@ import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.DiscoveredService
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.ServiceDiscoveryRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ServiceDiscoveryViewModel(
     private val repository: ServiceDiscoveryRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _services = MutableStateFlow<List<DiscoveredService>>(emptyList())
     val services: StateFlow<List<DiscoveredService>> = _services.asStateFlow()
@@ -34,6 +41,7 @@ class ServiceDiscoveryViewModel(
     }
 
     fun startDiscovery() {
+        if (isPassiveMode.value) return
         _isScanning.value = true
         val taskName = "Service Discovery"
         ActiveTaskMonitor.addTask(taskName)

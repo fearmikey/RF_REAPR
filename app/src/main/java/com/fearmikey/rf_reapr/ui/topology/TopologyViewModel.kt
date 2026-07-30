@@ -32,6 +32,9 @@ class TopologyViewModel(
         .map { it.isNotBlank() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _mappedGraph = MutableStateFlow<MappedGraph?>(null)
     val mappedGraph: StateFlow<MappedGraph?> = _mappedGraph.asStateFlow()
 
@@ -40,6 +43,9 @@ class TopologyViewModel(
 
     private val _isAuditing = MutableStateFlow(false)
     val isAuditing: StateFlow<Boolean> = _isAuditing.asStateFlow()
+
+    private val _showNetworkMismatchDialog = MutableStateFlow(false)
+    val showNetworkMismatchDialog: StateFlow<Boolean> = _showNetworkMismatchDialog.asStateFlow()
     
     private val gson = Gson()
 
@@ -74,7 +80,12 @@ class TopologyViewModel(
      * Starts a full network discovery and maps the topology.
      */
     fun startNetworkDiscovery() {
+        if (isPassiveMode.value) return
         viewModelScope.launch {
+            // Clear previous scan data before starting a new discovery session
+            scanSessionRepository.clearAllData()
+            _mappedGraph.value = null
+            
             val networkInfo = discoveryRepository.getLocalNetworkInfo()
             discoveryRepository.discoverDevices().collect { result ->
                 _discoveryState.value = result
@@ -101,59 +112,98 @@ class TopologyViewModel(
     }
 
     /**
-     * Audits all current nodes for high-impact ports and vulnerabilities.
+     * Checks if current network matches the one from the last scan.
+     * If not, prompts for rescan. Otherwise, starts audit.
      */
     fun auditHighImpactPorts() {
+        if (isPassiveMode.value) return
         viewModelScope.launch {
-            _isAuditing.value = true
-            val nodes = _mappedGraph.value?.nodes?.map { it.node } ?: emptyList()
-            nodes.forEach { node ->
-                portScannerRepository.setConfig(node.ipAddress, NetworkNode.HIGH_IMPACT_PORTS)
-                portScannerRepository.startScan().collect { result ->
-                    if (result is NetworkScanner.ScanResult.Finished) {
-                        // 1. Fetch latest state to avoid overwriting manual changes
-                        val latestNode = scanSessionRepository.getNodeByIp(node.ipAddress) ?: node
-                        
-                        // 2. Audit found ports for vulnerabilities
-                        val auditedPorts = result.foundData.map { port ->
-                            val vulns = vulnerabilityRepository.lookupVulnerabilities(port.serviceName, port.banner)
-                            port.copy(vulnerabilities = vulns)
-                        }
-                        
-                        // 3. Only auto-identify if type is currently UNKNOWN
-                        val newDeviceType = if (latestNode.deviceType == DeviceType.UNKNOWN) {
-                            DeviceIdentificationService.identifyDevice(
-                                ipAddress = latestNode.ipAddress,
-                                macAddress = latestNode.macAddress,
-                                hostname = latestNode.hostname,
-                                openPorts = auditedPorts
-                            )
-                        } else {
-                            latestNode.deviceType
-                        }
-                        
-                        val updatedNode = latestNode.copy(
-                            openPorts = auditedPorts,
-                            riskLevel = calculateHighestRisk(auditedPorts),
-                            deviceType = newDeviceType,
-                            manufacturer = latestNode.manufacturer ?: DeviceIdentificationService.getManufacturer(latestNode.macAddress)
+            val currentNetwork = discoveryRepository.getLocalNetworkInfo()
+            val lastGatewayIp = scanSessionRepository.getLastSessionGatewayIp()
+
+            if (lastGatewayIp != null && currentNetwork.gatewayIp != lastGatewayIp) {
+                _showNetworkMismatchDialog.value = true
+            } else {
+                viewModelScope.launch {
+                    _isAuditing.value = true
+                    val nodes = _mappedGraph.value?.nodes?.map { it.node } ?: emptyList()
+                    nodes.forEach { node ->
+                        scanSingleNode(node)
+                    }
+                    _isAuditing.value = false
+                    
+                    // Log the audit completion
+                    val currentGraph = _mappedGraph.value
+                    if (currentGraph != null) {
+                        logRepository.saveLog(
+                            type = "TOPOLOGY",
+                            summary = "Completed audit of ${currentGraph.nodes.size} network nodes",
+                            detailJson = gson.toJson(currentGraph)
                         )
-                        scanSessionRepository.updateNodeDetails(updatedNode)
                     }
                 }
             }
+        }
+    }
+
+    fun scanSingleNodeTrigger(node: NetworkNode) {
+        if (isPassiveMode.value) return
+        viewModelScope.launch {
+            _isAuditing.value = true
+            scanSingleNode(node)
             _isAuditing.value = false
             
-            // Log the audit completion
-            val currentGraph = _mappedGraph.value
-            if (currentGraph != null) {
-                logRepository.saveLog(
-                    type = "TOPOLOGY",
-                    summary = "Completed audit of ${currentGraph.nodes.size} network nodes",
-                    detailJson = gson.toJson(currentGraph)
+            logRepository.saveLog(
+                type = "TOPOLOGY",
+                summary = "Completed individual audit for ${node.ipAddress}",
+                detailJson = gson.toJson(node)
+            )
+        }
+    }
+
+    private suspend fun scanSingleNode(node: NetworkNode) {
+        portScannerRepository.setConfig(node.ipAddress, NetworkNode.HIGH_IMPACT_PORTS)
+        portScannerRepository.startScan().collect { result ->
+            if (result is NetworkScanner.ScanResult.Finished) {
+                // 1. Fetch latest state to avoid overwriting manual changes
+                val latestNode = scanSessionRepository.getNodeByIp(node.ipAddress) ?: node
+                
+                // 2. Audit found ports for vulnerabilities
+                val auditedPorts = result.foundData.map { port ->
+                    val vulns = vulnerabilityRepository.lookupVulnerabilities(port.serviceName, port.banner)
+                    port.copy(vulnerabilities = vulns)
+                }
+                
+                // 3. Only auto-identify if type is currently UNKNOWN
+                val newDeviceType = if (latestNode.deviceType == DeviceType.UNKNOWN) {
+                    DeviceIdentificationService.identifyDevice(
+                        ipAddress = latestNode.ipAddress,
+                        macAddress = latestNode.macAddress,
+                        hostname = latestNode.hostname,
+                        openPorts = auditedPorts
+                    )
+                } else {
+                    latestNode.deviceType
+                }
+                
+                val updatedNode = latestNode.copy(
+                    openPorts = auditedPorts,
+                    riskLevel = calculateHighestRisk(auditedPorts),
+                    deviceType = newDeviceType,
+                    manufacturer = latestNode.manufacturer ?: DeviceIdentificationService.getManufacturer(latestNode.macAddress)
                 )
+                scanSessionRepository.updateNodeDetails(updatedNode)
             }
         }
+    }
+
+    fun dismissNetworkMismatchDialog() {
+        _showNetworkMismatchDialog.value = false
+    }
+
+    fun confirmNetworkMismatchRescan() {
+        _showNetworkMismatchDialog.value = false
+        startNetworkDiscovery()
     }
 
     fun clearData() {

@@ -48,6 +48,13 @@ class SettingsViewModel(
             initialValue = true
         )
 
+    val isPassiveMode: StateFlow<Boolean> = repository.isPassiveMode
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     fun setThemePreference(preference: ThemePreference) {
         viewModelScope.launch {
             repository.setThemePreference(preference)
@@ -69,6 +76,12 @@ class SettingsViewModel(
     fun setCameraShortcutEnabled(enabled: Boolean) {
         viewModelScope.launch {
             repository.setCameraShortcutEnabled(enabled)
+        }
+    }
+
+    fun setPassiveMode(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setPassiveMode(enabled)
         }
     }
 }

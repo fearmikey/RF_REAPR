@@ -35,6 +35,9 @@ class PortScannerViewModel(
         .map { it.isNotBlank() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _foundPorts = MutableStateFlow<List<OpenPort>>(emptyList())
     val foundPorts: StateFlow<List<OpenPort>> = _foundPorts.asStateFlow()
 
@@ -88,6 +91,10 @@ class PortScannerViewModel(
     }
 
     private fun initiateScan() {
+        if (isPassiveMode.value) {
+            _isScanning.value = false
+            return
+        }
         startTime = System.currentTimeMillis()
         _eta.value = "Calculating..."
         _isScanning.value = true

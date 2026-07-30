@@ -51,6 +51,10 @@ class ScanSessionRepositoryImpl(
         return networkDao.getNodeByIp(ip)?.toDomain()
     }
 
+    override suspend fun getLastSessionGatewayIp(): String? {
+        return scanSessionDao.getLastSessionGatewayIp()
+    }
+
     override suspend fun clearAllData() {
         networkDao.deleteAllNodes()
         scanSessionDao.deleteAllSessions()

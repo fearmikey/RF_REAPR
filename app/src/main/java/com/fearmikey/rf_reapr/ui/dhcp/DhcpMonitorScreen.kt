@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material3.*
@@ -28,6 +29,7 @@ fun DhcpMonitorScreen(
     onDeviceClick: (MonitoredDevice) -> Unit
 ) {
     val status by viewModel.status.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val devices by viewModel.devices.collectAsState()
 
     var showInfoDialog by remember { mutableStateOf(false) }
@@ -68,18 +70,41 @@ fun DhcpMonitorScreen(
             ) {
                 Text(
                     text = if (status is DhcpMonitorRepository.MonitoringStatus.Scanning) "Monitoring Active..." else "Monitor Inactive",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                     )
                 Switch(
                     checked = status !is DhcpMonitorRepository.MonitoringStatus.Idle,
                     onCheckedChange = { isChecked ->
                         if (isChecked) {
-                            showWarningDialog = true
+                            if (!isPassiveMode) {
+                                showWarningDialog = true
+                            }
                         } else {
                             viewModel.stopMonitoring()
                         }
-                    }
+                    },
+                    enabled = !isPassiveMode
                 )
+            }
+
+            if (isPassiveMode) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            "Passive Mode (Stealth). Network monitoring inhibited.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
             }
 
             if (status is DhcpMonitorRepository.MonitoringStatus.Scanning) {

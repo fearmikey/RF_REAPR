@@ -33,11 +33,11 @@ fun PingScreen(
     var host by remember { mutableStateOf("google.com") }
     var continuous by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val pingLines by viewModel.pingLines.collectAsState()
+    val isRunning = uiState is PingStatus.Loading || uiState is PingStatus.Progress
     val listState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
-
-    val isRunning = uiState is PingStatus.Loading || uiState is PingStatus.Progress
 
     // Auto-scroll to bottom when new lines arrive
     LaunchedEffect(pingLines.size) {
@@ -69,7 +69,7 @@ fun PingScreen(
                 onValueChange = { host = it },
                 label = { Text("Target Host or IP") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isRunning,
+                enabled = !isRunning && !isPassiveMode,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Go,
@@ -77,7 +77,7 @@ fun PingScreen(
                 ),
                 keyboardActions = KeyboardActions(
                     onGo = {
-                        if (host.isNotBlank()) {
+                        if (host.isNotBlank() && !isPassiveMode) {
                             viewModel.runPing(host, continuous)
                             keyboardController?.hide()
                         }
@@ -94,13 +94,22 @@ fun PingScreen(
                                 viewModel.runPing(host, continuous)
                                 keyboardController?.hide()
                             },
-                            enabled = host.isNotBlank()
+                            enabled = host.isNotBlank() && !isPassiveMode
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Run Ping")
                         }
                     }
                 }
             )
+
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). Pinging inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,

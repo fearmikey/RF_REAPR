@@ -31,13 +31,21 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun CloudAssetScannerScreen(
     viewModel: CloudAssetScannerViewModel,
+    initialDomain: String? = null,
     onBack: () -> Unit
 ) {
-    var domain by remember { mutableStateOf("google.com") }
+    var domain by remember { mutableStateOf(initialDomain ?: "google.com") }
     val uiState by viewModel.uiState.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+
+    LaunchedEffect(initialDomain) {
+        if (!initialDomain.isNullOrBlank()) {
+            viewModel.scanAssets(initialDomain)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -62,6 +70,7 @@ fun CloudAssetScannerScreen(
                 onValueChange = { domain = it },
                 label = { Text("Target Domain (for bucket patterns)") },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isPassiveMode,
                 leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Uri,
@@ -70,13 +79,22 @@ fun CloudAssetScannerScreen(
                 ),
                 keyboardActions = KeyboardActions(
                     onSearch = {
-                        if (domain.isNotBlank()) {
+                        if (domain.isNotBlank() && !isPassiveMode) {
                             viewModel.scanAssets(domain)
                             keyboardController?.hide()
                         }
                     }
                 )
             )
+
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). Cloud discovery inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -86,7 +104,7 @@ fun CloudAssetScannerScreen(
                     keyboardController?.hide()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.progress == 0f || uiState.isFinished
+                enabled = (uiState.progress == 0f || uiState.isFinished) && !isPassiveMode
             ) {
                 Icon(Icons.Default.Search, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

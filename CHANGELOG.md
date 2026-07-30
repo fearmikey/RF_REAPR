@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.4] - 2026-07-30
+
+### Added
+- **System**: Introduced "Passive Mode" (Stealth) vs. "Active Mode" (Detectable) global toggle.
+- **UI/UX**: Redesigned Main Menu with categorized toolkit cards and tool inhibitions for stealth operations.
+- **Network Auditing**:
+    - Integrated Service Discovery (mDNS) and UPnP/NAT-PMP Auditor.
+    - Added DNS Security Auditor and Visual Traceroute.
+    - Added ARP Spoofing Detector.
+- **Physical Access**: Integrated HID Injector and Magnetometer into the toolkit.
+- **Web & Infrastructure**: Added Subdomain Enumerator, TLS Cipher Scanner, and Cloud Asset Discovery.
+
+### Changed
+- **Architecture**: Significant expansion of the Repository pattern to support new network and physical audit tools.
+- **Maintenance**: Version bump to 1.4.4.
+
+### Removed
+- **Modules**: Removed deprecated Credential Tester and legacy HID Script Parser.
+
 ## [1.4.3] - 2026-07-30
 
 ### Added

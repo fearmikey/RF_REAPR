@@ -7,19 +7,26 @@ import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.HidPayload
 import com.fearmikey.rf_reapr.domain.repository.HidAssetRepository
 import com.fearmikey.rf_reapr.domain.repository.HidRepository
-import com.fearmikey.rf_reapr.domain.service.HidScriptParser
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
+import java.io.BufferedWriter
 import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 
 class HidInjectorViewModel(
     private val repository: HidRepository,
     private val assetRepository: HidAssetRepository,
-    private val parser: HidScriptParser
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _scripts = MutableStateFlow<List<HidPayload>>(emptyList())
     val scripts: StateFlow<List<HidPayload>> = _scripts.asStateFlow()
@@ -33,8 +40,8 @@ class HidInjectorViewModel(
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
 
-    private val _isExecuting = MutableStateFlow(false)
-    val isExecuting: StateFlow<Boolean> = _isExecuting.asStateFlow()
+    private val _isFlashing = MutableStateFlow(false)
+    val isFlashing: StateFlow<Boolean> = _isFlashing.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -76,25 +83,51 @@ class HidInjectorViewModel(
         addLog("Loaded script: ${payload.name}")
     }
 
-    fun runScript() {
-        if (_isExecuting.value) return
+    fun flashScript(uri: Uri, context: Context) {
+        if (_isFlashing.value || isPassiveMode.value) {
+            if (isPassiveMode.value) addLog("Passive Mode enabled. HID injection inhibited.")
+            return
+        }
+        
+        viewModelScope.launch {
+            _isFlashing.value = true
+            addLog("Flashing script to: ${uri.path}")
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    BufferedWriter(OutputStreamWriter(outputStream)).use { writer ->
+                        writer.write(_currentScript.value)
+                    }
+                    addLog("Flashing successful!")
+                } ?: throw Exception("Could not open output stream")
+            } catch (e: Exception) {
+                addLog("Flashing failed: ${e.message}")
+            } finally {
+                _isFlashing.value = false
+            }
+        }
+    }
+
+    fun flashSavedScript(payload: HidPayload, uri: Uri, context: Context) {
+        if (_isFlashing.value || isPassiveMode.value) {
+            if (isPassiveMode.value) addLog("Passive Mode enabled. HID injection inhibited.")
+            return
+        }
 
         viewModelScope.launch {
-            _isExecuting.value = true
-            addLog("Starting execution...")
-            parser.parseAndExecute(
-                script = _currentScript.value,
-                onLog = { log -> addLog(log) },
-                onRetrieve = { fileName ->
-                    val asset = assetRepository.saveAsset(
-                        name = fileName,
-                        content = "Retrieved content for $fileName\nTimestamp: ${System.currentTimeMillis()}"
-                    )
-                    addLog("Asset saved to: ${asset.path}")
-                }
-            )
-            addLog("Execution finished.")
-            _isExecuting.value = false
+            _isFlashing.value = true
+            addLog("Flashing ${payload.name} to: ${uri.path}")
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    BufferedWriter(OutputStreamWriter(outputStream)).use { writer ->
+                        writer.write(payload.script)
+                    }
+                    addLog("Flashing ${payload.name} successful!")
+                } ?: throw Exception("Could not open output stream")
+            } catch (e: Exception) {
+                addLog("Flashing failed: ${e.message}")
+            } finally {
+                _isFlashing.value = false
+            }
         }
     }
 

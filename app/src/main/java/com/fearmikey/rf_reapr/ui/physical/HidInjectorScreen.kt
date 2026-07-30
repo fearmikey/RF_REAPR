@@ -11,7 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.fearmikey.rf_reapr.domain.model.HidPayload
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,16 +33,36 @@ fun HidInjectorScreen(
     val scripts by viewModel.scripts.collectAsState()
     val currentScript by viewModel.currentScript.collectAsState()
     val scriptName by viewModel.scriptName.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val logs by viewModel.logs.collectAsState()
-    val isExecuting by viewModel.isExecuting.collectAsState()
+    val isFlashing by viewModel.isFlashing.collectAsState()
 
     val context = LocalContext.current
     var showScriptList by remember { mutableStateOf(false) }
+    var scriptToFlash by remember { mutableStateOf<HidPayload?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri ->
             uri?.let { viewModel.importScript(it, context) }
+        }
+    )
+
+    val flashLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain"),
+        onResult = { uri ->
+            uri?.let { viewModel.flashScript(it, context) }
+        }
+    )
+
+    val flashSavedLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain"),
+        onResult = { uri ->
+            uri?.let { 
+                scriptToFlash?.let { payload ->
+                    viewModel.flashSavedScript(payload, it, context)
+                }
+            }
         }
     )
 
@@ -67,10 +88,14 @@ fun HidInjectorScreen(
                         Text("Assets", color = MaterialTheme.colorScheme.primary)
                     }
                     IconButton(
-                        onClick = { viewModel.runScript() },
-                        enabled = !isExecuting && currentScript.isNotBlank()
+                        onClick = { flashLauncher.launch("payload.txt") },
+                        enabled = !isFlashing && currentScript.isNotBlank() && !isPassiveMode
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = "Run", tint = if (isExecuting) Color.Gray else MaterialTheme.colorScheme.primary)
+                        Icon(
+                            imageVector = Icons.Default.Usb,
+                            contentDescription = "Flash to USB",
+                            tint = if (isFlashing || isPassiveMode) Color.Gray else MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             )
@@ -82,6 +107,21 @@ fun HidInjectorScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
+            if (isPassiveMode) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Text(
+                        "Passive Mode (Stealth). USB HID injection inhibited.",
+                        modifier = Modifier.padding(8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+
             OutlinedTextField(
                 value = scriptName,
                 onValueChange = { viewModel.onNameChange(it) },
@@ -109,7 +149,7 @@ fun HidInjectorScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Execution Logs", style = MaterialTheme.typography.titleMedium)
+            Text("Operation Logs", style = MaterialTheme.typography.titleMedium)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -173,8 +213,16 @@ fun HidInjectorScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(script.name, modifier = Modifier.weight(1f))
-                                    IconButton(onClick = { viewModel.deleteScript(script) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                    Row {
+                                        IconButton(onClick = { 
+                                            scriptToFlash = script
+                                            flashSavedLauncher.launch("${script.name}.txt")
+                                        }) {
+                                            Icon(Icons.Default.Usb, contentDescription = "Flash", tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                        IconButton(onClick = { viewModel.deleteScript(script) }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                        }
                                     }
                                 }
                                 HorizontalDivider()

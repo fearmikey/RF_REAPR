@@ -2,6 +2,7 @@ package com.fearmikey.rf_reapr.ui.permissions
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -10,7 +11,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,11 +43,27 @@ fun PermissionExplanationScreen(
     onPermissionsGranted: () -> Unit
 ) {
     val context = LocalContext.current
-    val permissionsToRequest = arrayOf(
-        Manifest.permission.BLUETOOTH_SCAN,
-        Manifest.permission.BLUETOOTH_CONNECT,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    )
+    val permissionsToRequest = remember {
+        val list = mutableListOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            list.add(Manifest.permission.BLUETOOTH_SCAN)
+            list.add(Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            list.add(Manifest.permission.BLUETOOTH)
+            list.add(Manifest.permission.BLUETOOTH_ADMIN)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            list.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        
+        list.toTypedArray()
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -97,17 +116,35 @@ fun PermissionExplanationScreen(
         
         PermissionItem(
             icon = Icons.Default.Bluetooth,
-            title = "Bluetooth Low Energy",
-            description = "Required to scan for and audit BLE devices in your vicinity."
+            title = "Radio Interfaces",
+            description = "Required to scan for and audit BLE and WiFi devices in your vicinity."
         )
         
         Spacer(modifier = Modifier.height(24.dp))
         
         PermissionItem(
             icon = Icons.Default.LocationOn,
-            title = "Precise Location",
-            description = "Android requires location access to perform WiFi and Bluetooth scans."
+            title = "Geospatial Tagging",
+            description = "Used to map signals to physical coordinates and meet system requirements for radio scanning."
         )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        PermissionItem(
+            icon = Icons.Default.Camera,
+            title = "Evidence Collection",
+            description = "Enables the capture of photographic evidence for compliance audits."
+        )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Spacer(modifier = Modifier.height(24.dp))
+
+            PermissionItem(
+                icon = Icons.Default.Notifications,
+                title = "Background Alerts",
+                description = "Keeps you informed of scan results and background task status."
+            )
+        }
         
         Spacer(modifier = Modifier.weight(1f))
         Spacer(modifier = Modifier.height(40.dp))

@@ -64,6 +64,18 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         emit(prefs.getBoolean("camera_shortcut_enabled", true))
     }
 
+    override val isPassiveMode: Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "passive_mode") {
+                trySend(p.getBoolean(key, false))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.onStart {
+        emit(prefs.getBoolean("passive_mode", false))
+    }
+
     override suspend fun setThemePreference(preference: ThemePreference) {
         prefs.edit().putString("theme_preference", preference.name).apply()
     }
@@ -92,5 +104,9 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
             state,
             PackageManager.DONT_KILL_APP
         )
+    }
+
+    override suspend fun setPassiveMode(enabled: Boolean) {
+        prefs.edit().putBoolean("passive_mode", enabled).apply()
     }
 }

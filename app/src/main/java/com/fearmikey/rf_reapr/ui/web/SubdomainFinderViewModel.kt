@@ -3,18 +3,25 @@ package com.fearmikey.rf_reapr.ui.web
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository
 import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository.SubdomainResult
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class SubdomainFinderViewModel(
     private val repository: SubdomainFinderRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _subdomains = MutableStateFlow(SubdomainFinderRepository.SubdomainListWrapper())
     val subdomains: StateFlow<SubdomainFinderRepository.SubdomainListWrapper> = _subdomains.asStateFlow()
@@ -38,7 +45,7 @@ class SubdomainFinderViewModel(
     }
 
     fun startSearch(domain: String) {
-        if (domain.isBlank()) return
+        if (domain.isBlank() || isPassiveMode.value) return
         
         viewModelScope.launch {
             _subdomains.value = SubdomainFinderRepository.SubdomainListWrapper(emptyList())

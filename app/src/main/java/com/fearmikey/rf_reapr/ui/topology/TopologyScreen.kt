@@ -29,16 +29,22 @@ import com.fearmikey.rf_reapr.ui.topology.components.NetworkNodeListState
 fun TopologyScreen(
     viewModel: TopologyViewModel,
     onBack: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToCredentialTester: (String) -> Unit
+    onNavigateToSettings: () -> Unit
 ) {
     val mappedGraph by viewModel.mappedGraph.collectAsState()
     val discoveryState by viewModel.discoveryState.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val isAuditing by viewModel.isAuditing.collectAsState()
     val isApiKeySet by viewModel.isApiKeySet.collectAsState()
+    val showNetworkMismatchDialog by viewModel.showNetworkMismatchDialog.collectAsState()
     
     var isListView by remember { mutableStateOf(false) }
-    var selectedNode by remember { mutableStateOf<NetworkNode?>(null) }
+    var selectedNodeId by remember { mutableStateOf<String?>(null) }
+    
+    val selectedNode = remember(selectedNodeId, mappedGraph) {
+        mappedGraph?.nodes?.find { it.node.id == selectedNodeId }?.node
+    }
+
     var showClearConfirmation by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showDiscoveryWarning by remember { mutableStateOf(false) }
@@ -99,12 +105,12 @@ fun TopologyScreen(
                     // Audit Ports
                     IconButton(
                         onClick = { showAuditWarning = true },
-                        enabled = !isAuditing && discoveryState !is NetworkScanner.ScanResult.Progress
+                        enabled = !isAuditing && discoveryState !is NetworkScanner.ScanResult.Progress && !isPassiveMode
                     ) {
                         Icon(
                             imageVector = Icons.Default.BugReport,
                             contentDescription = "Audit High-Impact Ports",
-                            tint = if (isAuditing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                            tint = if (isAuditing) MaterialTheme.colorScheme.error else if (isPassiveMode) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
                         )
                     }
                     IconButton(onClick = { isListView = !isListView }) {
@@ -117,8 +123,10 @@ fun TopologyScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showDiscoveryWarning = true }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Rescan Network")
+            if (!isPassiveMode) {
+                FloatingActionButton(onClick = { showDiscoveryWarning = true }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Rescan Network")
+                }
             }
         }
     ) { padding ->
@@ -133,7 +141,7 @@ fun TopologyScreen(
                     val nodesState = remember(graph) { 
                         NetworkNodeListState(graph.nodes.map { it.node }) 
                     }
-                    val onNodeClickRemembered = remember { { node: NetworkNode -> selectedNode = node } }
+                    val onNodeClickRemembered = remember { { node: NetworkNode -> selectedNodeId = node.id } }
                     NetworkNodeList(
                         state = nodesState,
                         onNodeClick = onNodeClickRemembered
@@ -141,7 +149,7 @@ fun TopologyScreen(
                 } else {
                     NetworkMapView(
                         mappedGraph = graph,
-                        onNodeClick = { selectedNode = it }
+                        onNodeClick = { selectedNodeId = it.id }
                     )
                 }
             } ?: run {
@@ -274,6 +282,35 @@ fun TopologyScreen(
                 )
             }
 
+            // NETWORK MISMATCH DIALOG
+            if (showNetworkMismatchDialog) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.dismissNetworkMismatchDialog() },
+                    title = { Text("Network Change Detected") },
+                    text = {
+                        Text(
+                            "The current network gateway does not match the one from your last scan. " +
+                            "Auditing the old network map while connected to a new network will yield incorrect results. " +
+                            "Would you like to perform a fresh network discovery first?"
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.confirmNetworkMismatchRescan()
+                            }
+                        ) {
+                            Text("Rescan Network")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.dismissNetworkMismatchDialog() }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
             if (showApiKeyRecommendation) {
                 AlertDialog(
                     onDismissRequest = { showApiKeyRecommendation = false },
@@ -357,16 +394,16 @@ fun TopologyScreen(
             DeviceDetailBottomSheet(
                 node = node,
                 allNodes = mappedGraph?.nodes?.map { it.node } ?: emptyList(),
-                onDismiss = { selectedNode = null },
+                onDismiss = { selectedNodeId = null },
+                isPassiveMode = isPassiveMode,
                 onTypeChange = { newType ->
                     viewModel.updateDeviceType(node, newType)
                 },
                 onParentChange = { newParentId ->
                     viewModel.updateParent(node, newParentId)
                 },
-                onNavigateToCredentialTester = { ip ->
-                    selectedNode = null
-                    onNavigateToCredentialTester(ip)
+                onScanPorts = { nodeToScan ->
+                    viewModel.scanSingleNodeTrigger(nodeToScan)
                 }
             )
         }

@@ -42,6 +42,7 @@ fun WebsiteInspectorScreen(
 ) {
     var url by remember { mutableStateOf("https://google.com") }
     val uiState by viewModel.uiState.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
 
     Scaffold(
@@ -67,6 +68,7 @@ fun WebsiteInspectorScreen(
                 onValueChange = { url = it },
                 label = { Text("Target URL or Domain") },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isPassiveMode,
                 leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Uri,
@@ -75,11 +77,22 @@ fun WebsiteInspectorScreen(
                 ),
                 keyboardActions = KeyboardActions(
                     onSearch = {
-                        viewModel.inspectWebsite(url)
-                        keyboardController?.hide()
+                        if (!isPassiveMode) {
+                            viewModel.inspectWebsite(url)
+                            keyboardController?.hide()
+                        }
                     }
                 )
             )
+
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). Web auditing inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
             
@@ -88,7 +101,8 @@ fun WebsiteInspectorScreen(
                     viewModel.inspectWebsite(url)
                     keyboardController?.hide()
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isPassiveMode
             ) {
                 Text("Run Comprehensive Audit")
             }

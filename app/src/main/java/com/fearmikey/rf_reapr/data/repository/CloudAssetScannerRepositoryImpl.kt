@@ -16,27 +16,7 @@ class CloudAssetScannerRepositoryImpl(
 ) : CloudAssetScannerRepository {
 
     override fun scanAssets(domain: String): Flow<CloudScanResult> = channelFlow {
-        val baseName = domain.substringBefore(".")
-        val patterns = listOf(
-            // AWS S3
-            "AWS S3" to "https://$domain.s3.amazonaws.com",
-            "AWS S3" to "https://$baseName.s3.amazonaws.com",
-            "AWS S3" to "https://$baseName-data.s3.amazonaws.com",
-            "AWS S3" to "https://$baseName-backup.s3.amazonaws.com",
-            "AWS S3" to "https://$baseName-public.s3.amazonaws.com",
-            "AWS S3" to "https://s3.amazonaws.com/$domain",
-            "AWS S3" to "https://s3.amazonaws.com/$baseName",
-            
-            // Google Cloud Storage
-            "Google Cloud" to "https://storage.googleapis.com/$domain",
-            "Google Cloud" to "https://storage.googleapis.com/$baseName",
-            "Google Cloud" to "https://$domain.storage.googleapis.com",
-            
-            // Azure Blobs
-            "Azure Blob" to "https://$baseName.blob.core.windows.net",
-            "Azure Blob" to "https://$baseName-data.blob.core.windows.net"
-        )
-
+        val patterns = generatePatterns(domain)
         val discovered = Collections.synchronizedList(mutableListOf<CloudAsset>())
         val processed = AtomicInteger(0)
         val total = patterns.size
@@ -63,7 +43,7 @@ class CloudAssetScannerRepositoryImpl(
                     } finally {
                         val current = processed.incrementAndGet()
                         val progress = current.toFloat() / total
-                        if (current % 2 == 0 || current == total) {
+                        if (current % 10 == 0 || current == total) {
                             send(CloudScanResult(discovered.toList(), progress))
                         }
                     }
@@ -71,5 +51,54 @@ class CloudAssetScannerRepositoryImpl(
             }
         }
         send(CloudScanResult(discovered.toList(), 1f, isFinished = true))
+    }
+
+    private fun generatePatterns(domain: String): List<Pair<String, String>> {
+        val baseName = domain.substringBefore(".")
+        val keywords = listOf(
+            "dev", "prod", "staging", "test", "assets", "backup", "data", "logs",
+            "config", "static", "public", "private", "internal", "files", "media", "web", "storage"
+        )
+        val awsRegions = listOf("us-east-1", "us-west-1", "us-west-2", "eu-west-1", "eu-central-1")
+        val doRegions = listOf("nyc3", "ams3", "sgp1", "sfo2")
+        val linodeRegions = listOf("us-east-1", "eu-central-1", "ap-south-1")
+
+        val patterns = mutableListOf<Pair<String, String>>()
+
+        fun addPermutations(platform: String, format: (String) -> String) {
+            patterns.add(platform to format(baseName))
+            patterns.add(platform to format(domain))
+            keywords.forEach { kw ->
+                patterns.add(platform to format("$baseName-$kw"))
+                patterns.add(platform to format("$kw-$baseName"))
+                patterns.add(platform to format("$baseName.$kw"))
+                patterns.add(platform to format("$kw.$baseName"))
+            }
+        }
+
+        // AWS S3
+        addPermutations("AWS S3") { "https://$it.s3.amazonaws.com" }
+        awsRegions.forEach { region ->
+            addPermutations("AWS S3 ($region)") { "https://$it.s3.$region.amazonaws.com" }
+        }
+
+        // Google Cloud Storage
+        addPermutations("Google Cloud") { "https://storage.googleapis.com/$it" }
+        addPermutations("Google Cloud") { "https://$it.storage.googleapis.com" }
+
+        // Azure Blobs
+        addPermutations("Azure Blob") { "https://$it.blob.core.windows.net" }
+
+        // DigitalOcean Spaces
+        doRegions.forEach { region ->
+            addPermutations("DigitalOcean ($region)") { "https://$it.$region.digitaloceanspaces.com" }
+        }
+
+        // Linode Objects
+        linodeRegions.forEach { region ->
+            addPermutations("Linode ($region)") { "https://$it.$region.linodeobjects.com" }
+        }
+
+        return patterns.distinctBy { it.second }
     }
 }

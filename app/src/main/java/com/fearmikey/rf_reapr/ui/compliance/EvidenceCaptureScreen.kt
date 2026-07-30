@@ -36,8 +36,12 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.FolderSpecial
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,10 +92,6 @@ fun EvidenceCaptureScreen(
     var showProjectSettings by remember { mutableStateOf(false) }
     var captureNotes by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        permissionState.launchMultiplePermissionRequest()
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -133,17 +133,10 @@ fun EvidenceCaptureScreen(
                 onNotesChange = { captureNotes = it }
             )
         } else {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Permissions required for camera and location.")
-                    Button(onClick = { permissionState.launchMultiplePermissionRequest() }) {
-                        Text("Grant Permissions")
-                    }
-                }
-            }
+            PermissionDeniedContent(
+                modifier = Modifier.padding(padding),
+                onGrant = { permissionState.launchMultiplePermissionRequest() }
+            )
         }
 
         if (showFolderSelector) {
@@ -244,6 +237,67 @@ fun EvidenceCaptureScreen(
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun PermissionDeniedContent(
+    modifier: Modifier = Modifier,
+    onGrant: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF00050A))
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Security,
+            contentDescription = null,
+            tint = Color(0xFFEF5350), // Red
+            modifier = Modifier.size(64.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text(
+            text = "HARDWARE ACCESS BLOCKED",
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "Evidence capture requires direct access to the Camera and Location sensors for verifiable audit logging.\n\nPlease grant permissions to proceed.",
+            color = Color.Gray,
+            fontSize = 14.sp,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp
+        )
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Button(
+            onClick = onGrant,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFEF5350),
+                contentColor = Color.White
+            ),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(
+                text = "GRANT ACCESS",
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }

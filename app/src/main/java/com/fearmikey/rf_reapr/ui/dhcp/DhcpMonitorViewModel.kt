@@ -4,14 +4,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.MonitoredDevice
 import com.fearmikey.rf_reapr.domain.repository.DhcpMonitorRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class DhcpMonitorViewModel(
-    private val repository: DhcpMonitorRepository
+    private val repository: DhcpMonitorRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _status = MutableStateFlow<DhcpMonitorRepository.MonitoringStatus>(DhcpMonitorRepository.MonitoringStatus.Idle)
     val status: StateFlow<DhcpMonitorRepository.MonitoringStatus> = _status.asStateFlow()
@@ -19,6 +26,7 @@ class DhcpMonitorViewModel(
     val devices: StateFlow<List<MonitoredDevice>> = repository.activeDevices as StateFlow<List<MonitoredDevice>>
 
     fun startMonitoring() {
+        if (isPassiveMode.value) return
         viewModelScope.launch {
             repository.startMonitoring().collect {
                 _status.value = it

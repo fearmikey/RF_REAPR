@@ -40,6 +40,7 @@ fun TracerouteScreen(
 ) {
     var hostInput by remember { mutableStateOf("8.8.8.8") }
     val hops by viewModel.hops.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
@@ -76,6 +77,7 @@ fun TracerouteScreen(
                 onValueChange = { hostInput = it },
                 label = { Text("Target Host / IP") },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isPassiveMode,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Search,
@@ -83,7 +85,7 @@ fun TracerouteScreen(
                 ),
                 keyboardActions = KeyboardActions(
                     onSearch = {
-                        if (hostInput.isNotBlank()) {
+                        if (hostInput.isNotBlank() && !isPassiveMode) {
                             viewModel.startTraceroute(hostInput)
                             keyboardController?.hide()
                         }
@@ -95,7 +97,7 @@ fun TracerouteScreen(
                             viewModel.startTraceroute(hostInput)
                             keyboardController?.hide()
                         },
-                        enabled = !isScanning && hostInput.isNotBlank()
+                        enabled = !isScanning && hostInput.isNotBlank() && !isPassiveMode
                     ) {
                         Icon(Icons.Default.Search, contentDescription = "Scan")
                     }
@@ -103,6 +105,15 @@ fun TracerouteScreen(
             )
             
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (isPassiveMode) {
+                Text(
+                    "Passive Mode (Stealth). Traceroute inhibited.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
 
             if (isScanning) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())

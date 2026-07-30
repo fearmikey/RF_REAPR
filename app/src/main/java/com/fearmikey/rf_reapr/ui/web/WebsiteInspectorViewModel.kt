@@ -6,17 +6,24 @@ import com.fearmikey.rf_reapr.domain.repository.WebsiteInspectorRepository
 import com.fearmikey.rf_reapr.domain.repository.WebsiteInspectorRepository.WebsiteInspectorStatus
 import com.fearmikey.rf_reapr.domain.repository.WebsiteInspectorRepository.InspectorStatus
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
+import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class WebsiteInspectorViewModel(
     private val repository: WebsiteInspectorRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _uiState = MutableStateFlow(WebsiteInspectorStatus())
     val uiState: StateFlow<WebsiteInspectorStatus> = _uiState.asStateFlow()
@@ -31,7 +38,7 @@ class WebsiteInspectorViewModel(
     }
 
     fun inspectWebsite(url: String) {
-        if (url.isBlank()) return
+        if (url.isBlank() || isPassiveMode.value) return
         
         val taskName = "Website Audit ($url)"
         ActiveTaskMonitor.addTask(taskName)

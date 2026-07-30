@@ -10,8 +10,8 @@ object VersionUtils {
      *    1 if v1 > v2
      */
     fun compareVersions(v1: String, v2: String): Int {
-        val parts1 = v1.split('.').mapNotNull { it.toIntOrNull() ?: 0 }
-        val parts2 = v2.split('.').mapNotNull { it.toIntOrNull() ?: 0 }
+        val parts1 = v1.filter { it.isDigit() || it == '.' }.split('.').mapNotNull { it.toIntOrNull() }
+        val parts2 = v2.filter { it.isDigit() || it == '.' }.split('.').mapNotNull { it.toIntOrNull() }
         
         val length = maxOf(parts1.size, parts2.size)
         for (i in 0 until length) {

@@ -23,6 +23,7 @@ fun UpnpAuditorScreen(
     onBack: () -> Unit
 ) {
     val scanResult by viewModel.scanResult.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val isScanning = scanResult is NetworkScanner.ScanResult.Progress
 
     Scaffold(
@@ -36,12 +37,17 @@ fun UpnpAuditorScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = { if (isScanning) viewModel.stopScan() else viewModel.startScan() }
+                        onClick = { if (isScanning) viewModel.stopScan() else viewModel.startScan() },
+                        enabled = !isPassiveMode
                     ) {
                         if (isScanning) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                tint = if (isPassiveMode) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                 }
@@ -63,8 +69,27 @@ fun UpnpAuditorScreen(
             when (scanResult) {
                 is NetworkScanner.ScanResult.Idle -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Button(onClick = { viewModel.startScan() }) {
-                            Text("Start Discovery Scan")
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (isPassiveMode) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    shape = MaterialTheme.shapes.medium,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                ) {
+                                    Text(
+                                        "Passive Mode (Stealth). UPnP auditing inhibited.",
+                                        modifier = Modifier.padding(16.dp),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = { viewModel.startScan() },
+                                enabled = !isPassiveMode
+                            ) {
+                                Text("Start Discovery Scan")
+                            }
                         }
                     }
                 }

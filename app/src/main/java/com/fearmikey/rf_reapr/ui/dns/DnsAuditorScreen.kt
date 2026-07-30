@@ -21,6 +21,7 @@ fun DnsAuditorScreen(
     onBackClick: () -> Unit
 ) {
     val result by viewModel.auditResult.collectAsState()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
@@ -60,7 +61,10 @@ fun DnsAuditorScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                Button(onClick = { viewModel.runAudit() }) {
+                Button(
+                    onClick = { viewModel.runAudit() },
+                    enabled = !isPassiveMode
+                ) {
                     Text("Re-Run Audit")
                 }
             } else {
@@ -69,8 +73,28 @@ fun DnsAuditorScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
+                
+                if (isPassiveMode) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text(
+                            "Passive Mode (Stealth). DNS auditing inhibited.",
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(32.dp))
-                Button(onClick = { viewModel.runAudit() }, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { viewModel.runAudit() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isPassiveMode
+                ) {
                     Icon(Icons.Default.LockPerson, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Start DNS Audit")

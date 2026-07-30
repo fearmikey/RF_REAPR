@@ -52,8 +52,6 @@ import com.fearmikey.rf_reapr.ui.ping.PingViewModel
 import com.fearmikey.rf_reapr.ui.web.*
 import com.fearmikey.rf_reapr.ui.scanner.PortScannerScreen
 import com.fearmikey.rf_reapr.ui.scanner.PortScannerViewModel
-import com.fearmikey.rf_reapr.ui.scanner.CredentialTesterScreen
-import com.fearmikey.rf_reapr.ui.scanner.CredentialTesterViewModel
 import com.fearmikey.rf_reapr.ui.settings.SettingsScreen
 import com.fearmikey.rf_reapr.ui.settings.SettingsViewModel
 import com.fearmikey.rf_reapr.ui.splash.SplashScreen
@@ -66,7 +64,6 @@ import com.fearmikey.rf_reapr.ui.physical.HidAssetsScreen
 import com.fearmikey.rf_reapr.ui.physical.HidAssetsViewModel
 import com.fearmikey.rf_reapr.ui.physical.HidInjectorScreen
 import com.fearmikey.rf_reapr.ui.physical.HidInjectorViewModel
-import com.fearmikey.rf_reapr.domain.service.DuckyScriptParser
 import com.fearmikey.rf_reapr.ui.physical.MagnetometerScreen
 import com.fearmikey.rf_reapr.ui.physical.MagnetometerViewModel
 import com.fearmikey.rf_reapr.ui.wireless.BluetoothProximityFinderScreen
@@ -100,7 +97,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         notificationManager = ScanNotificationManager(this)
-        requestNotificationPermission()
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
@@ -167,10 +163,8 @@ class MainActivity : ComponentActivity() {
         val tracerouteRepository = TracerouteRepositoryImpl()
         val arpDetectorRepository = ArpDetectorRepositoryImpl(this)
         val upnpScannerRepository = UpnpScannerRepositoryImpl()
-        val credentialTesterRepository = CredentialTesterRepositoryImpl(okHttpClient)
         val hidRepository = LocalHidRepository(database.hidScriptDao())
         val hidAssetRepository = LocalHidAssetRepository(this, database.hidAssetDao())
-        val hidParser = DuckyScriptParser()
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
 
@@ -248,28 +242,28 @@ class MainActivity : ComponentActivity() {
                         NfcScannerViewModel(nfcRepository)
                     }
                     val websiteInspectorViewModel: WebsiteInspectorViewModel = viewModel {
-                        WebsiteInspectorViewModel(websiteInspectorRepository, logRepository)
+                        WebsiteInspectorViewModel(websiteInspectorRepository, logRepository, settingsRepository)
                     }
                     val subdomainFinderViewModel: SubdomainFinderViewModel = viewModel {
-                        SubdomainFinderViewModel(subdomainFinderRepository, logRepository)
+                        SubdomainFinderViewModel(subdomainFinderRepository, logRepository, settingsRepository)
                     }
                     val tlsCipherScannerViewModel: TlsCipherScannerViewModel = viewModel {
-                        TlsCipherScannerViewModel(tlsCipherScannerRepository, logRepository)
+                        TlsCipherScannerViewModel(tlsCipherScannerRepository, logRepository, settingsRepository)
                     }
                     val cloudAssetScannerViewModel: CloudAssetScannerViewModel = viewModel {
-                        CloudAssetScannerViewModel(cloudAssetScannerRepository, logRepository)
+                        CloudAssetScannerViewModel(cloudAssetScannerRepository, logRepository, settingsRepository)
                     }
                     val hibpViewModel: HibpViewModel = viewModel {
                         HibpViewModel(hibpRepository, settingsRepository)
                     }
                     val pingViewModel: PingViewModel = viewModel {
-                        PingViewModel(pingRepository, logRepository)
+                        PingViewModel(pingRepository, logRepository, settingsRepository)
                     }
                     val logViewModel: LogViewModel = viewModel {
                         LogViewModel(logRepository)
                     }
                     val dhcpViewModel: DhcpMonitorViewModel = viewModel {
-                        DhcpMonitorViewModel(dhcpRepository)
+                        DhcpMonitorViewModel(dhcpRepository, settingsRepository)
                     }
                     val complianceViewModel: ComplianceViewModel = viewModel {
                         ComplianceViewModel(complianceRepository)
@@ -288,25 +282,22 @@ class MainActivity : ComponentActivity() {
                     }
                     
                     val serviceDiscoveryViewModel: ServiceDiscoveryViewModel = viewModel {
-                        ServiceDiscoveryViewModel(serviceDiscoveryRepository, logRepository)
+                        ServiceDiscoveryViewModel(serviceDiscoveryRepository, logRepository, settingsRepository)
                     }
                     val dnsAuditorViewModel: DnsAuditorViewModel = viewModel {
-                        DnsAuditorViewModel(dnsAuditorRepository, logRepository)
+                        DnsAuditorViewModel(dnsAuditorRepository, logRepository, settingsRepository)
                     }
                     val tracerouteViewModel: TracerouteViewModel = viewModel {
-                        TracerouteViewModel(tracerouteRepository, logRepository)
+                        TracerouteViewModel(tracerouteRepository, logRepository, settingsRepository)
                     }
                     val arpDetectorViewModel: ArpDetectorViewModel = viewModel {
                         ArpDetectorViewModel(arpDetectorRepository)
                     }
                     val upnpScannerViewModel: UpnpScannerViewModel = viewModel {
-                        UpnpScannerViewModel(upnpScannerRepository)
-                    }
-                    val credentialTesterViewModel: CredentialTesterViewModel = viewModel {
-                        CredentialTesterViewModel(credentialTesterRepository)
+                        UpnpScannerViewModel(upnpScannerRepository, settingsRepository)
                     }
                     val hidInjectorViewModel: HidInjectorViewModel = viewModel {
-                        HidInjectorViewModel(hidRepository, hidAssetRepository, hidParser)
+                        HidInjectorViewModel(hidRepository, hidAssetRepository, settingsRepository)
                     }
                     val hidAssetsViewModel: HidAssetsViewModel = viewModel {
                         HidAssetsViewModel(hidAssetRepository)
@@ -327,13 +318,22 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Splash.route) {
                             SplashScreen(versionName = versionName) {
                                 val hasBluetooth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
                                 } else {
-                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED
+                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED &&
+                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED
                                 }
-                                val hasLocation = ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                val hasLocation = ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
+                                                  ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                val hasCamera = ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                                val hasNotifications = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    ActivityCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                                } else {
+                                    true
+                                }
                                 
-                                if (hasBluetooth && hasLocation) {
+                                if (hasBluetooth && hasLocation && hasCamera && hasNotifications) {
                                     navController.navigate(Screen.MainMenu.route) {
                                         popUpTo(Screen.Splash.route) { inclusive = true }
                                     }
@@ -352,9 +352,12 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable(Screen.MainMenu.route) {
-                            MainMenuScreen { route ->
-                                navController.navigate(route)
-                            }
+                            MainMenuScreen(
+                                settingsViewModel = settingsViewModel,
+                                onNavigate = { route ->
+                                    navController.navigate(route)
+                                }
+                            )
                         }
                         composable(Screen.PortScanner.route) { backStackEntry ->
                             val ip = backStackEntry.arguments?.getString("ip")
@@ -369,10 +372,7 @@ class MainActivity : ComponentActivity() {
                             TopologyScreen(
                                 viewModel = topologyViewModel,
                                 onBack = { navController.popBackStack() },
-                                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                                onNavigateToCredentialTester = { ip ->
-                                    navController.navigate(Screen.CredentialTester.createRoute(ip))
-                                }
+                                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
                             )
                         }
                         composable(Screen.WifiFingerprinter.route) {
@@ -412,17 +412,24 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.SubdomainFinder.route) {
                             SubdomainFinderScreen(
                                 viewModel = subdomainFinderViewModel,
-                            ) { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                onNavigateToCloudScanner = { domain ->
+                                    navController.navigate(Screen.CloudAssetScanner.createRoute(domain))
+                                }
+                            )
                         }
                         composable(Screen.TlsCipherScanner.route) {
                             TlsCipherScannerScreen(
                                 viewModel = tlsCipherScannerViewModel,
                             ) { navController.popBackStack() }
                         }
-                        composable(Screen.CloudAssetScanner.route) {
+                        composable(Screen.CloudAssetScanner.route) { backStackEntry ->
+                            val domain = backStackEntry.arguments?.getString("domain")
                             CloudAssetScannerScreen(
                                 viewModel = cloudAssetScannerViewModel,
-                            ) { navController.popBackStack() }
+                                initialDomain = domain,
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         composable(Screen.HibpChecker.route) {
                             HibpScreen(
@@ -542,13 +549,6 @@ class MainActivity : ComponentActivity() {
                                 viewModel = upnpScannerViewModel,
                             ) { navController.popBackStack() }
                         }
-                        composable(Screen.CredentialTester.route) { backStackEntry ->
-                            val ip = backStackEntry.arguments?.getString("ip")
-                            CredentialTesterScreen(
-                                viewModel = credentialTesterViewModel,
-                                initialIp = ip,
-                            ) { navController.popBackStack() }
-                        }
                         
                         composable(Screen.SdrController.route) {
                             SdrScreen(
@@ -600,14 +600,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
             }
         }
     }
