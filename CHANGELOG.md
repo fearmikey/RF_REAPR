@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.5] - 2026-08-01
+
+### Added
+- **Compliance & Reporting**: 
+    - Significantly enhanced PDF and DOCX report generation with detailed "Audit Logs" section.
+    - Added structured reporting for Port scans, Web scans (Cloud Assets, Subdomains, TLS Ciphers), Ping results, and Network Topology.
+    - Improved network node tables in reports to include open ports and better layout.
+- **UI/UX**: Added "View on GitHub" link in the Settings screen.
+
+### Changed
+- **Web & Infrastructure**: Refactored Web Audit view models to save structured log data (JSON), enabling rich reporting.
+- **Maintenance**: Version bump to 1.4.5.
+
 ## [1.4.4] - 2026-07-30
 
 ### Added

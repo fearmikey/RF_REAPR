@@ -274,7 +274,7 @@ class ReportRepositoryImpl(
                     canvas.drawText("${scan.networkName ?: "Unknown"} (${scan.gatewayIp ?: ""})", margin, y, paint)
                     y += 20f
                     
-                    val cols = listOf("IP Address" to 10f, "Hostname" to 150f, "Risk" to 400f)
+                    val cols = listOf("IP Address" to 10f, "Hostname" to 130f, "Ports" to 280f, "Risk" to 450f)
                     drawTableHeader(cols)
 
                     paint.textSize = 10f
@@ -285,12 +285,15 @@ class ReportRepositoryImpl(
                         }
                         
                         canvas.drawText(node.ipAddress, margin + 10f, y + 15f, paint)
-                        canvas.drawText(node.hostname ?: "N/A", margin + 150f, y + 15f, paint)
+                        canvas.drawText(node.hostname ?: "N/A", margin + 130f, y + 15f, paint)
+                        
+                        val portStr = node.openPorts.joinToString(",") { it.port.toString() }
+                        canvas.drawText(if (portStr.length > 30) portStr.take(27) + "..." else portStr, margin + 280f, y + 15f, paint)
                         
                         val prevColor = paint.color
                         paint.color = getRiskColor(node.riskLevel)
                         paint.isFakeBoldText = true
-                        canvas.drawText(node.riskLevel.name, margin + 400f, y + 15f, paint)
+                        canvas.drawText(node.riskLevel.name, margin + 450f, y + 15f, paint)
                         paint.color = prevColor
                         paint.isFakeBoldText = false
                         
@@ -447,6 +450,166 @@ class ReportRepositoryImpl(
                             }
                         }
                     }
+                }
+            }
+
+            // Event Logs
+            if (data.eventLogs.isNotEmpty()) {
+                checkNewPage(40f)
+                paint.textSize = 16f
+                paint.isFakeBoldText = true
+                canvas.drawText("Detailed Audit Logs", margin, y, paint)
+                y += 30f
+
+                data.eventLogs.forEach { log ->
+                    checkNewPage(40f)
+                    paint.textSize = 12f
+                    paint.isFakeBoldText = true
+                    canvas.drawText("${log.summary} [${log.type}]", margin, y, paint)
+                    y += 18f
+                    
+                    try {
+                        when (log.type) {
+                            "PORT" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                val ports = (dataMap["ports"] as? List<*>) ?: emptyList<Any>()
+                                if (ports.isNotEmpty()) {
+                                    val cols = listOf("Port" to 10f, "Service" to 100f, "Banner" to 250f)
+                                    drawTableHeader(cols)
+                                    paint.textSize = 9f
+                                    ports.forEach { portObj ->
+                                        if (y > pageHeight - margin - 20f) { startNewPage(); drawTableHeader(cols) }
+                                        val p = portObj as Map<*, *>
+                                        canvas.drawText(p["port"].toString().substringBefore("."), margin + 10f, y + 15f, paint)
+                                        canvas.drawText(p["serviceName"]?.toString() ?: "unknown", margin + 100f, y + 15f, paint)
+                                        canvas.drawText(p["banner"]?.toString()?.take(40) ?: "N/A", margin + 250f, y + 15f, paint)
+                                        y += 18f
+                                    }
+                                }
+                            }
+                            "WEB_CLOUD", "WEB" -> {
+                                try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    val assets = (dataMap["assets"] as? List<*>) ?: emptyList<Any>()
+                                    if (assets.isNotEmpty()) {
+                                        val cols = listOf("Platform" to 10f, "URL" to 100f, "Status" to 400f)
+                                        drawTableHeader(cols)
+                                        paint.textSize = 9f
+                                        assets.forEach { assetObj ->
+                                            if (y > pageHeight - margin - 20f) { startNewPage(); drawTableHeader(cols) }
+                                            val a = assetObj as Map<*, *>
+                                            canvas.drawText(a["platform"]?.toString() ?: "", margin + 10f, y + 15f, paint)
+                                            canvas.drawText(a["url"]?.toString()?.take(50) ?: "", margin + 100f, y + 15f, paint)
+                                            canvas.drawText(a["status"]?.toString() ?: "", margin + 400f, y + 15f, paint)
+                                            y += 18f
+                                        }
+                                    } else {
+                                        // Try WebsiteInspectorStatus
+                                        if (dataMap.containsKey("httpStatus")) {
+                                            drawWrappedText("Website Security Audit Details:", 10f, isBold = true)
+                                            drawWrappedText("HTTP Status: ${dataMap["httpStatus"]}", 9f, indent = 10f)
+                                            drawWrappedText("TLS Status: ${dataMap["tlsStatus"]}", 9f, indent = 10f)
+                                            drawWrappedText("DNS Status: ${dataMap["dnsStatus"]}", 9f, indent = 10f)
+                                        } else {
+                                            drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
+                                }
+                            }
+                            "WEB_TLS" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                val ciphers = (dataMap["ciphers"] as? List<*>) ?: emptyList<Any>()
+                                if (ciphers.isNotEmpty()) {
+                                    val cols = listOf("Protocol" to 10f, "Cipher Suite" to 100f, "Risk" to 450f)
+                                    drawTableHeader(cols)
+                                    paint.textSize = 8f
+                                    ciphers.forEach { cipherObj ->
+                                        if (y > pageHeight - margin - 20f) { startNewPage(); drawTableHeader(cols) }
+                                        val c = cipherObj as Map<*, *>
+                                        canvas.drawText(c["protocol"]?.toString() ?: "", margin + 10f, y + 15f, paint)
+                                        canvas.drawText(c["cipherSuite"]?.toString() ?: "", margin + 100f, y + 15f, paint)
+                                        canvas.drawText(c["riskLevel"]?.toString() ?: "", margin + 450f, y + 15f, paint)
+                                        y += 18f
+                                    }
+                                }
+                            }
+                            "WEB_SUBDOMAIN" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                val subdomains = (dataMap["subdomains"] as? List<*>) ?: emptyList<Any>()
+                                if (subdomains.isNotEmpty()) {
+                                    drawWrappedText("Discovered Subdomains: " + subdomains.joinToString { (it as Map<*, *>)["hostname"]?.toString() ?: "" }, 10f)
+                                }
+                            }
+                            "PING" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                val lines = (dataMap["lines"] as? List<*>) ?: emptyList<Any>()
+                                if (lines.isNotEmpty()) {
+                                    drawWrappedText("Ping results for ${dataMap["host"]}:", 10f, isBold = true)
+                                    lines.forEach { line ->
+                                        drawWrappedText(line.toString(), 9f, indent = 20f)
+                                    }
+                                }
+                            }
+                            "TOPOLOGY" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                if (dataMap.containsKey("nodes") && dataMap.containsKey("edges")) {
+                                    // It's a MappedGraph
+                                    val nodes = (dataMap["nodes"] as? List<*>) ?: emptyList<Any>()
+                                    if (nodes.isNotEmpty()) {
+                                        drawWrappedText("Network Topology Map:", 11f, isBold = true)
+                                        val cols = listOf("IP Address" to 10f, "Hostname" to 120f, "Device" to 280f, "Risk" to 420f)
+                                        drawTableHeader(cols)
+                                        paint.textSize = 9f
+                                        nodes.forEach { nodeContainer ->
+                                            if (y > pageHeight - margin - 20f) { startNewPage(); drawTableHeader(cols) }
+                                            val container = nodeContainer as Map<*, *>
+                                            val n = container["node"] as Map<*, *>
+                                            canvas.drawText(n["ipAddress"]?.toString() ?: "", margin + 10f, y + 15f, paint)
+                                            canvas.drawText(n["hostname"]?.toString() ?: "N/A", margin + 120f, y + 15f, paint)
+                                            canvas.drawText(n["deviceType"]?.toString() ?: "UNKNOWN", margin + 280f, y + 15f, paint)
+                                            canvas.drawText(n["riskLevel"]?.toString() ?: "LOW", margin + 420f, y + 15f, paint)
+                                            y += 18f
+                                        }
+                                    }
+                                    val edges = (dataMap["edges"] as? List<*>) ?: emptyList<Any>()
+                                    if (edges.isNotEmpty()) {
+                                        y += 5f
+                                        drawWrappedText("Connections:", 10f, isBold = true)
+                                        edges.forEach { edgeObj ->
+                                            val e = edgeObj as Map<*, *>
+                                            drawWrappedText("${e["fromNodeId"]} -> ${e["toNodeId"]} (${e["connectionType"]})", 9f, indent = 15f)
+                                        }
+                                    }
+                                } else if (dataMap.containsKey("ipAddress")) {
+                                    // It's a single NetworkNode
+                                    drawWrappedText("Node Audit: ${dataMap["ipAddress"]} (${dataMap["hostname"] ?: "N/A"})", 11f, isBold = true)
+                                    drawWrappedText("Risk: ${dataMap["riskLevel"]}, Type: ${dataMap["deviceType"]}", 10f, indent = 10f)
+                                    val ports = (dataMap["openPorts"] as? List<*>) ?: emptyList<Any>()
+                                    if (ports.isNotEmpty()) {
+                                        drawWrappedText("Open Ports:", 10f, isBold = true, indent = 10f)
+                                        ports.forEach { portObj ->
+                                            val p = portObj as Map<*, *>
+                                            drawWrappedText("Port ${p["port"].toString().substringBefore(".")}: ${p["serviceName"]}", 9f, indent = 20f)
+                                        }
+                                    }
+                                }
+                            }
+                            else -> {
+                                // Try to see if it's JSON but not handled
+                                if (log.detailJson.startsWith("{") || log.detailJson.startsWith("[")) {
+                                    drawWrappedText("Structured Log Data (JSON):", 10f, isBold = true)
+                                    drawWrappedText(log.detailJson.take(500), 8f, color = Color.DKGRAY, indent = 10f)
+                                } else {
+                                    drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
+                    }
+                    y += 15f
                 }
             }
 
@@ -657,9 +820,159 @@ class ReportRepositoryImpl(
                     val p = document.createParagraph()
                     p.createRun().apply {
                         isBold = true
-                        setText("${log.type} [${SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(log.timestamp))}]")
+                        setText("${log.summary} [${log.type}]")
                     }
-                    document.createParagraph().createRun().setText(log.summary)
+                    
+                    try {
+                        when (log.type) {
+                            "PORT" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                val ports = (dataMap["ports"] as? List<*>) ?: emptyList<Any>()
+                                if (ports.isNotEmpty()) {
+                                    val table = document.createTable(ports.size + 1, 3)
+                                    table.getRow(0).apply {
+                                        getCell(0).text = "Port"
+                                        getCell(1).text = "Service"
+                                        getCell(2).text = "Banner"
+                                    }
+                                    ports.forEachIndexed { i, portObj ->
+                                        val row = table.getRow(i + 1)
+                                        val po = portObj as Map<*, *>
+                                        row.getCell(0).text = po["port"].toString().substringBefore(".")
+                                        row.getCell(1).text = po["serviceName"]?.toString() ?: ""
+                                        row.getCell(2).text = po["banner"]?.toString() ?: ""
+                                    }
+                                }
+                            }
+                            "WEB_CLOUD", "WEB" -> {
+                                try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    val assets = (dataMap["assets"] as? List<*>) ?: emptyList<Any>()
+                                    if (assets.isNotEmpty()) {
+                                        val table = document.createTable(assets.size + 1, 3)
+                                        table.getRow(0).apply {
+                                            getCell(0).text = "Platform"
+                                            getCell(1).text = "URL"
+                                            getCell(2).text = "Status"
+                                        }
+                                        assets.forEachIndexed { i, assetObj ->
+                                            val row = table.getRow(i + 1)
+                                            val ao = assetObj as Map<*, *>
+                                            row.getCell(0).text = ao["platform"]?.toString() ?: ""
+                                            row.getCell(1).text = ao["url"]?.toString() ?: ""
+                                            row.getCell(2).text = ao["status"]?.toString() ?: ""
+                                        }
+                                    } else {
+                                        document.createParagraph().createRun().setText(log.detailJson)
+                                    }
+                                } catch (e: Exception) {
+                                    document.createParagraph().createRun().setText(log.detailJson)
+                                }
+                            }
+                            "WEB_SUBDOMAIN" -> {
+                                try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    val subdomains = (dataMap["subdomains"] as? List<*>) ?: emptyList<Any>()
+                                    if (subdomains.isNotEmpty()) {
+                                        document.createParagraph().createRun().apply { isBold = true; setText("Discovered Subdomains:") }
+                                        val table = document.createTable(subdomains.size + 1, 2)
+                                        table.getRow(0).apply {
+                                            getCell(0).text = "Hostname"
+                                            getCell(1).text = "IP Address"
+                                        }
+                                        subdomains.forEachIndexed { i, subObj ->
+                                            val row = table.getRow(i + 1)
+                                            val so = subObj as Map<*, *>
+                                            row.getCell(0).text = so["hostname"]?.toString() ?: ""
+                                            row.getCell(1).text = so["ip"]?.toString() ?: "N/A"
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    document.createParagraph().createRun().setText(log.detailJson)
+                                }
+                            }
+                            "WEB_TLS" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                val ciphers = (dataMap["ciphers"] as? List<*>) ?: emptyList<Any>()
+                                if (ciphers.isNotEmpty()) {
+                                    val table = document.createTable(ciphers.size + 1, 3)
+                                    table.getRow(0).apply {
+                                        getCell(0).text = "Protocol"
+                                        getCell(1).text = "Cipher Suite"
+                                        getCell(2).text = "Risk"
+                                    }
+                                    ciphers.forEachIndexed { i, cipherObj ->
+                                        val row = table.getRow(i + 1)
+                                        val co = cipherObj as Map<*, *>
+                                        row.getCell(0).text = co["protocol"]?.toString() ?: ""
+                                        row.getCell(1).text = co["cipherSuite"]?.toString() ?: ""
+                                        row.getCell(2).text = co["riskLevel"]?.toString() ?: ""
+                                    }
+                                }
+                            }
+                            "PING" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                val lines = (dataMap["lines"] as? List<*>) ?: emptyList<Any>()
+                                if (lines.isNotEmpty()) {
+                                    document.createParagraph().createRun().apply {
+                                        isBold = true
+                                        setText("Ping results for ${dataMap["host"]}:")
+                                    }
+                                    lines.forEach { line ->
+                                        document.createParagraph().createRun().setText(line.toString())
+                                    }
+                                }
+                            }
+                            "TOPOLOGY" -> {
+                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                if (dataMap.containsKey("nodes") && dataMap.containsKey("edges")) {
+                                    val nodes = (dataMap["nodes"] as? List<*>) ?: emptyList<Any>()
+                                    if (nodes.isNotEmpty()) {
+                                        document.createParagraph().createRun().apply { isBold = true; setText("Network Topology Map:") }
+                                        val table = document.createTable(nodes.size + 1, 4)
+                                        table.getRow(0).apply {
+                                            getCell(0).text = "IP Address"
+                                            getCell(1).text = "Hostname"
+                                            getCell(2).text = "Device"
+                                            getCell(3).text = "Risk"
+                                        }
+                                        nodes.forEachIndexed { i, nodeContainer ->
+                                            val row = table.getRow(i + 1)
+                                            val n = (nodeContainer as Map<*, *>)["node"] as Map<*, *>
+                                            row.getCell(0).text = n["ipAddress"]?.toString() ?: ""
+                                            row.getCell(1).text = n["hostname"]?.toString() ?: ""
+                                            row.getCell(2).text = n["deviceType"]?.toString() ?: ""
+                                            row.getCell(3).text = n["riskLevel"]?.toString() ?: ""
+                                        }
+                                    }
+                                    val edges = (dataMap["edges"] as? List<*>) ?: emptyList<Any>()
+                                    if (edges.isNotEmpty()) {
+                                        document.createParagraph().createRun().apply { isBold = true; setText("Connections:") }
+                                        edges.forEach { edgeObj ->
+                                            val e = edgeObj as Map<*, *>
+                                            document.createParagraph().createRun().setText("${e["fromNodeId"]} -> ${e["toNodeId"]} (${e["connectionType"]})")
+                                        }
+                                    }
+                                } else if (dataMap.containsKey("ipAddress")) {
+                                    document.createParagraph().createRun().apply { isBold = true; setText("Node Audit: ${dataMap["ipAddress"]}") }
+                                    document.createParagraph().createRun().setText("Type: ${dataMap["deviceType"]}, Risk: ${dataMap["riskLevel"]}")
+                                    val ports = (dataMap["openPorts"] as? List<*>) ?: emptyList<Any>()
+                                    if (ports.isNotEmpty()) {
+                                        document.createParagraph().createRun().apply { isBold = true; setText("Open Ports:") }
+                                        ports.forEach { portObj ->
+                                            val p = portObj as Map<*, *>
+                                            document.createParagraph().createRun().setText("Port ${p["port"].toString().substringBefore(".")}: ${p["serviceName"]}")
+                                        }
+                                    }
+                                }
+                            }
+                            else -> {
+                                document.createParagraph().createRun().setText(log.detailJson)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        document.createParagraph().createRun().setText(log.detailJson)
+                    }
                 }
             }
 

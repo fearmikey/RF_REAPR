@@ -7,6 +7,7 @@ import com.fearmikey.rf_reapr.domain.repository.CloudAssetScannerRepository.Clou
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,8 @@ class CloudAssetScannerViewModel(
     private val logRepository: LogRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    private val gson = Gson()
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -48,9 +51,12 @@ class CloudAssetScannerViewModel(
                     
                     if (result.isFinished) {
                         logRepository.saveLog(
-                            type = "WEB",
+                            type = "WEB_CLOUD",
                             summary = "Cloud asset scan for $domain",
-                            detailJson = "Found ${result.discoveredAssets.size} potential assets."
+                            detailJson = gson.toJson(mapOf(
+                                "domain" to domain,
+                                "assets" to result.discoveredAssets
+                            ))
                         )
                     }
                 }

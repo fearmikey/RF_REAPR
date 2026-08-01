@@ -7,6 +7,7 @@ import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.repository.TlsCipherScannerRepository
 import com.fearmikey.rf_reapr.domain.repository.TlsCipherScannerRepository.TlsScanResult
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,8 @@ class TlsCipherScannerViewModel(
     private val logRepository: LogRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    private val gson = Gson()
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -48,9 +51,12 @@ class TlsCipherScannerViewModel(
                     
                     if (result.isFinished) {
                         logRepository.saveLog(
-                            type = "WEB",
+                            type = "WEB_TLS",
                             summary = "TLS Cipher scan for $url",
-                            detailJson = "Found ${result.supportedCiphers.size} supported ciphers."
+                            detailJson = gson.toJson(mapOf(
+                                "url" to url,
+                                "ciphers" to result.supportedCiphers
+                            ))
                         )
                     }
                 }

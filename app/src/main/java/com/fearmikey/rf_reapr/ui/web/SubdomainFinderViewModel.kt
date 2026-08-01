@@ -7,6 +7,7 @@ import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository
 import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository.SubdomainResult
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,8 @@ class SubdomainFinderViewModel(
     private val logRepository: LogRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    private val gson = Gson()
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -63,9 +66,12 @@ class SubdomainFinderViewModel(
                     
                     if (result.isFinished) {
                         logRepository.saveLog(
-                            type = "WEB",
+                            type = "WEB_SUBDOMAIN",
                             summary = "Subdomain scan for $domain",
-                            detailJson = "Found ${result.subdomains.size} subdomains: ${result.subdomains.joinToString { it.hostname }}"
+                            detailJson = gson.toJson(mapOf(
+                                "domain" to domain,
+                                "subdomains" to result.subdomains
+                            ))
                         )
                     }
                 }

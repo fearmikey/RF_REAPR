@@ -318,6 +318,21 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.secondary
             )
+
+            TextButton(
+                onClick = { uriHandler.openUri("https://github.com/fearmikey/RF_REAPR") },
+                modifier = Modifier.padding(top = 8.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = if (darkTheme) WebGold else Color(0xFF8B6B00)
+                ),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text(
+                    text = "View on GitHub",
+                    textDecoration = TextDecoration.Underline,
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
         }
     }
 }
