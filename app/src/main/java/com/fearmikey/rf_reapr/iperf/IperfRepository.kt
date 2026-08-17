@@ -64,7 +64,11 @@ class IperfRepository {
         bindInterfaceIp: String?,
         durationSeconds: Int = 10
     ): String = withContext(Dispatchers.IO) {
-        val args = mutableListOf("-c", serverIp, "-t", durationSeconds.toString())
+        val args = mutableListOf(
+            "-c", serverIp,
+            "-t", durationSeconds.toString(),
+            "--connect-timeout", "5000" // 5 seconds timeout
+        )
         
         // Force the traffic out of the specific interface (e.g. Ethernet Dongle)
         if (!bindInterfaceIp.isNullOrBlank()) {
