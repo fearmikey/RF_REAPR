@@ -3,19 +3,27 @@
 #include <vector>
 #include <android/log.h>
 #include <sstream>
+#include <unistd.h>
+#include <cstdio>
+#include <cstdlib>
+#include <fcntl.h>
+
+#include "iperf3/src/iperf.h"
+#include "iperf3/src/iperf_api.h"
 
 #define TAG "IperfJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
-
-// In a real implementation, you would include the iperf3 API headers here.
-// #include "iperf/iperf_api.h"
 
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_fearmikey_rf_1reapr_iperf_IperfNative_runIperfCommand(JNIEnv *env, jobject thiz, jobjectArray args) {
     int argCount = env->GetArrayLength(args);
     std::vector<std::string> cppArgs;
+    cppArgs.reserve(argCount + 1);
+
+    // argv[0] is typically the program name
+    cppArgs.push_back("iperf3");
 
     std::stringstream commandStr;
     commandStr << "iperf3 ";
@@ -29,27 +37,67 @@ Java_com_fearmikey_rf_1reapr_iperf_IperfNative_runIperfCommand(JNIEnv *env, jobj
         env->DeleteLocalRef(string);
     }
 
-    LOGI("Executing (Simulated): %s", commandStr.str().c_str());
+    std::vector<char*> argv;
+    for (size_t i = 0; i < cppArgs.size(); ++i) {
+        argv.push_back(const_cast<char*>(cppArgs[i].c_str()));
+    }
 
-    // --- REAL IMPLEMENTATION PLACEHOLDER ---
-    // Here we would call the actual iperf_run_client() API
-    // struct iperf_test *test = iperf_new_test();
-    // iperf_parse_arguments(test, argc, argv);
-    // iperf_run_client(test);
-    // iperf_free_test(test);
-    // ---------------------------------------
+    LOGI("Executing: %s", commandStr.str().c_str());
 
-    // Return a simulated success result for now
-    std::string mockResult = "Connecting to host " + cppArgs[1] + ", port 5201\n";
-    mockResult += "[  5] local 192.168.1.15 port 45226 connected to " + cppArgs[1] + " port 5201\n";
-    mockResult += "[ ID] Interval           Transfer     Bitrate\n";
-    mockResult += "[  5]   0.00-1.00   sec  11.2 MBytes  94.1 Mbits/sec\n";
-    mockResult += "[  5]   1.00-2.00   sec  11.2 MBytes  94.2 Mbits/sec\n";
-    mockResult += "- - - - - - - - - - - - - - - - - - - - - - - - -\n";
-    mockResult += "[ ID] Interval           Transfer     Bitrate         Retr\n";
-    mockResult += "[  5]   0.00-2.00   sec  22.4 MBytes  94.2 Mbits/sec    0             sender\n";
-    mockResult += "[  5]   0.00-2.00   sec  22.4 MBytes  94.2 Mbits/sec                  receiver\n";
-    mockResult += "iperf Done.\n";
+    struct iperf_test *test = iperf_new_test();
+    if (test == NULL) {
+        LOGE("Failed to create iperf test");
+        return env->NewStringUTF("Error: failed to create iperf test");
+    }
 
-    return env->NewStringUTF(mockResult.c_str());
+    iperf_defaults(test);
+
+    // Use a large memory buffer for output
+    const size_t buf_size = 1024 * 1024; // 1MB
+    char* out_buf = (char*)malloc(buf_size);
+    memset(out_buf, 0, buf_size);
+    FILE* mem_out = fmemopen(out_buf, buf_size, "w");
+    if (mem_out != NULL) {
+        test->outfile = mem_out;
+    }
+
+    int parse_res = iperf_parse_arguments(test, static_cast<int>(argv.size()), argv.data());
+    if (parse_res < 0) {
+        LOGE("Failed to parse arguments: %s", iperf_strerror(i_errno));
+        if (mem_out) {
+            fprintf(mem_out, "Error parsing arguments: %s\n", iperf_strerror(i_errno));
+        }
+    } else {
+        if (test->role == 'c') {
+            if (iperf_run_client(test) < 0) {
+                LOGE("iperf_run_client failed: %s", iperf_strerror(i_errno));
+                if (mem_out) {
+                    fprintf(mem_out, "iperf_run_client failed: %s\n", iperf_strerror(i_errno));
+                }
+            }
+        } else if (test->role == 's') {
+            if (iperf_run_server(test) < 0) {
+                LOGE("iperf_run_server failed: %s", iperf_strerror(i_errno));
+                if (mem_out) {
+                    fprintf(mem_out, "iperf_run_server failed: %s\n", iperf_strerror(i_errno));
+                }
+            }
+        } else {
+             if (mem_out) {
+                 fprintf(mem_out, "Error: Unknown role. Use -c or -s.\n");
+             }
+        }
+    }
+
+    if (mem_out != NULL) {
+        fflush(mem_out);
+        fclose(mem_out);
+    }
+
+    iperf_free_test(test);
+
+    std::string result(out_buf);
+    free(out_buf);
+
+    return env->NewStringUTF(result.c_str());
 }

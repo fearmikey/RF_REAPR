@@ -2,25 +2,42 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project("iperf_jni")
 
-# Import the prebuilt libcrypto and libssl if we wanted full features.
-# To keep this minimal and simple for this implementation, we will compile iperf3 without OpenSSL.
-# This disables authentication and TLS features of iperf3, which is usually fine for local/dongle tests.
-
 # Configure iperf build options
 add_definitions(-DHAVE_CONFIG_H)
+add_definitions(-D_GNU_SOURCE)
+add_definitions(-DWITHOUT_OPENSSL)
 
-# Define the source files for iperf3.
-# In a real environment, you'd clone the full iperf source tree. For this PoC,
-# we'll assume we have the core files or use an existing library.
-# Since getting the full iperf3 source to compile via CMake natively without configure scripts
-# is highly complex, we're going to create a dummy implementation to demonstrate the architecture
-# or pull from an existing NDK library if needed.
+# Include directories
+include_directories(iperf3/src)
 
-# We will implement the wrapper directly here for now to simulate the JNI binding.
+# iperf3 source files
+set(IPERF3_SOURCES
+    iperf3/src/cjson.c
+    iperf3/src/iperf_api.c
+    iperf3/src/iperf_error.c
+    iperf3/src/iperf_auth.c
+    iperf3/src/iperf_client_api.c
+    iperf3/src/iperf_locale.c
+    iperf3/src/iperf_server_api.c
+    iperf3/src/iperf_tcp.c
+    iperf3/src/iperf_udp.c
+    iperf3/src/iperf_sctp.c
+    iperf3/src/iperf_util.c
+    iperf3/src/iperf_time.c
+    iperf3/src/iperf_pthread.c
+    iperf3/src/dscp.c
+    iperf3/src/net.c
+    iperf3/src/tcp_info.c
+    iperf3/src/timer.c
+    iperf3/src/units.c
+)
+
+# Build a shared library combining iperf3 and JNI wrapper
 add_library(
         iperf_jni
         SHARED
         iperf_jni.cpp
+        ${IPERF3_SOURCES}
 )
 
 find_library(
