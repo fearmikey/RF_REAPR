@@ -364,6 +364,39 @@ class ReportRepositoryImpl(
                 }
             }
 
+            // iPerf Throughput Tests
+            if (data.iperfTests.isNotEmpty()) {
+                checkNewPage(40f)
+                paint.textSize = 16f
+                paint.isFakeBoldText = true
+                canvas.drawText("Network Throughput Analysis (iPerf3)", margin, y, paint)
+                y += 30f
+
+                data.iperfTests.forEach { log ->
+                    checkNewPage(60f)
+                    paint.textSize = 13f
+                    paint.isFakeBoldText = true
+                    canvas.drawText(log.summary, margin, y, paint)
+                    y += 20f
+
+                    paint.textSize = 10f
+                    paint.isFakeBoldText = false
+                    paint.typeface = Typeface.MONOSPACE
+                    
+                    val lines = log.detailJson.lines()
+                    lines.forEach { line ->
+                        if (y > pageHeight - margin - 20f) {
+                            startNewPage()
+                            paint.typeface = Typeface.MONOSPACE
+                        }
+                        canvas.drawText(line, margin + 10f, y, paint)
+                        y += 14f
+                    }
+                    paint.typeface = Typeface.DEFAULT
+                    y += 20f
+                }
+            }
+
             // Compliance
             if (data.complianceFindings.isNotEmpty()) {
                 checkNewPage(40f)
@@ -761,6 +794,33 @@ class ReportRepositoryImpl(
                             }
                         }
                     } catch (_: Exception) {}
+                }
+            }
+
+            // iPerf Throughput Tests
+            if (data.iperfTests.isNotEmpty()) {
+                val iperfSection = document.createParagraph()
+                iperfSection.createRun().apply {
+                    addBreak()
+                    isBold = true
+                    fontSize = 14
+                    setText("Network Throughput Analysis (iPerf3)")
+                }
+
+                data.iperfTests.forEach { log ->
+                    document.createParagraph().createRun().apply {
+                        isBold = true
+                        setText(log.summary)
+                    }
+
+                    val lines = log.detailJson.lines()
+                    lines.forEach { line ->
+                        document.createParagraph().createRun().apply {
+                            fontFamily = "Courier New"
+                            fontSize = 9
+                            setText(line)
+                        }
+                    }
                 }
             }
 

@@ -78,6 +78,7 @@ import com.fearmikey.rf_reapr.ui.report.*
 import com.fearmikey.rf_reapr.ui.sdr.SdrScreen
 import com.fearmikey.rf_reapr.ui.sdr.SdrViewModel
 import com.fearmikey.rf_reapr.ui.iperf.IperfScreen
+import com.fearmikey.rf_reapr.ui.iperf.IperfViewModel
 import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -314,6 +315,10 @@ class MainActivity : ComponentActivity() {
 
                     val sdrViewModel: SdrViewModel = viewModel {
                         SdrViewModel(sdrRepository)
+                    }
+
+                    val iperfViewModel: IperfViewModel = viewModel {
+                        IperfViewModel(logRepository)
                     }
 
                     NavHost(
@@ -578,7 +583,10 @@ class MainActivity : ComponentActivity() {
                         }
                         
                         composable(Screen.IperfTester.route) {
-                            IperfScreen(onBack = { navController.popBackStack() })
+                            IperfScreen(
+                                viewModel = iperfViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         
                         // Log Routes
@@ -596,6 +604,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.PingLogs.route) {
                             LogListScreen("PING", "Ping Report Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.IperfLogs.route) {
+                            LogListScreen("IPERF", "iPerf Tester Logs", logViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.TopologyLogs.route) {
                             LogListScreen("TOPOLOGY", "Network Map Logs", logViewModel) { navController.popBackStack() }

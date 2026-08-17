@@ -116,6 +116,16 @@ fun ReportBuilderScreen(
                 )
             }
 
+            item { SectionHeader("iPerf Throughput Tests", Icons.Default.NetworkPing) }
+            items(state.availableIperfTests) { test ->
+                SelectionItem(
+                    title = test.summary,
+                    subtitle = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(test.timestamp)),
+                    isSelected = test.id in state.selectedIperfTestIds,
+                    onToggle = { viewModel.toggleIperfTest(test.id) }
+                )
+            }
+
             item { SectionHeader("Evidence Projects", Icons.Default.PhotoLibrary) }
             items(state.availableProjects) { project ->
                 SelectionItem(

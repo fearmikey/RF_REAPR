@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.7] - 2026-08-17
+
+### Added
+- **Network Auditing**:
+    - Added **Iperf throughput results** to the automated Report Builder (PDF and DOCX).
+    - Enhanced `IperfScreen` with a real-time bandwidth chart for visual performance tracking.
+- **Web & Infrastructure**:
+    - Improved **Shodan integration** with better domain search support and API key validation.
+- **Architecture**:
+    - Stabilized `iperf3` JNI implementation with robust error handling and pthread synchronization fixes.
+    - Optimized native build process and removed redundant source files.
+
+### Changed
+- **Maintenance**: Version bump to 1.4.7.
+
 ## [1.4.6] - 2026-08-17
 
 ### Added

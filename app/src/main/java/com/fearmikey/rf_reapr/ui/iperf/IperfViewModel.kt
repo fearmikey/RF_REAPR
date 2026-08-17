@@ -4,12 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.iperf.IperfRepository
 import com.fearmikey.rf_reapr.iperf.NetworkInterfaceInfo
+import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class IperfViewModel : ViewModel() {
+class IperfViewModel(
+    private val logRepository: LogRepository
+) : ViewModel() {
 
     private val repository = IperfRepository()
 
@@ -21,6 +24,9 @@ class IperfViewModel : ViewModel() {
 
     private val _serverIp = MutableStateFlow("")
     val serverIp: StateFlow<String> = _serverIp.asStateFlow()
+
+    private val _isServerMode = MutableStateFlow(false)
+    val isServerMode: StateFlow<Boolean> = _isServerMode.asStateFlow()
 
     private val _testOutput = MutableStateFlow("")
     val testOutput: StateFlow<String> = _testOutput.asStateFlow()
@@ -51,27 +57,48 @@ class IperfViewModel : ViewModel() {
         _serverIp.value = ip
     }
 
+    fun setServerMode(isServer: Boolean) {
+        _isServerMode.value = isServer
+    }
+
     fun setSelectedInterface(interfaceInfo: NetworkInterfaceInfo) {
         _selectedInterface.value = interfaceInfo
     }
 
+    fun stopTest() {
+        repository.stopTest()
+        _testOutput.value += "\n\n[ABORTED BY USER]\n"
+    }
+
     fun startTest() {
-        if (_serverIp.value.isBlank()) {
+        val isServer = _isServerMode.value
+        if (!isServer && _serverIp.value.isBlank()) {
             _testOutput.value = "Please enter a valid server IP address."
             return
         }
 
         viewModelScope.launch {
             _isRunning.value = true
-            _testOutput.value = "Starting test to ${_serverIp.value}...\nBinding to interface: ${_selectedInterface.value?.name ?: "Default"}\n\n"
+            val modeLabel = if (isServer) "Server Mode" else "Client Mode to ${_serverIp.value}"
+            _testOutput.value = "Starting iPerf3 $modeLabel...\nBinding to interface: ${_selectedInterface.value?.name ?: "Default"}\n\n"
             
             val result = repository.runTest(
                 serverIp = _serverIp.value,
+                isServerMode = isServer,
                 bindInterfaceIp = _selectedInterface.value?.ipv4Address
             )
             
             _testOutput.value += result
             _isRunning.value = false
+
+            // Save to logs if successful (assuming any non-error result from JNI is "success" for logging)
+            if (!result.contains("Error executing iPerf")) {
+                logRepository.saveLog(
+                    type = "IPERF",
+                    summary = "iPerf $modeLabel",
+                    detailJson = result
+                )
+            }
         }
     }
 }

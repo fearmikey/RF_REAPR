@@ -55,5 +55,6 @@ sealed class Screen(val route: String) {
     data object PortLogs : Screen("logs/port")
     data object WebLogs : Screen("logs/web")
     data object PingLogs : Screen("logs/ping")
+    data object IperfLogs : Screen("logs/iperf")
     data object TopologyLogs : Screen("logs/topology")
 }

@@ -55,20 +55,30 @@ class IperfRepository {
 
     /**
      * Executes the iPerf test via the native JNI bridge.
-     * @param serverIp The target iperf3 server IP.
+     * @param serverIp The target iperf3 server IP (only for client mode).
+     * @param isServerMode Whether to run as a server (-s) or client (-c).
      * @param bindInterfaceIp The IP address of the local interface to bind to (forces traffic over specific adapter).
      * @param durationSeconds The duration of the test.
      */
     suspend fun runTest(
         serverIp: String,
+        isServerMode: Boolean,
         bindInterfaceIp: String?,
         durationSeconds: Int = 10
     ): String = withContext(Dispatchers.IO) {
-        val args = mutableListOf(
-            "-c", serverIp,
-            "-t", durationSeconds.toString(),
-            "--connect-timeout", "5000" // 5 seconds timeout
-        )
+        val args = mutableListOf<String>()
+        
+        if (isServerMode) {
+            args.add("-s")
+            args.add("-1") // Run for one test then exit
+        } else {
+            args.add("-c")
+            args.add(serverIp)
+            args.add("-t")
+            args.add(durationSeconds.toString())
+            args.add("--connect-timeout")
+            args.add("5000")
+        }
         
         // Force the traffic out of the specific interface (e.g. Ethernet Dongle)
         if (!bindInterfaceIp.isNullOrBlank()) {
@@ -81,5 +91,12 @@ class IperfRepository {
         } catch (e: Exception) {
             "Error executing iPerf: ${e.message}"
         }
+    }
+
+    /**
+     * Forcefully stops any currently running iPerf test.
+     */
+    fun stopTest() {
+        IperfNative.stopIperf()
     }
 }

@@ -49,3 +49,7 @@ target_link_libraries(
         iperf_jni
         ${log-lib}
 )
+
+# Fix for 16 KB page size compatibility (Android 15+)
+set_target_properties(iperf_jni PROPERTIES LINK_FLAGS "-Wl,-z,max-page-size=16384")
+

@@ -314,6 +314,13 @@ fun MainMenuScreen(
             Icons.Default.NetworkCheck,
             Screen.PingLogs.route,
             ToolCategory.LOGS
+        ),
+        ToolkitTool(
+            "iPerf Tester Logs",
+            "Export network throughput logs.",
+            Icons.Default.NetworkPing,
+            Screen.IperfLogs.route,
+            ToolCategory.LOGS
         )
     )
 

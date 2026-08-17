@@ -15,4 +15,9 @@ object IperfNative {
      * @return The standard output of the iperf command.
      */
     external fun runIperfCommand(args: Array<String>): String
+
+    /**
+     * Terminates any ongoing iperf command.
+     */
+    external fun stopIperf()
 }
