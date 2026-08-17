@@ -15,12 +15,18 @@ android {
         applicationId = "com.fearmikey.rf_reapr"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.4.5"
+        versionCode = 11
+        versionName = "1.4.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+                arguments += "-DANDROID_STL=c++_shared"
+            }
         }
     }
 
@@ -58,6 +64,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    externalNativeBuild {
+        cmake {
+            path("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
     packaging {
         jniLibs {

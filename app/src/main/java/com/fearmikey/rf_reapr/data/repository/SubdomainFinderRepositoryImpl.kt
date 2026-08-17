@@ -12,10 +12,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.InetAddress
 import java.util.Collections
-import java.util.concurrent.TimeUnit
+
 
 class SubdomainFinderRepositoryImpl(
-    private val client: OkHttpClient
+    private val client: OkHttpClient,
 ) : SubdomainFinderRepository {
 
     private val commonSubdomains = listOf(
@@ -51,7 +51,7 @@ class SubdomainFinderRepositoryImpl(
 
         // Add the naked domain first
         try {
-            val addr = InetAddress.getByName(domain)
+            val addr = withContext(Dispatchers.IO) { InetAddress.getByName(domain) }
             foundSubdomains.add(SubdomainItem(domain, addr.hostAddress, DiscoverySource.PASSIVE))
             send(SubdomainResult(foundSubdomains.toList(), 0f))
         } catch (_: Exception) {}
@@ -97,7 +97,7 @@ class SubdomainFinderRepositoryImpl(
                         synchronized(this@channelFlow) {
                             processedCount++
                             val progress = processedCount.toFloat() / total
-                            if (processedCount % 100 == 0 || processedCount == total) {
+                            if ((processedCount % 100 == 0) || (processedCount == total)) {
                                 launch {
                                     val currentResults = synchronized(foundSubdomains) { foundSubdomains.toList() }
                                     send(SubdomainResult(currentResults, progress))
@@ -115,7 +115,7 @@ class SubdomainFinderRepositoryImpl(
     private suspend fun findSubdomainsPassively(domain: String): List<String> = withContext(Dispatchers.IO) {
         val results = mutableSetOf<String>()
         try {
-            val url = "https://crt.sh/?q=%.$domain&output=json"
+            val url = "https://crt.sh/?q=%25.$domain&output=json"
             val request = Request.Builder()
                 .url(url)
                 .build()
@@ -129,7 +129,7 @@ class SubdomainFinderRepositoryImpl(
                     val obj = element.asJsonObject
                     // Extraction from name_value and common_name
                     val names = mutableListOf<String>()
-                    obj.get("common_name")?.asString?.let { names.add(it) }
+                    obj["common_name"]?.asString?.let { names.add(it) }
                     obj.get("name_value")?.asString?.let { valList ->
                         names.addAll(valList.split("\n"))
                     }
@@ -142,7 +142,7 @@ class SubdomainFinderRepositoryImpl(
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Silently fail, fallback to brute force
         }
         results.toList()

@@ -17,6 +17,7 @@ RF-REAPR integrates a wide range of security modules:
 *   **Port Scanner**: Identify open ports and potential vulnerabilities on network devices.
 *   **Website Inspector**: Basic web auditing and security header analysis.
 *   **Ping Tool**: Network latency and connectivity testing.
+*   **Network Throughput (iPerf)**: High-performance bandwidth testing via integrated iperf3.
 *   **DNS Enumerator**: Discover subdomains and DNS records.
 *   **DHCP Monitor**: Monitor DHCP traffic for rogue servers.
 *   **RDAP Auditor**: Query registration data for domains and IP ranges.
@@ -54,7 +55,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.4.5.apk` from the root of this repository.
+1.  Download the latest `RF_REAPR_v1.4.6.apk` from the root of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)

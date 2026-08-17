@@ -76,6 +76,18 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         emit(prefs.getBoolean("passive_mode", false))
     }
 
+    override val shodanApiKey: Flow<String> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "shodan_api_key") {
+                trySend(p.getString(key, "") ?: "")
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.onStart {
+        emit(prefs.getString("shodan_api_key", "") ?: "")
+    }
+
     override suspend fun setThemePreference(preference: ThemePreference) {
         prefs.edit().putString("theme_preference", preference.name).apply()
     }
@@ -108,5 +120,9 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
 
     override suspend fun setPassiveMode(enabled: Boolean) {
         prefs.edit().putBoolean("passive_mode", enabled).apply()
+    }
+
+    override suspend fun setShodanApiKey(key: String) {
+        prefs.edit().putString("shodan_api_key", key).apply()
     }
 }

@@ -52,6 +52,7 @@ import com.fearmikey.rf_reapr.ui.ping.PingViewModel
 import com.fearmikey.rf_reapr.ui.web.*
 import com.fearmikey.rf_reapr.ui.scanner.PortScannerScreen
 import com.fearmikey.rf_reapr.ui.scanner.PortScannerViewModel
+import com.fearmikey.rf_reapr.ui.settings.ApiKeysScreen
 import com.fearmikey.rf_reapr.ui.settings.SettingsScreen
 import com.fearmikey.rf_reapr.ui.settings.SettingsViewModel
 import com.fearmikey.rf_reapr.ui.splash.SplashScreen
@@ -76,6 +77,7 @@ import com.fearmikey.rf_reapr.ui.arp.*
 import com.fearmikey.rf_reapr.ui.report.*
 import com.fearmikey.rf_reapr.ui.sdr.SdrScreen
 import com.fearmikey.rf_reapr.ui.sdr.SdrViewModel
+import com.fearmikey.rf_reapr.ui.iperf.IperfScreen
 import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -149,7 +151,6 @@ class MainActivity : ComponentActivity() {
         val reportRepository = ReportRepositoryImpl(
             this,
             database.scanSessionDao(),
-            database.networkDao(),
             database.evidenceDao(),
             database.complianceDao(),
             database.eventLogDao()
@@ -163,6 +164,7 @@ class MainActivity : ComponentActivity() {
         val tracerouteRepository = TracerouteRepositoryImpl()
         val arpDetectorRepository = ArpDetectorRepositoryImpl(this)
         val upnpScannerRepository = UpnpScannerRepositoryImpl()
+        val shodanRepository = ShodanRepositoryImpl(okHttpClient, settingsRepository)
         val hidRepository = LocalHidRepository(database.hidScriptDao())
         val hidAssetRepository = LocalHidAssetRepository(this, database.hidAssetDao())
 
@@ -255,6 +257,9 @@ class MainActivity : ComponentActivity() {
                     }
                     val hibpViewModel: HibpViewModel = viewModel {
                         HibpViewModel(hibpRepository, settingsRepository)
+                    }
+                    val shodanViewModel: ShodanViewModel = viewModel {
+                        ShodanViewModel(shodanRepository, settingsRepository)
                     }
                     val pingViewModel: PingViewModel = viewModel {
                         PingViewModel(pingRepository, logRepository, settingsRepository)
@@ -393,7 +398,17 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Settings.route) {
                             SettingsScreen(
                                 viewModel = settingsViewModel,
-                            ) { navController.popBackStack() }
+                                onNavigateToApiKeys = { navController.navigate(Screen.ApiKeys.route) },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.ApiKeys.route) { backStackEntry ->
+                            val highlight = backStackEntry.arguments?.getString("highlight")
+                            ApiKeysScreen(
+                                viewModel = settingsViewModel,
+                                highlightKey = highlight,
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         composable(Screen.DhcpMonitor.route) {
                             DhcpMonitorScreen(
@@ -434,6 +449,11 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.HibpChecker.route) {
                             HibpScreen(
                                 viewModel = hibpViewModel,
+                            ) { navController.popBackStack() }
+                        }
+                        composable(Screen.ShodanScanner.route) {
+                            ShodanScreen(
+                                viewModel = shodanViewModel,
                             ) { navController.popBackStack() }
                         }
                         composable(Screen.PingTool.route) {
@@ -555,6 +575,10 @@ class MainActivity : ComponentActivity() {
                                 viewModel = sdrViewModel,
                                 onNavigateBack = { navController.popBackStack() }
                             )
+                        }
+                        
+                        composable(Screen.IperfTester.route) {
+                            IperfScreen(onBack = { navController.popBackStack() })
                         }
                         
                         // Log Routes

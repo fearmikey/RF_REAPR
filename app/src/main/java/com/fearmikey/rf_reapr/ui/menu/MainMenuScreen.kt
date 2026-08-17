@@ -48,7 +48,8 @@ data class ToolkitTool(
     val route: String,
     val category: ToolCategory,
     val tint: Color? = null,
-    val isAggressive: Boolean = false
+    val isAggressive: Boolean = false,
+    val requiresApiKey: Boolean = false
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -135,6 +136,14 @@ fun MainMenuScreen(
             "Map the path packets take to a destination.",
             Icons.Default.Route,
             Screen.Traceroute.route,
+            ToolCategory.NETWORK,
+            isAggressive = true
+        ),
+        ToolkitTool(
+            "iPerf Tester",
+            "Measure network throughput using iPerf3.",
+            Icons.Default.NetworkPing,
+            Screen.IperfTester.route,
             ToolCategory.NETWORK,
             isAggressive = true
         ),
@@ -236,7 +245,17 @@ fun MainMenuScreen(
             "Check if accounts are in known data breaches.",
             Icons.Default.LockPerson,
             Screen.HibpChecker.route,
-            ToolCategory.WEB
+            ToolCategory.WEB,
+            requiresApiKey = true
+        ),
+        ToolkitTool(
+            "Shodan IoT Scanner",
+            "Search for exposed IoT devices and open WAN ports.",
+            Icons.Default.Search,
+            Screen.ShodanScanner.route,
+            ToolCategory.WEB,
+            isAggressive = true,
+            requiresApiKey = true
         ),
         // Compliance Tools
         ToolkitTool(
@@ -393,6 +412,7 @@ fun MainMenuScreen(
                         },
                         tools = allTools.filter { it.category == category },
                         isPassiveMode = isPassiveMode,
+                        settingsViewModel = settingsViewModel,
                         onNavigate = onNavigate,
                         onInhibitedClick = onInhibitedClick
                     )
@@ -440,6 +460,7 @@ fun CategoryCard(
     onClick: () -> Unit,
     tools: List<ToolkitTool>,
     isPassiveMode: Boolean,
+    settingsViewModel: SettingsViewModel?,
     onNavigate: (String) -> Unit,
     onInhibitedClick: () -> Unit
 ) {
@@ -470,7 +491,7 @@ fun CategoryCard(
                         .fillMaxWidth()
                 ) {
                     tools.forEach { tool ->
-                        ToolItem(tool, isPassiveMode, onNavigate, onInhibitedClick)
+                        ToolItem(tool, isPassiveMode, settingsViewModel, onNavigate, onInhibitedClick)
                         if (tool != tools.last()) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 4.dp),
@@ -488,19 +509,46 @@ fun CategoryCard(
 fun ToolItem(
     tool: ToolkitTool,
     isPassiveMode: Boolean,
+    settingsViewModel: SettingsViewModel?,
     onNavigate: (String) -> Unit,
     onInhibitedClick: () -> Unit
 ) {
     val isInhibited = isPassiveMode && tool.isAggressive
+    val isApiKeyRequired = tool.requiresApiKey
+    
+    // Check if the required API key is missing
+    val isApiKeyMissing = if (isApiKeyRequired) {
+        when (tool.route) {
+            Screen.HibpChecker.route -> settingsViewModel?.hibpApiKey?.collectAsState()?.value.isNullOrBlank()
+            Screen.ShodanScanner.route -> settingsViewModel?.shodanApiKey?.collectAsState()?.value.isNullOrBlank()
+            else -> false
+        }
+    } else {
+        false
+    }
+    
+    val isGreyedOut = isInhibited || isApiKeyMissing
     
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { 
-                if (isInhibited) onInhibitedClick() else onNavigate(tool.route)
+                if (isInhibited) {
+                    onInhibitedClick()
+                } else if (isApiKeyMissing) {
+                    // Navigate to api keys with highlight param
+                    val highlightArg = when (tool.route) {
+                        Screen.HibpChecker.route -> "hibp"
+                        Screen.ShodanScanner.route -> "shodan"
+                        else -> null
+                    }
+                    onNavigate(Screen.ApiKeys.createRoute(highlightArg))
+                } else {
+                    onNavigate(tool.route)
+                }
             }
             .padding(vertical = 8.dp)
-            .alpha(if (isInhibited) 0.5f else 1f),
+            .alpha(if (isGreyedOut) 0.5f else 1f),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box {
@@ -524,11 +572,25 @@ fun ToolItem(
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = tool.name, style = MaterialTheme.typography.labelLarge)
-            Text(
-                text = if (isInhibited) "Inhibited in Passive Mode" else tool.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (isInhibited) PhysicalRed else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (isInhibited) {
+                 Text(
+                    text = "Inhibited in Passive Mode",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PhysicalRed
+                )
+            } else if (isApiKeyMissing) {
+                Text(
+                    text = "Requires 3rd party API Key (tap to set)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PhysicalRed
+                )
+            } else {
+                 Text(
+                    text = tool.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

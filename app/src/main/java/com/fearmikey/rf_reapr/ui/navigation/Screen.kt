@@ -11,6 +11,9 @@ sealed class Screen(val route: String) {
     data object WifiFingerprinter : Screen("wifi_fingerprinter")
     data object NfcScanner : Screen("nfc_scanner")
     data object Settings : Screen("settings")
+    data object ApiKeys : Screen("api_keys?highlight={highlight}") {
+        fun createRoute(highlight: String? = null) = if (highlight != null) "api_keys?highlight=$highlight" else "api_keys"
+    }
     data object DhcpMonitor : Screen("dhcp_monitor")
     data object WebsiteInspector : Screen("website_inspector")
     data object SubdomainFinder : Screen("subdomain_finder")
@@ -19,6 +22,7 @@ sealed class Screen(val route: String) {
         fun createRoute(domain: String? = null) = if (domain != null) "cloud_asset_scanner?domain=$domain" else "cloud_asset_scanner"
     }
     data object HibpChecker : Screen("hibp_checker")
+    data object ShodanScanner : Screen("shodan_scanner")
     data object PingTool : Screen("ping_tool")
     
     // New Physical Access & Wireless Tools
@@ -36,6 +40,7 @@ sealed class Screen(val route: String) {
     data object ArpDetector : Screen("arp_detector")
     data object UpnpAuditor : Screen("upnp_auditor")
     data object SdrController : Screen("sdr_controller")
+    data object IperfTester : Screen("iperf_tester")
 
     data object ComplianceChecklists : Screen("compliance_checklists")
     data object AuditChecklist : Screen("audit_checklist/{frameworkId}") {

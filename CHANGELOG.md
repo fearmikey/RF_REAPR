@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.6] - 2026-08-17
+
+### Added
+- **Network Auditing**:
+    - Integrated `iperf3` via JNI for high-performance network throughput testing.
+    - Added specialized `IperfScreen` with real-time throughput visualization and detailed log output.
+    - Added `IperfNative` JNI wrapper and `IperfRepository` for native execution within the app environment.
+    - Integrated Iperf into the toolkit with support for both client and server modes (server mode coming soon).
+- **Architecture**: Integrated CMake and C++ toolchain for native tool support.
+
+### Changed
+- **Maintenance**: Version bump to 1.4.6.
+
 ## [1.4.5] - 2026-08-01
 
 ### Added

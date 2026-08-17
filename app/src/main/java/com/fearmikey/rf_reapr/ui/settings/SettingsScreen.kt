@@ -2,24 +2,20 @@ package com.fearmikey.rf_reapr.ui.settings
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.fearmikey.rf_reapr.BuildConfig
 import com.fearmikey.rf_reapr.domain.model.ThemePreference
@@ -47,27 +43,23 @@ fun SettingsPreview() {
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    onNavigateToApiKeys: () -> Unit,
     onBack: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
     val currentTheme by viewModel.themePreference.collectAsState()
-    val apiKey by viewModel.vulnerabilityApiKey.collectAsState()
-    val hibpApiKey by viewModel.hibpApiKey.collectAsState()
     val cameraShortcutEnabled by viewModel.isCameraShortcutEnabled.collectAsState()
     
-    var editedApiKey by remember(apiKey) { mutableStateOf(apiKey) }
-    var editedHibpApiKey by remember(hibpApiKey) { mutableStateOf(hibpApiKey) }
     var expanded by remember { mutableStateOf(false) }
-    var showApiKey by remember { mutableStateOf(false) }
-    var showHibpApiKey by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
         viewModel.exportStatus.collect { message ->
             snackbarHostState.showSnackbar(message)
         }
     }
-
+    
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -85,6 +77,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
             Text(
@@ -144,7 +137,15 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Physical Security",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -157,7 +158,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
-                        text = "Open camera by double-pressing the power button (even when locked).",
+                        text = "Open evidence camera by double-pressing the power button (even when locked).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -178,122 +179,19 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            val fontSize = when {
-                editedApiKey.length > 35 -> 11.sp
-                editedApiKey.length > 25 -> 13.sp
-                else -> 16.sp
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            OutlinedButton(
+                onClick = { onNavigateToApiKeys() },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = editedApiKey,
-                    onValueChange = { editedApiKey = it },
-                    label = { Text("NVD API Key (Optional)") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = fontSize),
-                    visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { showApiKey = !showApiKey }) {
-                            Icon(
-                                imageVector = if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (showApiKey) "Hide API Key" else "Show API Key"
-                            )
-                        }
-                    },
-                    supportingText = {
-                        Text("Optional key used to increase rate limits for global CVE synchronization.")
-                    }
-                )
-
+                Icon(Icons.Default.Security, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-
-                Button(
-                    onClick = { viewModel.setVulnerabilityApiKey(editedApiKey) },
-                    enabled = editedApiKey != apiKey,
-                    modifier = Modifier.padding(bottom = 16.dp) // Align with TextField body, above supporting text
-                ) {
-                    Text("Apply")
-                }
+                Text("Manage 3rd Party API Keys")
             }
 
             val darkTheme = when (currentTheme) {
                 ThemePreference.LIGHT -> false
                 ThemePreference.DARK -> true
                 ThemePreference.SYSTEM -> isSystemInDarkTheme()
-            }
-
-            TextButton(
-                onClick = { uriHandler.openUri("https://nvd.nist.gov/developers/request-an-api-key") },
-                modifier = Modifier.align(Alignment.End),
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = if (darkTheme) WebGold else Color(0xFF8B6B00)
-                )
-            ) {
-                Text(
-                    text = "Get an API Key from NIST",
-                    textDecoration = TextDecoration.Underline
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val hibpFontSize = when {
-                editedHibpApiKey.length > 35 -> 11.sp
-                editedHibpApiKey.length > 25 -> 13.sp
-                else -> 16.sp
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedTextField(
-                    value = editedHibpApiKey,
-                    onValueChange = { editedHibpApiKey = it },
-                    label = { Text("HaveIBeenPwned API Key") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = hibpFontSize),
-                    visualTransformation = if (showHibpApiKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { showHibpApiKey = !showHibpApiKey }) {
-                            Icon(
-                                imageVector = if (showHibpApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (showHibpApiKey) "Hide HaveIBeenPwned API Key" else "Show HaveIBeenPwned API Key"
-                            )
-                        }
-                    },
-                    supportingText = {
-                        Text("Required for HaveIBeenPwned breach checks during OSINT audits.")
-                    }
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Button(
-                    onClick = { viewModel.setHibpApiKey(editedHibpApiKey) },
-                    enabled = editedHibpApiKey != hibpApiKey,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Text("Apply")
-                }
-            }
-
-            TextButton(
-                onClick = { uriHandler.openUri("https://haveibeenpwned.com/API/Key") },
-                modifier = Modifier.align(Alignment.End),
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = if (darkTheme) WebGold else Color(0xFF8B6B00)
-                )
-            ) {
-                Text(
-                    text = "Get an API Key from HaveIBeenPwned",
-                    textDecoration = TextDecoration.Underline
-                )
             }
 
             Spacer(modifier = Modifier.weight(1f))

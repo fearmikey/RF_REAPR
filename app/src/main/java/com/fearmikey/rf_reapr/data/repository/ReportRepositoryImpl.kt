@@ -18,7 +18,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import androidx.core.graphics.withTranslation
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment
+import org.apache.poi.common.usermodel.PictureType
 import org.apache.poi.xwpf.usermodel.XWPFDocument
 import org.apache.poi.util.Units
 import java.io.File
@@ -32,10 +34,9 @@ import com.google.gson.reflect.TypeToken
 class ReportRepositoryImpl(
     private val context: Context,
     private val scanSessionDao: ScanSessionDao,
-    private val networkDao: NetworkDao,
     private val evidenceDao: EvidenceDao,
     private val complianceDao: ComplianceDao,
-    private val eventLogDao: EventLogDao
+    private val eventLogDao: EventLogDao,
 ) : ReportRepository {
     private val gson = Gson()
 
@@ -163,7 +164,7 @@ class ReportRepositoryImpl(
             val pageWidth = 595
             val pageHeight = 842
             val margin = 50f
-            val contentWidth = (pageWidth - margin * 2).toInt()
+            val contentWidth = (pageWidth - (margin * 2)).toInt()
             
             var pageNumber = 1
             var pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
@@ -210,10 +211,9 @@ class ReportRepositoryImpl(
 
                 checkNewPage(layout.height.toFloat())
                 
-                canvas.save()
-                canvas.translate(margin + indent, y)
-                layout.draw(canvas)
-                canvas.restore()
+                canvas.withTranslation(margin + indent, y) {
+                    layout.draw(this)
+                }
                 
                 val height = layout.height.toFloat()
                 y += height
@@ -429,12 +429,11 @@ class ReportRepositoryImpl(
                             if (bitmap != null) {
                                 val maxWidth = 450f
                                 val scale = maxWidth / bitmap.width
-                                val drawWidth = maxWidth
                                 val drawHeight = bitmap.height * scale
                                 
                                 checkNewPage(drawHeight + 60f)
                                 
-                                val rect = RectF(margin + 20f, y, margin + 20f + drawWidth, y + drawHeight)
+                                val rect = RectF(margin + 20f, y, margin + 20f + maxWidth, y + drawHeight)
                                 canvas.drawBitmap(bitmap, null, rect, null)
                                 y += drawHeight + 10f
                                 
@@ -514,7 +513,7 @@ class ReportRepositoryImpl(
                                             drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
                                         }
                                     }
-                                } catch (e: Exception) {
+                                } catch (_: Exception) {
                                     drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
                                 }
                             }
@@ -753,8 +752,8 @@ class ReportRepositoryImpl(
                                 val runImg = pImg.createRun()
                                 runImg.addPicture(
                                     bis,
-                                    XWPFDocument.PICTURE_TYPE_PNG,
-                                    "spectrum_${min}.png",
+                                    PictureType.PNG,
+                                    "spectrum_$min.png",
                                     Units.toEMU(450.0),
                                     Units.toEMU(225.0)
                                 )
@@ -1002,7 +1001,7 @@ class ReportRepositoryImpl(
                             try {
                                 run.addPicture(
                                     FileInputStream(imgFile),
-                                    XWPFDocument.PICTURE_TYPE_JPEG,
+                                    PictureType.JPEG,
                                     imgFile.name,
                                     Units.toEMU(400.0),
                                     Units.toEMU(300.0)

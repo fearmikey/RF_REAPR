@@ -41,6 +41,13 @@ class SettingsViewModel(
             initialValue = ""
         )
 
+    val shodanApiKey: StateFlow<String> = repository.shodanApiKey
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ""
+        )
+
     val isCameraShortcutEnabled: StateFlow<Boolean> = repository.isCameraShortcutEnabled
         .stateIn(
             scope = viewModelScope,
@@ -82,6 +89,12 @@ class SettingsViewModel(
     fun setPassiveMode(enabled: Boolean) {
         viewModelScope.launch {
             repository.setPassiveMode(enabled)
+        }
+    }
+
+    fun setShodanApiKey(key: String) {
+        viewModelScope.launch {
+            repository.setShodanApiKey(key)
         }
     }
 }
