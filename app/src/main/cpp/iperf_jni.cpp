@@ -23,29 +23,30 @@ Java_com_fearmikey_rf_1reapr_iperf_IperfNative_runIperfCommand(JNIEnv *env, jobj
     cppArgs.reserve(argCount + 1);
 
     // argv[0] is typically the program name
-    cppArgs.push_back("iperf3");
+    cppArgs.emplace_back("iperf3");
 
     std::stringstream commandStr;
     commandStr << "iperf3 ";
 
     for (int i = 0; i < argCount; ++i) {
-        jstring string = (jstring) env->GetObjectArrayElement(args, i);
-        const char *rawString = env->GetStringUTFChars(string, 0);
-        cppArgs.push_back(std::string(rawString));
+        auto string = (jstring) env->GetObjectArrayElement(args, i);
+        const char *rawString = env->GetStringUTFChars(string, nullptr);
+        cppArgs.emplace_back(rawString);
         commandStr << rawString << " ";
         env->ReleaseStringUTFChars(string, rawString);
         env->DeleteLocalRef(string);
     }
 
     std::vector<char*> argv;
-    for (size_t i = 0; i < cppArgs.size(); ++i) {
-        argv.push_back(const_cast<char*>(cppArgs[i].c_str()));
+    argv.reserve(cppArgs.size());
+    for (const auto& arg : cppArgs) {
+        argv.emplace_back(const_cast<char*>(arg.c_str()));
     }
 
     LOGI("Executing: %s", commandStr.str().c_str());
 
     struct iperf_test *test = iperf_new_test();
-    if (test == NULL) {
+    if (test == nullptr) {
         LOGE("Failed to create iperf test");
         return env->NewStringUTF("Error: failed to create iperf test");
     }
@@ -57,7 +58,7 @@ Java_com_fearmikey_rf_1reapr_iperf_IperfNative_runIperfCommand(JNIEnv *env, jobj
     char* out_buf = (char*)malloc(buf_size);
     memset(out_buf, 0, buf_size);
     FILE* mem_out = fmemopen(out_buf, buf_size, "w");
-    if (mem_out != NULL) {
+    if (mem_out != nullptr) {
         test->outfile = mem_out;
     }
 
@@ -89,7 +90,7 @@ Java_com_fearmikey_rf_1reapr_iperf_IperfNative_runIperfCommand(JNIEnv *env, jobj
         }
     }
 
-    if (mem_out != NULL) {
+    if (mem_out != nullptr) {
         fflush(mem_out);
         fclose(mem_out);
     }
