@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
     - Added specialized `IperfScreen` with real-time throughput visualization and detailed log output.
     - Added `IperfNative` JNI wrapper and `IperfRepository` for native execution within the app environment.
     - Integrated Iperf into the toolkit with support for both client and server modes (server mode coming soon).
+- **Web & Infrastructure**:
+    - Integrated **Shodan API** for deep infrastructure and service intelligence.
+    - Added `ShodanScreen` to search for host details, services, and vulnerabilities via IP or domain.
+    - Added `ApiKeysScreen` in settings for centralized management of Shodan and other third-party API keys.
 - **Architecture**: Integrated CMake and C++ toolchain for native tool support.
 
 ### Changed

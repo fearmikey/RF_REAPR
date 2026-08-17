@@ -18,6 +18,7 @@ RF-REAPR integrates a wide range of security modules:
 *   **Website Inspector**: Basic web auditing and security header analysis.
 *   **Ping Tool**: Network latency and connectivity testing.
 *   **Network Throughput (iPerf)**: High-performance bandwidth testing via integrated iperf3.
+*   **Shodan Intelligence**: Search for host details and vulnerabilities using the Shodan API.
 *   **DNS Enumerator**: Discover subdomains and DNS records.
 *   **DHCP Monitor**: Monitor DHCP traffic for rogue servers.
 *   **RDAP Auditor**: Query registration data for domains and IP ranges.
