@@ -1,6 +1,0 @@
-- [x] Define `isCameraShortcutEnabled` in `SettingsRepository`
-- [x] Implement `isCameraShortcutEnabled` in `SettingsRepositoryImpl` with `PackageManager` logic
-- [x] Update `AndroidManifest.xml` with `activity-alias` for camera shortcut
-- [x] Expose setting in `SettingsViewModel`
-- [x] Add toggle in `SettingsScreen` UI
-- [x] Verify changes

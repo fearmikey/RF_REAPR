@@ -1,5 +1,0 @@
-- `[x]` Delete obsolete `HidScriptParser.kt`
-- `[x]` Update `MainActivity.kt` dependency injection
-- `[x]` Update `HidInjectorViewModel.kt` with flashing logic
-- `[x]` Update `HidInjectorScreen.kt` UI
-- `[x]` Verify build and functionality

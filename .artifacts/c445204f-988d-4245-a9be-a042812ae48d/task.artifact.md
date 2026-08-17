@@ -1,2 +1,0 @@
-- [x] Add GitHub link to `SettingsScreen.kt`
-- [x] Verify build

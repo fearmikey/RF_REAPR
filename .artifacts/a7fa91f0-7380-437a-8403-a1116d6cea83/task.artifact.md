@@ -1,5 +1,0 @@
-- [x] Implement enhanced pattern generation in `CloudAssetScannerRepositoryImpl`
-    - [x] Define keywords and regional endpoints
-    - [x] Implement `generatePatterns` helper
-    - [x] Update `scanAssets` to use generated patterns
-- [x] Verify the implementation with a build
