@@ -24,6 +24,7 @@ class TopologyViewModel(
     private val scanSessionRepository: ScanSessionRepository,
     private val portScannerRepository: PortScannerRepository,
     private val vulnerabilityRepository: VulnerabilityRepository,
+    private val snmpRepository: SnmpRepository,
     private val logRepository: LogRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
@@ -43,6 +44,12 @@ class TopologyViewModel(
 
     private val _isAuditing = MutableStateFlow(false)
     val isAuditing: StateFlow<Boolean> = _isAuditing.asStateFlow()
+
+    private val _autoPortScan = MutableStateFlow(true)
+    val autoPortScan: StateFlow<Boolean> = _autoPortScan.asStateFlow()
+
+    private val _autoSnmpDiscovery = MutableStateFlow(true)
+    val autoSnmpDiscovery: StateFlow<Boolean> = _autoSnmpDiscovery.asStateFlow()
 
     private val _showNetworkMismatchDialog = MutableStateFlow(false)
     val showNetworkMismatchDialog: StateFlow<Boolean> = _showNetworkMismatchDialog.asStateFlow()
@@ -106,9 +113,61 @@ class TopologyViewModel(
                         networkName = "Local Network",
                         gatewayIp = networkInfo.gatewayIp
                     )
+
+                    // After discovery, perform auto actions if enabled
+                    if (autoPortScan.value || autoSnmpDiscovery.value) {
+                        performAutoDiscoveryActions(nodes)
+                    }
                 }
             }
         }
+    }
+
+    private fun performAutoDiscoveryActions(nodes: List<NetworkNode>) {
+        viewModelScope.launch {
+            _isAuditing.value = true
+            nodes.forEach { node ->
+                if (autoPortScan.value) {
+                    scanSingleNode(node)
+                }
+                if (autoSnmpDiscovery.value) {
+                    querySnmpForNode(node)
+                }
+            }
+            _isAuditing.value = false
+            
+            // Log the completion of discovery + auto audit
+            val currentGraph = _mappedGraph.value
+            if (currentGraph != null) {
+                logRepository.saveLog(
+                    type = "TOPOLOGY",
+                    summary = "Completed network discovery and auto-audit of ${currentGraph.nodes.size} devices",
+                    detailJson = gson.toJson(currentGraph)
+                )
+            }
+        }
+    }
+
+    private suspend fun querySnmpForNode(node: NetworkNode) {
+        // Simple SNMP V2c public community query as discovery step
+        val result = snmpRepository.queryDevice(node.ipAddress, "public", 1)
+        result.onSuccess { snmpResult ->
+            val latestNode = scanSessionRepository.getNodeByIp(node.ipAddress) ?: node
+            val updatedNode = latestNode.copy(
+                snmpData = snmpResult,
+                // If SNMP responds, it's likely a Network Device or Server
+                deviceType = if (latestNode.deviceType == DeviceType.UNKNOWN) DeviceType.NETWORK_DEVICE else latestNode.deviceType
+            )
+            scanSessionRepository.updateNodeDetails(updatedNode)
+        }
+    }
+
+    fun toggleAutoPortScan() {
+        _autoPortScan.value = !_autoPortScan.value
+    }
+
+    fun toggleAutoSnmpDiscovery() {
+        _autoSnmpDiscovery.value = !_autoSnmpDiscovery.value
     }
 
     /**

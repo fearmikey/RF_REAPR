@@ -12,7 +12,8 @@ data class NetworkNode(
     val openPorts: List<OpenPort> = emptyList(),
     val deviceType: DeviceType = DeviceType.UNKNOWN,
     val manufacturer: String? = null,
-    val parentId: String? = null
+    val parentId: String? = null,
+    val snmpData: SnmpResult? = null
 ) {
     companion object {
         val HIGH_IMPACT_PORTS = listOf(21, 22, 23, 53, 80, 443, 445, 161, 389, 1433, 3306, 3389, 8080, 8443)

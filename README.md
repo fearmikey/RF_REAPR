@@ -18,6 +18,7 @@ RF-REAPR integrates a wide range of security modules:
 *   **Website Inspector**: Basic web auditing and security header analysis.
 *   **Ping Tool**: Network latency and connectivity testing.
 *   **Network Throughput (iPerf)**: High-performance bandwidth testing via integrated iperf3.
+*   **SNMP Browser**: Query and analyze network devices using the SNMP protocol.
 *   **Shodan Intelligence**: Search for host details and vulnerabilities using the Shodan API.
 *   **DNS Enumerator**: Discover subdomains and DNS records.
 *   **DHCP Monitor**: Monitor DHCP traffic for rogue servers.
@@ -56,7 +57,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.4.7.apk` from the root of this repository.
+1.  Download the latest `RF_REAPR_v1.4.8.apk` from the root of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)

@@ -6,7 +6,7 @@ sealed class Screen(val route: String) {
     data object PortScanner : Screen("port_scanner?ip={ip}") {
         fun createRoute(ip: String? = null) = if (ip != null) "port_scanner?ip=$ip" else "port_scanner"
     }
-    data object TopologyMap : Screen("topology_map")
+    data object TopologyMap : Screen("network_discovery")
     data object BluetoothProximityFinder : Screen("bluetooth_proximity_finder")
     data object WifiFingerprinter : Screen("wifi_fingerprinter")
     data object NfcScanner : Screen("nfc_scanner")
@@ -34,6 +34,7 @@ sealed class Screen(val route: String) {
     data object Magnetometer : Screen("magnetometer")
 
     // New Network Monitoring Tools
+    data object SnmpBrowser : Screen("snmp_browser")
     data object ServiceDiscovery : Screen("service_discovery")
     data object DnsAuditor : Screen("dns_auditor")
     data object Traceroute : Screen("traceroute")
@@ -56,5 +57,6 @@ sealed class Screen(val route: String) {
     data object WebLogs : Screen("logs/web")
     data object PingLogs : Screen("logs/ping")
     data object IperfLogs : Screen("logs/iperf")
-    data object TopologyLogs : Screen("logs/topology")
+    data object TopologyLogs : Screen("logs/network_discovery")
+    data object SnmpLogs : Screen("logs/snmp")
 }

@@ -74,6 +74,7 @@ import com.fearmikey.rf_reapr.ui.dns.*
 import com.fearmikey.rf_reapr.ui.mdns.*
 import com.fearmikey.rf_reapr.ui.traceroute.*
 import com.fearmikey.rf_reapr.ui.arp.*
+import com.fearmikey.rf_reapr.ui.snmp.*
 import com.fearmikey.rf_reapr.ui.report.*
 import com.fearmikey.rf_reapr.ui.sdr.SdrScreen
 import com.fearmikey.rf_reapr.ui.sdr.SdrViewModel
@@ -158,6 +159,7 @@ class MainActivity : ComponentActivity() {
         )
         
         val sdrRepository = RtlTcpRepositoryImpl()
+        val snmpRepository = SnmpRepositoryImpl()
         
         // New Repositories
         val serviceDiscoveryRepository = ServiceDiscoveryRepositoryImpl(this)
@@ -236,7 +238,7 @@ class MainActivity : ComponentActivity() {
                         PortScannerViewModel(portRepository, vulnerabilityRepository, scanSessionRepository, logRepository, settingsRepository)
                     }
                     val topologyViewModel: TopologyViewModel = viewModel {
-                        TopologyViewModel(discoveryRepository, scanSessionRepository, portRepository, vulnerabilityRepository, logRepository, settingsRepository)
+                        TopologyViewModel(discoveryRepository, scanSessionRepository, portRepository, vulnerabilityRepository, snmpRepository, logRepository, settingsRepository)
                     }
                     val wifiViewModel: WifiFingerprintViewModel = viewModel {
                         WifiFingerprintViewModel(wifiRepository, logRepository)
@@ -307,6 +309,9 @@ class MainActivity : ComponentActivity() {
                     }
                     val hidAssetsViewModel: HidAssetsViewModel = viewModel {
                         HidAssetsViewModel(hidAssetRepository)
+                    }
+                    val snmpViewModel: SnmpViewModel = viewModel {
+                        SnmpViewModel(snmpRepository, logRepository)
                     }
 
                     val reportBuilderViewModel: ReportBuilderViewModel = viewModel {
@@ -588,6 +593,12 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                        composable(Screen.SnmpBrowser.route) {
+                            SnmpBrowserScreen(
+                                viewModel = snmpViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                         
                         // Log Routes
                         composable(Screen.WifiLogs.route) {
@@ -609,7 +620,10 @@ class MainActivity : ComponentActivity() {
                             LogListScreen("IPERF", "iPerf Tester Logs", logViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.TopologyLogs.route) {
-                            LogListScreen("TOPOLOGY", "Network Map Logs", logViewModel) { navController.popBackStack() }
+                            LogListScreen("TOPOLOGY", "Network Discovery Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.SnmpLogs.route) {
+                            LogListScreen("SNMP", "SNMP Browser Logs", logViewModel) { navController.popBackStack() }
                         }
                         
                         // Compliance Routes

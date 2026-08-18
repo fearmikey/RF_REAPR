@@ -126,6 +126,16 @@ fun ReportBuilderScreen(
                 )
             }
 
+            item { SectionHeader("SNMP Browser Results", Icons.Default.Router) }
+            items(state.availableSnmpResults) { result ->
+                SelectionItem(
+                    title = result.summary,
+                    subtitle = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(result.timestamp)),
+                    isSelected = result.id in state.selectedSnmpLogIds,
+                    onToggle = { viewModel.toggleSnmpResult(result.id) }
+                )
+            }
+
             item { SectionHeader("Evidence Projects", Icons.Default.PhotoLibrary) }
             items(state.availableProjects) { project ->
                 SelectionItem(

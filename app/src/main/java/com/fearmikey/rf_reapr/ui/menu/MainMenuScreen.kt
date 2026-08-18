@@ -84,8 +84,8 @@ fun MainMenuScreen(
             isAggressive = true
         ),
         ToolkitTool(
-            "Network Topology",
-            "Visualize the network graph and risk levels.",
+            "Network Discovery",
+            "Map connected devices and automatically audit services.",
             Icons.AutoMirrored.Filled.List,
             Screen.TopologyMap.route,
             ToolCategory.NETWORK,
@@ -144,6 +144,14 @@ fun MainMenuScreen(
             "Measure network throughput using iPerf3.",
             Icons.Default.NetworkPing,
             Screen.IperfTester.route,
+            ToolCategory.NETWORK,
+            isAggressive = true
+        ),
+        ToolkitTool(
+            "SNMP Browser",
+            "Query routers and switches for system info and traffic.",
+            Icons.Default.Router,
+            Screen.SnmpBrowser.route,
             ToolCategory.NETWORK,
             isAggressive = true
         ),
@@ -288,8 +296,8 @@ fun MainMenuScreen(
             ToolCategory.LOGS
         ),
         ToolkitTool(
-            "Network Map Logs",
-            "Export network topology audit logs.",
+            "Network Discovery Logs",
+            "Export network discovery and audit logs.",
             Icons.AutoMirrored.Filled.List,
             Screen.TopologyLogs.route,
             ToolCategory.LOGS
@@ -320,6 +328,13 @@ fun MainMenuScreen(
             "Export network throughput logs.",
             Icons.Default.NetworkPing,
             Screen.IperfLogs.route,
+            ToolCategory.LOGS
+        ),
+        ToolkitTool(
+            "SNMP Browser Logs",
+            "Export SNMP query results.",
+            Icons.Default.Router,
+            Screen.SnmpLogs.route,
             ToolCategory.LOGS
         )
     )

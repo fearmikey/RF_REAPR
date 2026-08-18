@@ -5,6 +5,8 @@ enum class DeviceType {
     SWITCH,
     ACCESS_POINT,
     WORKSTATION,
+    SERVER,
+    NETWORK_DEVICE,
     MOBILE,
     IOT,
     UNKNOWN

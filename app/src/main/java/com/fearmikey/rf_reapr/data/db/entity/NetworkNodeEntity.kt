@@ -16,5 +16,6 @@ data class NetworkNodeEntity(
     val lastSeen: Long = System.currentTimeMillis(),
     val openPorts: List<OpenPort> = emptyList(),
     val deviceType: DeviceType = DeviceType.UNKNOWN,
-    val parentId: String? = null
+    val parentId: String? = null,
+    val snmpData: com.fearmikey.rf_reapr.domain.model.SnmpResult? = null
 )

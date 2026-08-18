@@ -28,9 +28,10 @@ class ReportBuilderViewModel(
                         availableScans = scans,
                         availableProjects = projects,
                         availableCompliance = compliance,
-                        availableLogs = logs.filter { it.type != "WIFI" && it.type != "IPERF" },
+                        availableLogs = logs.filter { it.type != "WIFI" && it.type != "IPERF" && it.type != "SNMP" },
                         availableWifiScans = logs.filter { it.type == "WIFI" },
-                        availableIperfTests = logs.filter { it.type == "IPERF" }
+                        availableIperfTests = logs.filter { it.type == "IPERF" },
+                        availableSnmpResults = logs.filter { it.type == "SNMP" }
                     )
                 }
             }.collect()
@@ -115,6 +116,17 @@ class ReportBuilderViewModel(
         }
     }
 
+    fun toggleSnmpResult(logId: Long) {
+        _uiState.update { state ->
+            val newSelected = if (logId in state.selectedSnmpLogIds) {
+                state.selectedSnmpLogIds - logId
+            } else {
+                state.selectedSnmpLogIds + logId
+            }
+            state.copy(selectedSnmpLogIds = newSelected)
+        }
+    }
+
     fun generateReport(format: ReportFormat) {
         val state = _uiState.value
         if (state.isGenerating) return
@@ -143,6 +155,7 @@ class ReportBuilderViewModel(
                 networkScans = selectedScans,
                 wifiScans = state.availableWifiScans.filter { it.id in state.selectedWifiScanIds },
                 iperfTests = state.availableIperfTests.filter { it.id in state.selectedIperfTestIds },
+                snmpResults = state.availableSnmpResults.filter { it.id in state.selectedSnmpLogIds },
                 evidenceProjects = selectedProjects,
                 complianceFindings = selectedCompliance,
                 eventLogs = state.availableLogs.filter { it.id in state.selectedLogIds }
@@ -178,12 +191,14 @@ data class ReportBuilderUiState(
     val availableLogs: List<EventLog> = emptyList(),
     val availableWifiScans: List<EventLog> = emptyList(),
     val availableIperfTests: List<EventLog> = emptyList(),
+    val availableSnmpResults: List<EventLog> = emptyList(),
     val selectedScanIds: Set<Long> = emptySet(),
     val selectedProjectIds: Set<String> = emptySet(),
     val selectedComplianceIds: Set<String> = emptySet(),
     val selectedLogIds: Set<Long> = emptySet(),
     val selectedWifiScanIds: Set<Long> = emptySet(),
     val selectedIperfTestIds: Set<Long> = emptySet(),
+    val selectedSnmpLogIds: Set<Long> = emptySet(),
     val isGenerating: Boolean = false,
     val generatedUri: Uri? = null,
     val error: String? = null

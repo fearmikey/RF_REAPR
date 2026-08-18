@@ -397,6 +397,55 @@ class ReportRepositoryImpl(
                 }
             }
 
+            // SNMP Results
+            if (data.snmpResults.isNotEmpty()) {
+                checkNewPage(40f)
+                paint.textSize = 16f
+                paint.isFakeBoldText = true
+                canvas.drawText("SNMP Infrastructure Audit", margin, y, paint)
+                y += 30f
+
+                data.snmpResults.forEach { log ->
+                    try {
+                        val result = gson.fromJson(log.detailJson, SnmpResult::class.java)
+                        checkNewPage(80f)
+                        paint.textSize = 13f
+                        paint.isFakeBoldText = true
+                        canvas.drawText("${result.sysName ?: result.targetIp}", margin, y, paint)
+                        y += 20f
+                        
+                        paint.textSize = 10f
+                        paint.isFakeBoldText = false
+                        canvas.drawText("Description: ${result.sysDescr ?: "N/A"}", margin + 10f, y, paint)
+                        y += 15f
+                        canvas.drawText("Uptime: ${result.sysUptime ?: "N/A"}", margin + 10f, y, paint)
+                        y += 15f
+                        canvas.drawText("Location: ${result.sysLocation ?: "N/A"}", margin + 10f, y, paint)
+                        y += 25f
+                        
+                        if (result.interfaces.isNotEmpty()) {
+                            val cols = listOf("Index" to 10f, "Interface" to 60f, "Type" to 180f, "Status" to 350f, "Traffic (In/Out)" to 450f)
+                            drawTableHeader(cols)
+                            
+                            paint.textSize = 9f
+                            result.interfaces.forEach { iface ->
+                                if (y > pageHeight - margin - 30f) {
+                                    startNewPage()
+                                    drawTableHeader(cols)
+                                }
+                                canvas.drawText(iface.index.toString(), margin + 10f, y + 15f, paint)
+                                canvas.drawText(iface.name.take(20), margin + 60f, y + 15f, paint)
+                                canvas.drawText(iface.type.take(25), margin + 180f, y + 15f, paint)
+                                canvas.drawText(iface.operStatus, margin + 350f, y + 15f, paint)
+                                canvas.drawText("${iface.inOctets}/${iface.outOctets}", margin + 450f, y + 15f, paint)
+                                y += 20f
+                            }
+                            y += 15f
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+
             // Compliance
             if (data.complianceFindings.isNotEmpty()) {
                 checkNewPage(40f)
@@ -590,7 +639,7 @@ class ReportRepositoryImpl(
                                     // It's a MappedGraph
                                     val nodes = (dataMap["nodes"] as? List<*>) ?: emptyList<Any>()
                                     if (nodes.isNotEmpty()) {
-                                        drawWrappedText("Network Topology Map:", 11f, isBold = true)
+                                        drawWrappedText("Network Discovery Map:", 11f, isBold = true)
                                         val cols = listOf("IP Address" to 10f, "Hostname" to 120f, "Device" to 280f, "Risk" to 420f)
                                         drawTableHeader(cols)
                                         paint.textSize = 9f
@@ -824,6 +873,51 @@ class ReportRepositoryImpl(
                 }
             }
 
+            // SNMP Results
+            if (data.snmpResults.isNotEmpty()) {
+                val snmpSection = document.createParagraph()
+                snmpSection.createRun().apply {
+                    addBreak()
+                    isBold = true
+                    fontSize = 14
+                    setText("SNMP Infrastructure Audit")
+                }
+
+                data.snmpResults.forEach { log ->
+                    try {
+                        val result = gson.fromJson(log.detailJson, SnmpResult::class.java)
+                        document.createParagraph().createRun().apply {
+                            isBold = true
+                            fontSize = 12
+                            setText(result.sysName ?: result.targetIp)
+                        }
+                        
+                        document.createParagraph().createRun().setText("Description: ${result.sysDescr ?: "N/A"}")
+                        document.createParagraph().createRun().setText("Uptime: ${result.sysUptime ?: "N/A"}")
+                        document.createParagraph().createRun().setText("Location: ${result.sysLocation ?: "N/A"}")
+                        
+                        if (result.interfaces.isNotEmpty()) {
+                            val table = document.createTable(result.interfaces.size + 1, 5)
+                            val header = table.getRow(0)
+                            header.getCell(0).text = "Idx"
+                            header.getCell(1).text = "Interface"
+                            header.getCell(2).text = "Type"
+                            header.getCell(3).text = "Status"
+                            header.getCell(4).text = "In/Out Octets"
+                            
+                            result.interfaces.forEachIndexed { i, iface ->
+                                val row = table.getRow(i + 1)
+                                row.getCell(0).text = iface.index.toString()
+                                row.getCell(1).text = iface.name
+                                row.getCell(2).text = iface.type
+                                row.getCell(3).text = iface.operStatus
+                                row.getCell(4).text = "${iface.inOctets} / ${iface.outOctets}"
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+
             // Compliance
             if (data.complianceFindings.isNotEmpty()) {
                 val complianceSection = document.createParagraph()
@@ -987,7 +1081,7 @@ class ReportRepositoryImpl(
                                 if (dataMap.containsKey("nodes") && dataMap.containsKey("edges")) {
                                     val nodes = (dataMap["nodes"] as? List<*>) ?: emptyList<Any>()
                                     if (nodes.isNotEmpty()) {
-                                        document.createParagraph().createRun().apply { isBold = true; setText("Network Topology Map:") }
+                                        document.createParagraph().createRun().apply { isBold = true; setText("Network Discovery Map:") }
                                         val table = document.createTable(nodes.size + 1, 4)
                                         table.getRow(0).apply {
                                             getCell(0).text = "IP Address"

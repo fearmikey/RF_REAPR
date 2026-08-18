@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.8] - 2026-08-17
+
+### Added
+- **Network Auditing**:
+    - Integrated **SNMP Browser** module for querying network devices (v1/v2c).
+    - Support for OID walking, system information retrieval, interface monitoring, and service discovery via SNMP.
+    - Added SNMP scan results to the automated Report Builder (PDF/DOCX).
+- **Topology Mapping**:
+    - Major enhancements to the **Network Topology Map** with improved device type identification and risk analysis.
+    - Implemented persistence for discovered network nodes and sessions using Room database.
+    - Added detailed topology breakdown to audit reports.
+- **System**:
+    - Added `snmp4j` library for robust SNMP communication.
+
+### Changed
+- **Maintenance**: Version bump to 1.4.8.
+
 ## [1.4.7] - 2026-08-17
 
 ### Added

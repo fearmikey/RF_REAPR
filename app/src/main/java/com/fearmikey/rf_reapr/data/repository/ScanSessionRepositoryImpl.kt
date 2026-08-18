@@ -70,7 +70,8 @@ class ScanSessionRepositoryImpl(
             riskLevel = riskLevel,
             openPorts = openPorts,
             deviceType = deviceType,
-            parentId = parentId
+            parentId = parentId,
+            snmpData = snmpData
         )
     }
 
@@ -82,7 +83,8 @@ class ScanSessionRepositoryImpl(
             riskLevel = riskLevel,
             openPorts = openPorts,
             deviceType = deviceType,
-            parentId = parentId
+            parentId = parentId,
+            snmpData = snmpData
         )
     }
 }

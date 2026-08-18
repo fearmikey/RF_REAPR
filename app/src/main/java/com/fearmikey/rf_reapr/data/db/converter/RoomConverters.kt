@@ -25,4 +25,14 @@ class RoomConverters {
         val listType = object : TypeToken<List<OpenPort>>() {}.type
         return gson.fromJson(value, listType)
     }
+
+    @TypeConverter
+    fun fromSnmpResult(value: com.fearmikey.rf_reapr.domain.model.SnmpResult?): String? {
+        return value?.let { gson.toJson(it) }
+    }
+
+    @TypeConverter
+    fun toSnmpResult(value: String?): com.fearmikey.rf_reapr.domain.model.SnmpResult? {
+        return value?.let { gson.fromJson(it, com.fearmikey.rf_reapr.domain.model.SnmpResult::class.java) }
+    }
 }

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,8 +38,11 @@ fun TopologyScreen(
     val isAuditing by viewModel.isAuditing.collectAsState()
     val isApiKeySet by viewModel.isApiKeySet.collectAsState()
     val showNetworkMismatchDialog by viewModel.showNetworkMismatchDialog.collectAsState()
+    val autoPortScan by viewModel.autoPortScan.collectAsState()
+    val autoSnmpDiscovery by viewModel.autoSnmpDiscovery.collectAsState()
     
     var isListView by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
     var selectedNodeId by remember { mutableStateOf<String?>(null) }
     
     val selectedNode = remember(selectedNodeId, mappedGraph) {
@@ -60,7 +64,7 @@ fun TopologyScreen(
     if (showClearConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
-            title = { Text("Clear All Topology Data?") },
+            title = { Text("Clear All Discovery Data?") },
             text = { Text("This will permanently delete all discovered devices and scan results. This action cannot be undone.") },
             confirmButton = {
                 TextButton(
@@ -84,13 +88,41 @@ fun TopologyScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Network Topology Map") },
+                title = { Text("Network Discovery") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Scan Options")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = autoPortScan, onCheckedChange = { viewModel.toggleAutoPortScan() })
+                                        Text("Common Port Scan")
+                                    }
+                                },
+                                onClick = { viewModel.toggleAutoPortScan() }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = autoSnmpDiscovery, onCheckedChange = { viewModel.toggleAutoSnmpDiscovery() })
+                                        Text("Discover SNMP Services")
+                                    }
+                                },
+                                onClick = { viewModel.toggleAutoSnmpDiscovery() }
+                            )
+                        }
+                    }
                     IconButton(onClick = { showInfoDialog = true }) {
                         Icon(Icons.Default.Info, contentDescription = "Information")
                     }
@@ -175,7 +207,7 @@ fun TopologyScreen(
             if (showInfoDialog) {
                 AlertDialog(
                     onDismissRequest = { showInfoDialog = false },
-                    title = { Text("Topology Mapping Information") },
+                    title = { Text("Network Discovery Information") },
                     text = {
                         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                             Text(
@@ -184,7 +216,7 @@ fun TopologyScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Uses ARP sweeps and active probing to identify all live devices on the local subnet. It identifies manufacturers via MAC addresses and resolves hostnames to build a visual map.",
+                                text = "Uses ARP sweeps and active probing to identify all live devices on the local subnet. If enabled, it automatically performs port scans and SNMP discovery to enrich device data.",
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Spacer(modifier = Modifier.height(12.dp))
