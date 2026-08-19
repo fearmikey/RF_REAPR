@@ -41,6 +41,9 @@ fun NetworkMapView(
     val secondaryLabelStyle = remember(onSurfaceColor) {
         TextStyle(color = onSurfaceColor.copy(alpha = 0.7f), fontSize = 11.sp)
     }
+    val snmpLabelStyle = remember(onSurfaceColor) {
+        TextStyle(color = Color(0xFF00ACC1), fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+    }
     
     val edgeColor = remember(onSurfaceColor) { onSurfaceColor.copy(alpha = 0.2f) }
 
@@ -186,7 +189,21 @@ fun NetworkMapView(
                         labelYOffset += secondaryTextLayout.size.height
                     }
 
-                    // 4. Ports
+                    // 4. SNMP Indicator
+                    if (mappedNode.node.snmpData != null) {
+                        val snmpLabel = "SNMP"
+                        val snmpTextLayout = textMeasurer.measure(snmpLabel, snmpLabelStyle)
+                        drawText(
+                            textLayoutResult = snmpTextLayout,
+                            topLeft = Offset(
+                                x = mappedNode.x - (snmpTextLayout.size.width / 2f),
+                                y = mappedNode.y + labelYOffset
+                            )
+                        )
+                        labelYOffset += snmpTextLayout.size.height
+                    }
+
+                    // 5. Ports
                     val openPorts = mappedNode.node.openPorts
 
                     if (openPorts.isNotEmpty()) {

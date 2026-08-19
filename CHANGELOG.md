@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.9] - 2026-08-18
+
+### Added
+- **Network Auditing**:
+    - **Packet Capture (PCAP)**: Introduced integrated network traffic capture module.
+    - Support for both **VPN-based (Non-Root)** and **Native tcpdump (Root)** capture methods.
+    - Added real-time traffic monitor and PCAP file management system.
+- **Topology Mapping**:
+    - Enhanced `NetworkMapView` with improved node rendering and interaction.
+    - Added `DeviceDetailBottomSheet` for in-depth node inspection.
+    - Refined node list and topology filtering logic.
+- **System**:
+    - Added necessary `VpnService` and storage configurations for traffic analysis.
+
+### Changed
+- **Maintenance**: Version bump to 1.4.9.
+
 ## [1.4.8] - 2026-08-17
 
 ### Added

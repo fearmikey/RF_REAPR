@@ -148,6 +148,14 @@ fun MainMenuScreen(
             isAggressive = true
         ),
         ToolkitTool(
+            "Packet Capture",
+            "Capture network traffic to a PCAP file.",
+            Icons.Default.Waves,
+            Screen.PacketCapture.route,
+            ToolCategory.NETWORK,
+            isAggressive = true
+        ),
+        ToolkitTool(
             "SNMP Browser",
             "Query routers and switches for system info and traffic.",
             Icons.Default.Router,
@@ -335,6 +343,13 @@ fun MainMenuScreen(
             "Export SNMP query results.",
             Icons.Default.Router,
             Screen.SnmpLogs.route,
+            ToolCategory.LOGS
+        ),
+        ToolkitTool(
+            "Packet Capture Logs",
+            "Export raw PCAP files.",
+            Icons.Default.Waves,
+            Screen.PacketCaptureLogs.route,
             ToolCategory.LOGS
         )
     )

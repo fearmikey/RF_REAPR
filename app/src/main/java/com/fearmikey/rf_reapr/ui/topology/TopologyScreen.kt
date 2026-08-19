@@ -436,6 +436,9 @@ fun TopologyScreen(
                 },
                 onScanPorts = { nodeToScan ->
                     viewModel.scanSingleNodeTrigger(nodeToScan)
+                },
+                onScanSnmp = { nodeToScan ->
+                    viewModel.scanSnmpSingleNodeTrigger(nodeToScan)
                 }
             )
         }

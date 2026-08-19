@@ -75,6 +75,8 @@ import com.fearmikey.rf_reapr.ui.mdns.*
 import com.fearmikey.rf_reapr.ui.traceroute.*
 import com.fearmikey.rf_reapr.ui.arp.*
 import com.fearmikey.rf_reapr.ui.snmp.*
+import com.fearmikey.rf_reapr.ui.network.PacketCaptureScreen
+import com.fearmikey.rf_reapr.ui.logs.PcapLogListScreen
 import com.fearmikey.rf_reapr.ui.report.*
 import com.fearmikey.rf_reapr.ui.sdr.SdrScreen
 import com.fearmikey.rf_reapr.ui.sdr.SdrViewModel
@@ -593,6 +595,11 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                        composable(Screen.PacketCapture.route) {
+                            PacketCaptureScreen(
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                         composable(Screen.SnmpBrowser.route) {
                             SnmpBrowserScreen(
                                 viewModel = snmpViewModel,
@@ -624,6 +631,11 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.SnmpLogs.route) {
                             LogListScreen("SNMP", "SNMP Browser Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.PacketCaptureLogs.route) {
+                            PcapLogListScreen(
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         
                         // Compliance Routes

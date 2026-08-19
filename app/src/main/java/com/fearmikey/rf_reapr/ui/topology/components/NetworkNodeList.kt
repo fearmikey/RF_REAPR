@@ -47,15 +47,13 @@ fun NodeListItem(
     node: NetworkNode,
     onClick: () -> Unit
 ) {
-    // Passing individual properties instead of the node object itself
-    // helps Compose skip recomposition if these specific fields haven't changed,
-    // even if other fields (like openPorts) have.
     NodeListItemContent(
         hostname = node.hostname,
         ipAddress = node.ipAddress,
         macAddress = node.macAddress,
         manufacturer = node.manufacturer,
         riskLevel = node.riskLevel,
+        hasSnmp = node.snmpData != null,
         onClick = onClick
     )
 }
@@ -67,6 +65,7 @@ private fun NodeListItemContent(
     macAddress: String?,
     manufacturer: String?,
     riskLevel: RiskLevel,
+    hasSnmp: Boolean,
     onClick: () -> Unit
 ) {
     Card(
@@ -107,6 +106,14 @@ private fun NodeListItemContent(
                         text = "Manufacturer: $it",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                if (hasSnmp) {
+                    Text(
+                        text = "SNMP Service Detected",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = androidx.compose.ui.graphics.Color(0xFF00ACC1),
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

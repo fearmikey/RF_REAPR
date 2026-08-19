@@ -15,6 +15,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Network Discovery & Analysis
 *   **Network Topology Map**: Interactive visualization of network structure and connected devices.
 *   **Port Scanner**: Identify open ports and potential vulnerabilities on network devices.
+*   **Packet Capture (PCAP)**: Integrated traffic capture (VPN or Root) for deep packet analysis.
 *   **Website Inspector**: Basic web auditing and security header analysis.
 *   **Ping Tool**: Network latency and connectivity testing.
 *   **Network Throughput (iPerf)**: High-performance bandwidth testing via integrated iperf3.
@@ -57,7 +58,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.4.8.apk` from the root of this repository.
+1.  Download the latest `RF_REAPR_v1.4.9.apk` from the root of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)

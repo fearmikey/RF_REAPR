@@ -45,10 +45,10 @@ class TopologyViewModel(
     private val _isAuditing = MutableStateFlow(false)
     val isAuditing: StateFlow<Boolean> = _isAuditing.asStateFlow()
 
-    private val _autoPortScan = MutableStateFlow(true)
+    private val _autoPortScan = MutableStateFlow(false)
     val autoPortScan: StateFlow<Boolean> = _autoPortScan.asStateFlow()
 
-    private val _autoSnmpDiscovery = MutableStateFlow(true)
+    private val _autoSnmpDiscovery = MutableStateFlow(false)
     val autoSnmpDiscovery: StateFlow<Boolean> = _autoSnmpDiscovery.asStateFlow()
 
     private val _showNetworkMismatchDialog = MutableStateFlow(false)
@@ -214,7 +214,22 @@ class TopologyViewModel(
             
             logRepository.saveLog(
                 type = "TOPOLOGY",
-                summary = "Completed individual audit for ${node.ipAddress}",
+                summary = "Completed individual port audit for ${node.ipAddress}",
+                detailJson = gson.toJson(node)
+            )
+        }
+    }
+
+    fun scanSnmpSingleNodeTrigger(node: NetworkNode) {
+        if (isPassiveMode.value) return
+        viewModelScope.launch {
+            _isAuditing.value = true
+            querySnmpForNode(node)
+            _isAuditing.value = false
+            
+            logRepository.saveLog(
+                type = "TOPOLOGY",
+                summary = "Completed individual SNMP audit for ${node.ipAddress}",
                 detailJson = gson.toJson(node)
             )
         }

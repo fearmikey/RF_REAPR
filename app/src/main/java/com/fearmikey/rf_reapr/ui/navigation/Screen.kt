@@ -42,6 +42,7 @@ sealed class Screen(val route: String) {
     data object UpnpAuditor : Screen("upnp_auditor")
     data object SdrController : Screen("sdr_controller")
     data object IperfTester : Screen("iperf_tester")
+    data object PacketCapture : Screen("packet_capture")
 
     data object ComplianceChecklists : Screen("compliance_checklists")
     data object AuditChecklist : Screen("audit_checklist/{frameworkId}") {
@@ -59,4 +60,5 @@ sealed class Screen(val route: String) {
     data object IperfLogs : Screen("logs/iperf")
     data object TopologyLogs : Screen("logs/network_discovery")
     data object SnmpLogs : Screen("logs/snmp")
+    data object PacketCaptureLogs : Screen("logs/pcap")
 }

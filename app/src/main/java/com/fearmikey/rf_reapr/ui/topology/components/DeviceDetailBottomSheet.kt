@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,7 @@ fun DeviceDetailBottomSheet(
     onTypeChange: (DeviceType) -> Unit = {},
     onParentChange: (String?) -> Unit = {},
     onScanPorts: (NetworkNode) -> Unit = {},
+    onScanSnmp: (NetworkNode) -> Unit = {},
     isPassiveMode: Boolean = false
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -44,9 +46,9 @@ fun DeviceDetailBottomSheet(
     var selectedPortDetails by remember { mutableStateOf<OpenPort?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
-    // Auto-expand the sheet when ports are discovered
-    LaunchedEffect(node.openPorts.size) {
-        if (node.openPorts.isNotEmpty()) {
+    // Auto-expand the sheet when ports or SNMP data is discovered
+    LaunchedEffect(node.openPorts.size, node.snmpData != null) {
+        if (node.openPorts.isNotEmpty() || node.snmpData != null) {
             // Delay slightly to allow the LazyColumn to be measured and the sheet to update its internal constraints
             kotlinx.coroutines.delay(300)
             if (sheetState.currentValue != SheetValue.Expanded) {
@@ -132,6 +134,27 @@ fun DeviceDetailBottomSheet(
                         textAlign = TextAlign.Center
                     )
                 }
+
+                Button(
+                    onClick = { onScanSnmp(node) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    enabled = !isPassiveMode,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.SettingsRemote, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Scan SNMP", 
+                        style = MaterialTheme.typography.labelLarge,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -209,7 +232,32 @@ fun DeviceDetailBottomSheet(
             
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (node.openPorts.isEmpty()) {
+            // --- SNMP Data Section ---
+            node.snmpData?.let { snmp ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.SettingsRemote, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.tertiary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "SNMP Discovery Result", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        snmp.sysName?.let { Text(text = "SysName: $it", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold) }
+                        snmp.sysDescr?.let { Text(text = "Descr: $it", style = MaterialTheme.typography.bodySmall) }
+                        snmp.sysUptime?.let { Text(text = "Uptime: $it", style = MaterialTheme.typography.bodySmall) }
+                        snmp.sysLocation?.let { Text(text = "Location: $it", style = MaterialTheme.typography.bodySmall) }
+                        if (snmp.interfaces.isNotEmpty()) {
+                            Text(text = "Interfaces detected: ${snmp.interfaces.size}", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            if (node.openPorts.isEmpty() && node.snmpData == null) {
                 Text(
                     text = "No open ports detected on this device.",
                     style = MaterialTheme.typography.bodyMedium,
