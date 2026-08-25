@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,9 +29,9 @@ fun MagnetometerScreen(
     viewModel: MagnetometerViewModel,
     onBack: () -> Unit
 ) {
-    val data by viewModel.magnetometerData.collectAsState()
-    val peak by viewModel.peakStrength.collectAsState()
-    val status by viewModel.fieldStatus.collectAsState()
+    val data by viewModel.magnetometerData.collectAsStateWithLifecycle()
+    val peak by viewModel.peakStrength.collectAsStateWithLifecycle()
+    val status by viewModel.fieldStatus.collectAsStateWithLifecycle()
     
     var showAccuracyTip by remember { mutableStateOf(true) }
 

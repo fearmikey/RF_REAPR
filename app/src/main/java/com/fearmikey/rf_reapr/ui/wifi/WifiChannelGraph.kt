@@ -67,6 +67,18 @@ fun WifiChannelGraph(
         FrequencyRange.FREQ_6GHZ -> 5900f to 7150f
     }
 
+    val visibleAps = remember(accessPoints, hiddenBssids) {
+        accessPoints.filter { !hiddenBssids.contains(it.bssid) }
+    }
+
+    val apsByFreq = remember(visibleAps) {
+        visibleAps.groupBy { it.frequency }
+    }
+
+    val sortedApsForDrawing = remember(visibleAps) {
+        visibleAps.sortedBy { it.signalLevel }
+    }
+
     Column(modifier = modifier
         .fillMaxWidth()
         .background(surfaceColor, shape = MaterialTheme.shapes.medium)
@@ -168,10 +180,8 @@ fun WifiChannelGraph(
                 }
             }
 
-            // Draw access points as humps
-            accessPoints.forEach { ap ->
-                if (hiddenBssids.contains(ap.bssid)) return@forEach
-
+            // Draw access points as humps (weakest first so strongest is drawn on top)
+            sortedApsForDrawing.forEach { ap ->
                 val color = getColorForBssid(ap.bssid)
                 val centerX = freqToX(ap.frequency.toFloat())
                 val bandwidthWidth = (ap.bandwidth.toFloat() / (maxFreq - minFreq)) * width * scale
@@ -197,35 +207,64 @@ fun WifiChannelGraph(
                 
                 drawPath(path = path, color = color.copy(alpha = 0.3f))
                 drawPath(path = path, color = color, style = Stroke(width = 2.dp.toPx()))
+            }
+            
+            // Draw labels, grouped by frequency to prevent overlap
+            apsByFreq.forEach { (_, aps) ->
+                // Sort by signal strength descending (strongest first, so it gets placed at the top visually)
+                // If signal strengths are the same, they just get stacked because of the logic below.
+                val sortedAps = aps.sortedByDescending { it.signalLevel }
                 
-                // Draw SSID and Bandwidth (Fixed size labels)
-                val labelPaint = android.graphics.Paint().apply {
-                    this.color = onSurfaceColor.toArgb()
-                    this.textSize = 28f
-                    this.isFakeBoldText = true
-                    this.textAlign = android.graphics.Paint.Align.CENTER
+                var lastLabelBottomY = -Float.MAX_VALUE
+                val labelSpacing = 40f // Vertical space required for a label block
+                
+                // Note: we draw labels from strongest to weakest to ensure the strongest is placed at its ideal position (topY).
+                // However, doing so means the weakest label is drawn LAST (on top in Z-order).
+                // To ensure the strongest text is drawn ON TOP of weaker text, we calculate positions first, then draw in reverse.
+                
+                val labelPositions = sortedAps.map { ap ->
+                    val topY = rssiToY(ap.signalLevel)
+                    val baseY = maxOf(topY, lastLabelBottomY + labelSpacing)
+                    lastLabelBottomY = baseY
+                    ap to baseY
                 }
                 
-                val ssidLabel = if (ap.ssid.isEmpty()) "[Hidden]" else ap.ssid
-                drawContext.canvas.nativeCanvas.drawText(
-                    ssidLabel,
-                    centerX,
-                    topY - 30f,
-                    labelPaint
-                )
-                
-                val infoPaint = android.graphics.Paint().apply {
-                    this.color = onSurfaceColor.toArgb()
-                    this.textSize = 22f
-                    this.textAlign = android.graphics.Paint.Align.CENTER
-                    this.alpha = 200
+                // Draw in reverse (weakest first) so strongest text is on top Z-order
+                labelPositions.reversed().forEach { (ap, baseY) ->
+                    val centerX = freqToX(ap.frequency.toFloat())
+                    
+                    if (centerX < 0 || centerX > width) return@forEach
+                    
+                    // Draw SSID
+                    val labelPaint = android.graphics.Paint().apply {
+                        this.color = onSurfaceColor.toArgb()
+                        this.textSize = 28f
+                        this.isFakeBoldText = true
+                        this.textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                    
+                    val ssidLabel = if (ap.ssid.isEmpty()) "[Hidden]" else ap.ssid
+                    drawContext.canvas.nativeCanvas.drawText(
+                        ssidLabel,
+                        centerX,
+                        baseY - 30f,
+                        labelPaint
+                    )
+                    
+                    // Draw Bandwidth Info
+                    val infoPaint = android.graphics.Paint().apply {
+                        this.color = onSurfaceColor.toArgb()
+                        this.textSize = 22f
+                        this.textAlign = android.graphics.Paint.Align.CENTER
+                        this.alpha = 200
+                    }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        "${ap.bandwidth}MHz",
+                        centerX,
+                        baseY - 5f,
+                        infoPaint
+                    )
                 }
-                drawContext.canvas.nativeCanvas.drawText(
-                    "${ap.bandwidth}MHz",
-                    centerX,
-                    topY - 5f,
-                    infoPaint
-                )
             }
         }
         

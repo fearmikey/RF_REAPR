@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,7 +28,7 @@ fun LogListScreen(
     viewModel: LogViewModel,
     onBack: () -> Unit
 ) {
-    val logs by viewModel.logs.collectAsState()
+    val logs by viewModel.logs.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(type) {

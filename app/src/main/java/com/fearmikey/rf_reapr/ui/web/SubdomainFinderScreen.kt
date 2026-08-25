@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -43,10 +44,10 @@ fun SubdomainFinderScreen(
     onNavigateToCloudScanner: (String) -> Unit
 ) {
     var domain by remember { mutableStateOf("google.com") }
-    val subdomains by viewModel.subdomains.collectAsState()
-    val progress by viewModel.progress.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val isFinished by viewModel.isFinished.collectAsState()
+    val subdomains by viewModel.subdomains.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val isFinished by viewModel.isFinished.collectAsStateWithLifecycle()
     
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
@@ -214,7 +215,7 @@ fun SubdomainItemRow(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = item.hostname, 
+                        text = item.hostname,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -222,9 +223,9 @@ fun SubdomainItemRow(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(
-                        color = if (item.source == DiscoverySource.PASSIVE) 
-                            MaterialTheme.colorScheme.secondaryContainer 
-                        else 
+                        color = if (item.source == DiscoverySource.PASSIVE)
+                            MaterialTheme.colorScheme.secondaryContainer
+                        else
                             MaterialTheme.colorScheme.tertiaryContainer,
                         shape = MaterialTheme.shapes.extraSmall
                     ) {
@@ -232,9 +233,9 @@ fun SubdomainItemRow(
                             text = if (item.source == DiscoverySource.PASSIVE) "CT" else "BRUTE",
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (item.source == DiscoverySource.PASSIVE) 
-                                MaterialTheme.colorScheme.onSecondaryContainer 
-                            else 
+                            color = if (item.source == DiscoverySource.PASSIVE)
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            else
                                 MaterialTheme.colorScheme.onTertiaryContainer
                         )
                     }
@@ -245,10 +246,10 @@ fun SubdomainItemRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(
-                    imageVector = Icons.Default.ContentCopy, 
+                    imageVector = Icons.Default.ContentCopy,
                     contentDescription = "Copy",
                     modifier = Modifier
                         .size(18.dp)
@@ -256,7 +257,7 @@ fun SubdomainItemRow(
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Icon(
-                    imageVector = Icons.Default.OpenInBrowser, 
+                    imageVector = Icons.Default.OpenInBrowser,
                     contentDescription = "Open",
                     modifier = Modifier
                         .size(18.dp)
@@ -264,7 +265,7 @@ fun SubdomainItemRow(
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Icon(
-                    imageVector = Icons.Default.Cloud, 
+                    imageVector = Icons.Default.Cloud,
                     contentDescription = "Cloud Discovery",
                     modifier = Modifier
                         .size(18.dp)

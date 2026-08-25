@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -23,10 +24,18 @@ import java.util.*
 @Composable
 fun ReportBuilderScreen(
     viewModel: ReportBuilderViewModel,
+    autoGenerate: Boolean = false,
+    startTime: Long? = null,
     onBack: () -> Unit
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        if (autoGenerate) {
+            viewModel.autoSelectAndGenerate(startTime = startTime)
+        }
+    }
 
     LaunchedEffect(state.generatedUri) {
         state.generatedUri?.let { uri ->
@@ -133,6 +142,16 @@ fun ReportBuilderScreen(
                     subtitle = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(result.timestamp)),
                     isSelected = result.id in state.selectedSnmpLogIds,
                     onToggle = { viewModel.toggleSnmpResult(result.id) }
+                )
+            }
+
+            item { SectionHeader("External Recon", Icons.Default.Language) }
+            items(state.availableExternalRecon) { result ->
+                SelectionItem(
+                    title = result.summary,
+                    subtitle = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(result.timestamp)),
+                    isSelected = result.id in state.selectedExternalReconIds,
+                    onToggle = { viewModel.toggleExternalRecon(result.id) }
                 )
             }
 

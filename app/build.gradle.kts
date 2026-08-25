@@ -15,8 +15,8 @@ android {
         applicationId = "com.fearmikey.rf_reapr"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.4.9"
+        versionCode = 15
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -31,6 +31,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            isMinifyEnabled = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-DEBUG"
+        }
         release {
             val keystoreProperties = Properties()
             val keystorePropertiesFile = rootProject.file("local.properties")
@@ -49,8 +54,8 @@ android {
                 }
             }
 
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -64,6 +69,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    lint {
+        // Works around a crash in the androidx.lifecycle lint detector
+        // (NonNullableMutableLiveDataDetector) when analyzing MainActivity.kt
+        // with this AGP/Lint/Kotlin toolchain combination:
+        // "Found class ...KaCallableMemberCall, but interface was expected".
+        // This is a lint-tooling bug, not a real project issue.
+        disable += "NullSafeMutableLiveData"
     }
     externalNativeBuild {
         cmake {
@@ -87,6 +100,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
@@ -114,6 +128,9 @@ dependencies {
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
+
+    // Baseline Profile support (consumes a generated baseline profile if/when one is added)
+    implementation(libs.androidx.profileinstaller)
 
     // CameraX
     implementation(libs.androidx.camera.core)

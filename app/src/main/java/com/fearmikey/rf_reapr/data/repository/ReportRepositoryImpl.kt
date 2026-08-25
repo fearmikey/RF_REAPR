@@ -568,11 +568,16 @@ class ReportRepositoryImpl(
                                     }
                                 }
                             }
-                            "WEB_CLOUD", "WEB" -> {
+                            "WEB_CLOUD", "WEB", "CLOUD" -> {
                                 try {
-                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
-                                    val assets = (dataMap["assets"] as? List<*>) ?: emptyList<Any>()
-                                    if (assets.isNotEmpty()) {
+                                    val assets = try {
+                                        val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                        (dataMap["assets"] as? List<*>)
+                                    } catch (_: Exception) {
+                                        gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>
+                                    }
+
+                                    if (assets != null && assets.isNotEmpty()) {
                                         val cols = listOf("Platform" to 10f, "URL" to 100f, "Status" to 400f)
                                         drawTableHeader(cols)
                                         paint.textSize = 9f
@@ -585,23 +590,20 @@ class ReportRepositoryImpl(
                                             y += 18f
                                         }
                                     } else {
-                                        // Try WebsiteInspectorStatus
-                                        if (dataMap.containsKey("httpStatus")) {
-                                            drawWrappedText("Website Security Audit Details:", 10f, isBold = true)
-                                            drawWrappedText("HTTP Status: ${dataMap["httpStatus"]}", 9f, indent = 10f)
-                                            drawWrappedText("TLS Status: ${dataMap["tlsStatus"]}", 9f, indent = 10f)
-                                            drawWrappedText("DNS Status: ${dataMap["dnsStatus"]}", 9f, indent = 10f)
-                                        } else {
-                                            drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
-                                        }
+                                        drawWrappedText("No cloud assets discovered for this target.", 10f, color = Color.GRAY)
                                     }
                                 } catch (_: Exception) {
                                     drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
                                 }
                             }
-                            "WEB_TLS" -> {
-                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
-                                val ciphers = (dataMap["ciphers"] as? List<*>) ?: emptyList<Any>()
+                            "WEB_TLS", "TLS" -> {
+                                val ciphers = try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    (dataMap["ciphers"] as? List<*>) ?: (gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>) ?: emptyList<Any>()
+                                } catch (_: Exception) {
+                                    (gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>) ?: emptyList<Any>()
+                                }
+                                
                                 if (ciphers.isNotEmpty()) {
                                     val cols = listOf("Protocol" to 10f, "Cipher Suite" to 100f, "Risk" to 450f)
                                     drawTableHeader(cols)
@@ -614,13 +616,180 @@ class ReportRepositoryImpl(
                                         canvas.drawText(c["riskLevel"]?.toString() ?: "", margin + 450f, y + 15f, paint)
                                         y += 18f
                                     }
+                                } else {
+                                    drawWrappedText("No TLS ciphers audited or target unreachable.", 10f, color = Color.GRAY)
                                 }
                             }
-                            "WEB_SUBDOMAIN" -> {
-                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
-                                val subdomains = (dataMap["subdomains"] as? List<*>) ?: emptyList<Any>()
+                            "WEB_SUBDOMAIN", "SUBDOMAIN" -> {
+                                val subdomains = try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    (dataMap["subdomains"] as? List<*>) ?: (gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>) ?: emptyList<Any>()
+                                } catch (_: Exception) {
+                                    (gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>) ?: emptyList<Any>()
+                                }
+
                                 if (subdomains.isNotEmpty()) {
-                                    drawWrappedText("Discovered Subdomains: " + subdomains.joinToString { (it as Map<*, *>)["hostname"]?.toString() ?: "" }, 10f)
+                                    val cols = listOf("Hostname" to 10f, "IP Address" to 250f, "Source" to 450f)
+                                    drawTableHeader(cols)
+                                    paint.textSize = 9f
+                                    subdomains.forEach { subObj ->
+                                        if (y > pageHeight - margin - 20f) { startNewPage(); drawTableHeader(cols) }
+                                        val s = subObj as Map<*, *>
+                                        canvas.drawText(s["hostname"]?.toString() ?: "", margin + 10f, y + 15f, paint)
+                                        canvas.drawText(s["ipAddress"]?.toString() ?: "N/A", margin + 250f, y + 15f, paint)
+                                        canvas.drawText(s["source"]?.toString() ?: "N/A", margin + 450f, y + 15f, paint)
+                                        y += 18f
+                                    }
+                                } else {
+                                    drawWrappedText("No subdomains discovered for this domain.", 10f, color = Color.GRAY)
+                                }
+                            }
+                            "WEBSITE" -> {
+                                try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    drawWrappedText("Website Infrastructure Audit:", 10f, isBold = true)
+                                    
+                                    val httpStatus = dataMap["httpStatus"] as? Map<*, *>
+                                    val tlsStatus = dataMap["tlsStatus"] as? Map<*, *>
+                                    val dnsStatus = dataMap["dnsStatus"] as? Map<*, *>
+                                    
+                                    if (httpStatus != null) {
+                                        val httpData = httpStatus["data"] as? Map<*, *>
+                                        drawWrappedText("HTTP Analysis: ${httpStatus["type"] ?: ""}", 9f, indent = 10f)
+                                        if (httpData != null) {
+                                            drawWrappedText("Server: ${httpData["server"] ?: "N/A"}", 8f, indent = 20f)
+                                            drawWrappedText("Headers Found: ${(httpData["securityHeaders"] as? List<*>)?.size ?: 0}", 8f, indent = 20f)
+                                        }
+                                    }
+                                    if (tlsStatus != null) {
+                                        val tlsData = tlsStatus["data"] as? Map<*, *>
+                                        drawWrappedText("TLS Security: ${tlsStatus["type"] ?: ""}", 9f, indent = 10f)
+                                        if (tlsData != null) {
+                                            drawWrappedText("Protocol: ${tlsData["protocol"] ?: "N/A"}", 8f, indent = 20f)
+                                            drawWrappedText("Issuer: ${tlsData["issuer"] ?: "N/A"}", 8f, indent = 20f)
+                                        }
+                                    }
+                                    if (dnsStatus != null) {
+                                        val dnsData = dnsStatus["data"] as? Map<*, *>
+                                        drawWrappedText("DNS Records: ${dnsStatus["type"] ?: ""}", 9f, indent = 10f)
+                                        if (dnsData != null) {
+                                            val records = (dnsData["records"] as? List<*>) ?: emptyList<Any>()
+                                            records.forEach { recordObj ->
+                                                val r = recordObj as Map<*, *>
+                                                val type = r["type"]?.toString() ?: ""
+                                                val value = r["value"]?.toString() ?: ""
+                                                drawWrappedText("$type: $value", 8f, indent = 20f)
+                                            }
+                                        }
+                                    }
+                                } catch (_: Exception) {
+                                    drawWrappedText("Could not parse Website Audit data.", 10f, color = Color.GRAY)
+                                }
+                            }
+                            "HIBP" -> {
+                                val dataMap = try {
+                                    gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type) as? Map<String, Any>
+                                } catch (_: Exception) { null }
+                                
+                                val breaches = try {
+                                    (dataMap?.get("breaches") as? List<*>) ?: gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>
+                                } catch (_: Exception) { emptyList<Any>() }
+                                
+                                if (breaches != null && breaches.isNotEmpty()) {
+                                    val account = dataMap?.get("account")?.toString()
+                                    if (account != null) {
+                                        drawWrappedText("Target Checked: $account", 10f, isBold = true)
+                                        y += 5f
+                                    }
+                                    
+                                    drawWrappedText("Identified Breaches:", 10f, isBold = true)
+                                    val cols = listOf("Breach Name" to 10f, "Domain" to 110f, "Date" to 220f, "Leaked Data" to 300f)
+                                    drawTableHeader(cols)
+                                    paint.textSize = 8f
+                                    breaches.forEach { bObj ->
+                                        if (y > pageHeight - margin - 30f) { startNewPage(); drawTableHeader(cols) }
+                                        val b = bObj as Map<*, *>
+                                        canvas.drawText(b["name"]?.toString() ?: "", margin + 10f, y + 15f, paint)
+                                        canvas.drawText(b["domain"]?.toString() ?: "", margin + 110f, y + 15f, paint)
+                                        canvas.drawText(b["breachDate"]?.toString() ?: "", margin + 220f, y + 15f, paint)
+                                        
+                                        val dataClasses = (b["dataClasses"] as? List<*>)?.joinToString(", ") ?: ""
+                                        val dataText = if (dataClasses.length > 50) dataClasses.take(47) + "..." else dataClasses
+                                        canvas.drawText(dataText, margin + 300f, y + 15f, paint)
+                                        y += 18f
+                                    }
+                                } else {
+                                    drawWrappedText("No major breaches found for this domain on HIBP.", 10f, color = Color.GRAY)
+                                }
+                            }
+                            "SHODAN" -> {
+                                try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    
+                                    if (dataMap.containsKey("total") && dataMap.containsKey("matches")) {
+                                        val total = dataMap["total"]?.toString()?.substringBefore(".") ?: "0"
+                                        drawWrappedText("Total Shodan Results: $total", 10f, isBold = true)
+                                        
+                                        val matches = (dataMap["matches"] as? List<*>) ?: emptyList<Any>()
+                                        if (matches.isNotEmpty()) {
+                                            val cols = listOf("IP Address" to 10f, "Port" to 100f, "Hostnames" to 180f, "Organization" to 350f)
+                                            drawTableHeader(cols)
+                                            paint.textSize = 8f
+                                            matches.take(15).forEach { mObj ->
+                                                if (y > pageHeight - margin - 20f) { startNewPage(); drawTableHeader(cols) }
+                                                val m = mObj as Map<*, *>
+                                                canvas.drawText(m["ip_str"]?.toString() ?: "", margin + 10f, y + 15f, paint)
+                                                canvas.drawText(m["port"]?.toString()?.substringBefore(".") ?: "", margin + 100f, y + 15f, paint)
+                                                
+                                                val hostnames = (m["hostnames"] as? List<*>)?.joinToString(", ") ?: ""
+                                                canvas.drawText(if (hostnames.length > 30) hostnames.take(27) + "..." else hostnames, margin + 180f, y + 15f, paint)
+                                                
+                                                canvas.drawText(m["org"]?.toString()?.take(30) ?: "", margin + 350f, y + 15f, paint)
+                                                y += 18f
+                                            }
+                                        } else if (total != "0") {
+                                             drawWrappedText("(Detailed results hidden or unavailable)", 9f, color = Color.GRAY, indent = 10f)
+                                        } else {
+                                             drawWrappedText("No matches found in Shodan database.", 10f, color = Color.GRAY)
+                                        }
+                                    } else {
+                                        // Try host report or InternetDB format
+                                        val ip = dataMap["ip_str"]?.toString() ?: dataMap["ip"]?.toString()
+                                        if (ip != null) {
+                                            drawWrappedText("Shodan/InternetDB Host Report: $ip", 10f, isBold = true)
+                                            if (dataMap.containsKey("org")) drawWrappedText("Organization: ${dataMap["org"] ?: "N/A"}", 9f, indent = 10f)
+                                            if (dataMap.containsKey("isp")) drawWrappedText("ISP: ${dataMap["isp"] ?: "N/A"}", 9f, indent = 10f)
+                                            if (dataMap.containsKey("asn")) drawWrappedText("ASN: ${dataMap["asn"] ?: "N/A"}", 9f, indent = 10f)
+                                            if (dataMap.containsKey("os")) drawWrappedText("Operating System: ${dataMap["os"] ?: "N/A"}", 9f, indent = 10f)
+                                            
+                                            val location = listOfNotNull(dataMap["city"], dataMap["country_name"]).joinToString(", ")
+                                            if (location.isNotBlank()) drawWrappedText("Location: $location", 9f, indent = 10f)
+
+                                            val hostnames = (dataMap["hostnames"] as? List<*>)?.joinToString(", ") ?: ""
+                                            if (hostnames.isNotBlank()) drawWrappedText("Hostnames: $hostnames", 8f, indent = 10f)
+                                            
+                                            val domains = (dataMap["domains"] as? List<*>)?.joinToString(", ") ?: ""
+                                            if (domains.isNotBlank()) drawWrappedText("Domains: $domains", 8f, indent = 10f)
+
+                                            val ports = (dataMap["ports"] as? List<*>) ?: emptyList<Any>()
+                                            if (ports.isNotEmpty()) {
+                                                drawWrappedText("Open Ports: ${ports.joinToString { it.toString().substringBefore(".") }}", 9f, indent = 10f)
+                                            }
+                                            
+                                            val tags = (dataMap["tags"] as? List<*>)?.joinToString(", ") ?: ""
+                                            if (tags.isNotBlank()) drawWrappedText("Tags: $tags", 8f, indent = 10f, color = Color.BLUE)
+
+                                            val vulns = (dataMap["vulns"] as? List<*>) ?: emptyList<Any>()
+                                            if (vulns.isNotEmpty()) {
+                                                drawWrappedText("Detected Vulnerabilities (CVEs):", 9f, color = Color.RED, indent = 10f, isBold = true)
+                                                drawWrappedText(vulns.take(20).joinToString(", "), 8f, color = Color.RED, indent = 15f)
+                                            }
+                                        } else {
+                                            drawWrappedText("No Shodan data available for this target.", 10f, color = Color.GRAY)
+                                        }
+                                    }
+                                } catch (_: Exception) {
+                                    drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
                                 }
                             }
                             "PING" -> {
@@ -997,11 +1166,16 @@ class ReportRepositoryImpl(
                                     }
                                 }
                             }
-                            "WEB_CLOUD", "WEB" -> {
+                            "WEB_CLOUD", "WEB", "CLOUD" -> {
                                 try {
-                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
-                                    val assets = (dataMap["assets"] as? List<*>) ?: emptyList<Any>()
-                                    if (assets.isNotEmpty()) {
+                                    val assets = try {
+                                        val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                        (dataMap["assets"] as? List<*>)
+                                    } catch (_: Exception) {
+                                        gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>
+                                    }
+
+                                    if (assets != null && assets.isNotEmpty()) {
                                         val table = document.createTable(assets.size + 1, 3)
                                         table.getRow(0).apply {
                                             getCell(0).text = "Platform"
@@ -1016,52 +1190,212 @@ class ReportRepositoryImpl(
                                             row.getCell(2).text = ao["status"]?.toString() ?: ""
                                         }
                                     } else {
-                                        document.createParagraph().createRun().setText(log.detailJson)
+                                        document.createParagraph().createRun().setText("No cloud assets discovered for this target.")
                                     }
                                 } catch (e: Exception) {
                                     document.createParagraph().createRun().setText(log.detailJson)
                                 }
                             }
-                            "WEB_SUBDOMAIN" -> {
+                            "WEB_SUBDOMAIN", "SUBDOMAIN" -> {
                                 try {
-                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
-                                    val subdomains = (dataMap["subdomains"] as? List<*>) ?: emptyList<Any>()
-                                    if (subdomains.isNotEmpty()) {
+                                    val subdomains = try {
+                                        val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                        (dataMap["subdomains"] as? List<*>)
+                                    } catch (_: Exception) {
+                                        gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>
+                                    }
+
+                                    if (subdomains != null && subdomains.isNotEmpty()) {
                                         document.createParagraph().createRun().apply { isBold = true; setText("Discovered Subdomains:") }
-                                        val table = document.createTable(subdomains.size + 1, 2)
+                                        val table = document.createTable(subdomains.size + 1, 3)
                                         table.getRow(0).apply {
                                             getCell(0).text = "Hostname"
                                             getCell(1).text = "IP Address"
+                                            getCell(2).text = "Source"
                                         }
                                         subdomains.forEachIndexed { i, subObj ->
                                             val row = table.getRow(i + 1)
                                             val so = subObj as Map<*, *>
                                             row.getCell(0).text = so["hostname"]?.toString() ?: ""
-                                            row.getCell(1).text = so["ip"]?.toString() ?: "N/A"
+                                            row.getCell(1).text = so["ipAddress"]?.toString() ?: "N/A"
+                                            row.getCell(2).text = so["source"]?.toString() ?: "N/A"
                                         }
+                                    } else {
+                                        document.createParagraph().createRun().setText("No subdomains discovered for this domain.")
                                     }
                                 } catch (e: Exception) {
                                     document.createParagraph().createRun().setText(log.detailJson)
                                 }
                             }
-                            "WEB_TLS" -> {
-                                val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
-                                val ciphers = (dataMap["ciphers"] as? List<*>) ?: emptyList<Any>()
-                                if (ciphers.isNotEmpty()) {
-                                    val table = document.createTable(ciphers.size + 1, 3)
-                                    table.getRow(0).apply {
-                                        getCell(0).text = "Protocol"
-                                        getCell(1).text = "Cipher Suite"
-                                        getCell(2).text = "Risk"
+                            "WEB_TLS", "TLS" -> {
+                                try {
+                                    val ciphers = try {
+                                        val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                        (dataMap["ciphers"] as? List<*>)
+                                    } catch (_: Exception) {
+                                        gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>
                                     }
-                                    ciphers.forEachIndexed { i, cipherObj ->
-                                        val row = table.getRow(i + 1)
-                                        val co = cipherObj as Map<*, *>
-                                        row.getCell(0).text = co["protocol"]?.toString() ?: ""
-                                        row.getCell(1).text = co["cipherSuite"]?.toString() ?: ""
-                                        row.getCell(2).text = co["riskLevel"]?.toString() ?: ""
+
+                                    if (ciphers != null && ciphers.isNotEmpty()) {
+                                        val table = document.createTable(ciphers.size + 1, 3)
+                                        table.getRow(0).apply {
+                                            getCell(0).text = "Protocol"
+                                            getCell(1).text = "Cipher Suite"
+                                            getCell(2).text = "Risk"
+                                        }
+                                        ciphers.forEachIndexed { i, cipherObj ->
+                                            val row = table.getRow(i + 1)
+                                            val co = cipherObj as Map<*, *>
+                                            row.getCell(0).text = co["protocol"]?.toString() ?: ""
+                                            row.getCell(1).text = co["cipherSuite"]?.toString() ?: ""
+                                            row.getCell(2).text = co["riskLevel"]?.toString() ?: ""
+                                        }
+                                    } else {
+                                        document.createParagraph().createRun().setText("No TLS ciphers audited or target unreachable.")
                                     }
+                                } catch (_: Exception) {
+                                    document.createParagraph().createRun().setText(log.detailJson)
                                 }
+                            }
+                            "HIBP" -> {
+                                try {
+                                    val dataMap = try {
+                                        gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type) as? Map<String, Any>
+                                    } catch (_: Exception) { null }
+
+                                    val breaches = try {
+                                        (dataMap?.get("breaches") as? List<*>) ?: gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>
+                                    } catch (_: Exception) { emptyList<Any>() }
+                                    
+                                    if (breaches != null && breaches.isNotEmpty()) {
+                                        val account = dataMap?.get("account")?.toString()
+                                        if (account != null) {
+                                            document.createParagraph().createRun().apply { isBold = true; setText("Target Checked: $account") }
+                                        }
+
+                                        document.createParagraph().createRun().apply { isBold = true; setText("Identified Breaches:") }
+                                        val table = document.createTable(breaches.size + 1, 4)
+                                        table.getRow(0).apply {
+                                            getCell(0).text = "Breach Name"
+                                            getCell(1).text = "Domain"
+                                            getCell(2).text = "Date"
+                                            getCell(3).text = "Leaked Data"
+                                        }
+                                        breaches.forEachIndexed { i, bObj ->
+                                            val row = table.getRow(i + 1)
+                                            val b = bObj as Map<*, *>
+                                            row.getCell(0).text = b["name"]?.toString() ?: ""
+                                            row.getCell(1).text = b["domain"]?.toString() ?: ""
+                                            row.getCell(2).text = b["breachDate"]?.toString() ?: ""
+                                            
+                                            val dataClasses = (b["dataClasses"] as? List<*>)?.joinToString(", ") ?: ""
+                                            row.getCell(3).text = if (dataClasses.length > 50) dataClasses.take(47) + "..." else dataClasses
+                                        }
+                                    } else {
+                                        document.createParagraph().createRun().setText("No major breaches found for this domain on HIBP.")
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                            "SHODAN" -> {
+                                try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    
+                                    if (dataMap.containsKey("total") && dataMap.containsKey("matches")) {
+                                        val total = dataMap["total"]?.toString()?.substringBefore(".") ?: "0"
+                                        document.createParagraph().createRun().setText("Total Shodan Results: $total")
+                                        
+                                        val matches = (dataMap["matches"] as? List<*>) ?: emptyList<Any>()
+                                        if (matches.isNotEmpty()) {
+                                            val table = document.createTable(minOf(matches.size, 15) + 1, 4)
+                                            table.getRow(0).apply {
+                                                getCell(0).text = "IP Address"
+                                                getCell(1).text = "Port"
+                                                getCell(2).text = "Hostnames"
+                                                getCell(3).text = "Organization"
+                                            }
+                                            matches.take(15).forEachIndexed { i, mObj ->
+                                                val row = table.getRow(i + 1)
+                                                val m = mObj as Map<*, *>
+                                                row.getCell(0).text = m["ip_str"]?.toString() ?: ""
+                                                row.getCell(1).text = m["port"]?.toString()?.substringBefore(".") ?: ""
+                                                
+                                                val hostnames = (m["hostnames"] as? List<*>)?.joinToString(", ") ?: ""
+                                                row.getCell(2).text = if (hostnames.length > 30) hostnames.take(27) + "..." else hostnames
+                                                
+                                                row.getCell(3).text = m["org"]?.toString() ?: ""
+                                            }
+                                        } else if (total == "0") {
+                                            document.createParagraph().createRun().setText("No matches found in Shodan database.")
+                                        }
+                                    } else {
+                                        val ip = dataMap["ip_str"]?.toString() ?: dataMap["ip"]?.toString()
+                                        if (ip != null) {
+                                            document.createParagraph().createRun().apply { isBold = true; setText("Shodan/InternetDB Host Report: $ip") }
+                                            if (dataMap.containsKey("org")) document.createParagraph().createRun().setText("Organization: ${dataMap["org"] ?: "N/A"}")
+                                            if (dataMap.containsKey("isp")) document.createParagraph().createRun().setText("ISP: ${dataMap["isp"] ?: "N/A"}")
+                                            if (dataMap.containsKey("asn")) document.createParagraph().createRun().setText("ASN: ${dataMap["asn"] ?: "N/A"}")
+                                            if (dataMap.containsKey("os")) document.createParagraph().createRun().setText("Operating System: ${dataMap["os"] ?: "N/A"}")
+                                            
+                                            val location = listOfNotNull(dataMap["city"], dataMap["country_name"]).joinToString(", ")
+                                            if (location.isNotBlank()) document.createParagraph().createRun().setText("Location: $location")
+
+                                            val hostnames = (dataMap["hostnames"] as? List<*>)?.joinToString(", ") ?: ""
+                                            if (hostnames.isNotBlank()) document.createParagraph().createRun().setText("Hostnames: $hostnames")
+                                            
+                                            val domains = (dataMap["domains"] as? List<*>)?.joinToString(", ") ?: ""
+                                            if (domains.isNotBlank()) document.createParagraph().createRun().setText("Domains: $domains")
+
+                                            val ports = (dataMap["ports"] as? List<*>) ?: emptyList<Any>()
+                                            if (ports.isNotEmpty()) {
+                                                document.createParagraph().createRun().setText("Open Ports: ${ports.joinToString { it.toString().substringBefore(".") }}")
+                                            }
+
+                                            val tags = (dataMap["tags"] as? List<*>)?.joinToString(", ") ?: ""
+                                            if (tags.isNotBlank()) document.createParagraph().createRun().setText("Tags: $tags")
+
+                                            val vulns = (dataMap["vulns"] as? List<*>) ?: emptyList<Any>()
+                                            if (vulns.isNotEmpty()) {
+                                                document.createParagraph().createRun().apply { 
+                                                    isBold = true
+                                                    setText("Detected Vulnerabilities (CVEs):")
+                                                }
+                                                document.createParagraph().createRun().setText(vulns.take(20).joinToString(", "))
+                                            }
+                                        } else {
+                                            document.createParagraph().createRun().setText("No Shodan data available for this target.")
+                                        }
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                            "WEBSITE" -> {
+                                try {
+                                    val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)
+                                    document.createParagraph().createRun().apply { isBold = true; setText("Website Infrastructure Audit:") }
+                                    
+                                    val httpStatus = dataMap["httpStatus"] as? Map<*, *>
+                                    val tlsStatus = dataMap["tlsStatus"] as? Map<*, *>
+                                    val dnsStatus = dataMap["dnsStatus"] as? Map<*, *>
+                                    
+                                    if (httpStatus != null) {
+                                        document.createParagraph().createRun().setText("HTTP Analysis: ${httpStatus["type"] ?: ""}")
+                                    }
+                                    if (tlsStatus != null) {
+                                        document.createParagraph().createRun().setText("TLS Security: ${tlsStatus["type"] ?: ""}")
+                                    }
+                                    if (dnsStatus != null) {
+                                        document.createParagraph().createRun().setText("DNS Records: ${dnsStatus["type"] ?: ""}")
+                                        val dnsData = dnsStatus["data"] as? Map<*, *>
+                                        if (dnsData != null) {
+                                            val records = (dnsData["records"] as? List<*>) ?: emptyList<Any>()
+                                            records.forEach { recordObj ->
+                                                val r = recordObj as Map<*, *>
+                                                val type = r["type"]?.toString() ?: ""
+                                                val value = r["value"]?.toString() ?: ""
+                                                document.createParagraph().createRun().setText("  - $type: $value")
+                                            }
+                                        }
+                                    }
+                                } catch (_: Exception) {}
                             }
                             "PING" -> {
                                 val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)

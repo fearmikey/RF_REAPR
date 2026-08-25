@@ -5,22 +5,29 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fearmikey.rf_reapr.domain.model.InternetDbResponse
 import com.fearmikey.rf_reapr.domain.model.ShodanHostReport
 import com.fearmikey.rf_reapr.domain.model.ShodanMatch
 import com.fearmikey.rf_reapr.domain.model.ShodanSearchResponse
@@ -31,18 +38,21 @@ import com.fearmikey.rf_reapr.ui.theme.WebGold
 @Composable
 fun ShodanScreen(
     viewModel: ShodanViewModel,
-    onBack: () -> Unit
+    onNavigateToApiKeys: (String?) -> Unit,
+    onBack: () -> Unit,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val isApiKeyMissing by viewModel.isApiKeyMissing.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isApiKeyMissing by viewModel.isApiKeyMissing.collectAsStateWithLifecycle()
     
     var query by remember { mutableStateOf("") }
-    var searchMode by remember { mutableStateOf(0) } // 0 = Host IP, 1 = Search Query
+    var searchMode by remember { 
+        mutableIntStateOf(0) // Now defaults to Quick (0)
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Shodan IoT Scanner") },
+                title = { Text("Cloud Recon (Shodan)") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -56,7 +66,81 @@ fun ShodanScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (isApiKeyMissing) {
+            TabRow(selectedTabIndex = searchMode) {
+                Tab(
+                    selected = searchMode == 0,
+                    onClick = { searchMode = 0 },
+                    text = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Text("Quick", style = MaterialTheme.typography.labelLarge)
+                            Text("Free / No Key", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                )
+                Tab(
+                    selected = searchMode == 1,
+                    onClick = { 
+                        if (isApiKeyMissing) {
+                            onNavigateToApiKeys("shodan")
+                        } else {
+                            searchMode = 1 
+                        }
+                    },
+                    text = { 
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Dns, 
+                                contentDescription = null, 
+                                modifier = Modifier.size(20.dp),
+                                tint = if (isApiKeyMissing) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else Color.Unspecified
+                            )
+                            Text(
+                                text = "Host",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (isApiKeyMissing) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else Color.Unspecified
+                            )
+                            Text(
+                                text = "Paid / Deep",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isApiKeyMissing) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else Color.Unspecified
+                            )
+                        }
+                    }
+                )
+                Tab(
+                    selected = searchMode == 2,
+                    onClick = { 
+                        if (isApiKeyMissing) {
+                            onNavigateToApiKeys("shodan")
+                        } else {
+                            searchMode = 2 
+                        }
+                    },
+                    text = { 
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Search, 
+                                contentDescription = null, 
+                                modifier = Modifier.size(20.dp),
+                                tint = if (isApiKeyMissing) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else Color.Unspecified
+                            )
+                            Text(
+                                text = "Search",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (isApiKeyMissing) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else Color.Unspecified
+                            )
+                            Text(
+                                text = "Paid / Query",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isApiKeyMissing) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else Color.Unspecified
+                            )
+                        }
+                    }
+                )
+            }
+
+            if (isApiKeyMissing && (searchMode != 0)) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                     modifier = Modifier.padding(16.dp)
@@ -78,19 +162,7 @@ fun ShodanScreen(
                     }
                 }
             } else {
-                TabRow(selectedTabIndex = searchMode) {
-                    Tab(
-                        selected = searchMode == 0,
-                        onClick = { searchMode = 0 },
-                        text = { Text("Host Lookup") }
-                    )
-                    Tab(
-                        selected = searchMode == 1,
-                        onClick = { searchMode = 1 },
-                        text = { Text("Query Search") }
-                    )
-                }
-                
+                // ... (removing the second TabRow)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -100,15 +172,30 @@ fun ShodanScreen(
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        label = { Text(if (searchMode == 0) "IP Address" else "Search Query (e.g. apache)") },
+                        label = { 
+                            Text(
+                                when (searchMode) {
+                                    1 -> "IP Address or Domain"
+                                    2 -> "Search Query (e.g. apache)"
+                                    else -> "Quick Recon (IP or Domain)"
+                                }
+                            ) 
+                        },
                         modifier = Modifier.weight(1f),
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = if (searchMode == 2) KeyboardType.Text else KeyboardType.Uri,
+                            autoCorrect = false
+                        )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { 
-                            if (searchMode == 0) viewModel.getHostInfo(query)
-                            else viewModel.search(query) 
+                            when (searchMode) {
+                                1 -> viewModel.getHostInfo(query)
+                                2 -> viewModel.search(query)
+                                else -> viewModel.getInternetDbInfo(query)
+                            }
                         },
                         enabled = query.isNotBlank() && uiState !is ShodanUiState.Loading
                     ) {
@@ -146,7 +233,92 @@ fun ShodanScreen(
                     is ShodanUiState.SearchSuccess -> {
                         SearchResultView(state.response)
                     }
+                    is ShodanUiState.InternetDbSuccess -> {
+                        InternetDbView(state.data)
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun InternetDbView(data: InternetDbResponse) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = WebGold.copy(alpha = 0.1f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = data.ip,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = WebGold
+                    )
+                    Text(
+                        text = "InternetDB Quick Recon",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (data.hostnames.isNotEmpty()) {
+            item {
+                Text("Hostnames", style = MaterialTheme.typography.titleSmall, color = WebGold)
+                Text(data.hostnames.joinToString(", "), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+
+        if (data.ports.isNotEmpty()) {
+            item {
+                Text("Open Ports", style = MaterialTheme.typography.titleSmall, color = WebGold)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    data.ports.forEach { port ->
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Text(
+                                text = port.toString(),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (data.vulns.isNotEmpty()) {
+            item {
+                Text("Known CVEs", style = MaterialTheme.typography.titleSmall, color = PhysicalRed)
+            }
+            items(data.vulns) { vuln ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f))
+                ) {
+                    Text(
+                        text = vuln,
+                        modifier = Modifier.padding(8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        }
+
+        if (data.tags.isNotEmpty()) {
+            item {
+                Text("Tags", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Text(data.tags.joinToString(", "), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -347,14 +519,15 @@ fun HostReportView(report: ShodanHostReport) {
                                     style = MaterialTheme.typography.titleMedium
                                 )
                             }
-                            if (!service.shodan?.module.isNullOrBlank()) {
+                            val module = service.shodan?.module
+                            if (!module.isNullOrBlank()) {
                                 Spacer(modifier = Modifier.weight(1f))
                                 Surface(
                                     shape = RoundedCornerShape(16.dp),
                                     color = MaterialTheme.colorScheme.secondaryContainer
                                 ) {
                                     Text(
-                                        text = service.shodan!!.module!!,
+                                        text = module,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                         style = MaterialTheme.typography.labelSmall
                                     )

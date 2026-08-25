@@ -47,6 +47,30 @@ fun NetworkMapView(
     
     val edgeColor = remember(onSurfaceColor) { onSurfaceColor.copy(alpha = 0.2f) }
 
+    // Pre-calculate text layouts to avoid measuring during draw calls
+    val nodeTextLayouts = remember(mappedGraph, labelStyle, secondaryLabelStyle, snmpLabelStyle) {
+        mappedGraph.nodes.associate { mappedNode ->
+            val node = mappedNode.node
+            val primaryLabel = node.hostname ?: node.ipAddress
+            val primaryLayout = textMeasurer.measure(primaryLabel, labelStyle)
+            
+            val secondaryLayout = node.hostname?.let {
+                textMeasurer.measure(node.ipAddress, secondaryLabelStyle)
+            }
+            
+            val snmpLayout = if (node.snmpData != null) {
+                textMeasurer.measure("SNMP", snmpLabelStyle)
+            } else null
+            
+            val portsLayout = if (node.openPorts.isNotEmpty()) {
+                val portsLabel = "Ports: ${node.openPorts.joinToString(", ") { it.port.toString() }}"
+                textMeasurer.measure(portsLabel, secondaryLabelStyle)
+            } else null
+            
+            node.id to Quadruple(primaryLayout, secondaryLayout, snmpLayout, portsLayout)
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -164,64 +188,55 @@ fun NetworkMapView(
                     // 3. Draw Labels
                     var labelYOffset = 30f / scale
                     
-                    val primaryLabel = mappedNode.node.hostname ?: mappedNode.node.ipAddress
-                    val primaryTextLayout = textMeasurer.measure(primaryLabel, labelStyle)
-                    
-                    drawText(
-                        textLayoutResult = primaryTextLayout,
-                        topLeft = Offset(
-                            x = mappedNode.x - (primaryTextLayout.size.width / 2f),
-                            y = mappedNode.y + labelYOffset
-                        )
-                    )
-                    labelYOffset += primaryTextLayout.size.height
-
-                    // If hostname is used as primary, show IP as secondary
-                    if (mappedNode.node.hostname != null) {
-                        val secondaryTextLayout = textMeasurer.measure(mappedNode.node.ipAddress, secondaryLabelStyle)
+                    val layouts = nodeTextLayouts[mappedNode.node.id]
+                    if (layouts != null) {
+                        val (primaryLayout, secondaryLayout, snmpLayout, portsLayout) = layouts
+                        
                         drawText(
-                            textLayoutResult = secondaryTextLayout,
+                            textLayoutResult = primaryLayout,
                             topLeft = Offset(
-                                x = mappedNode.x - (secondaryTextLayout.size.width / 2f),
+                                x = mappedNode.x - (primaryLayout.size.width / 2f),
                                 y = mappedNode.y + labelYOffset
                             )
                         )
-                        labelYOffset += secondaryTextLayout.size.height
-                    }
+                        labelYOffset += primaryLayout.size.height
 
-                    // 4. SNMP Indicator
-                    if (mappedNode.node.snmpData != null) {
-                        val snmpLabel = "SNMP"
-                        val snmpTextLayout = textMeasurer.measure(snmpLabel, snmpLabelStyle)
-                        drawText(
-                            textLayoutResult = snmpTextLayout,
-                            topLeft = Offset(
-                                x = mappedNode.x - (snmpTextLayout.size.width / 2f),
-                                y = mappedNode.y + labelYOffset
+                        secondaryLayout?.let {
+                            drawText(
+                                textLayoutResult = it,
+                                topLeft = Offset(
+                                    x = mappedNode.x - (it.size.width / 2f),
+                                    y = mappedNode.y + labelYOffset
+                                )
                             )
-                        )
-                        labelYOffset += snmpTextLayout.size.height
-                    }
+                            labelYOffset += it.size.height
+                        }
 
-                    // 5. Ports
-                    val openPorts = mappedNode.node.openPorts
-
-                    if (openPorts.isNotEmpty()) {
-                        val portsLabel = "Ports: ${openPorts.joinToString(", ") { it.port.toString() }}"
-                        val portsTextLayoutResult = textMeasurer.measure(
-                            text = portsLabel,
-                            style = secondaryLabelStyle
-                        )
-                        drawText(
-                            textLayoutResult = portsTextLayoutResult,
-                            topLeft = Offset(
-                                x = mappedNode.x - (portsTextLayoutResult.size.width / 2f),
-                                y = mappedNode.y + labelYOffset
+                        snmpLayout?.let {
+                            drawText(
+                                textLayoutResult = it,
+                                topLeft = Offset(
+                                    x = mappedNode.x - (it.size.width / 2f),
+                                    y = mappedNode.y + labelYOffset
+                                )
                             )
-                        )
+                            labelYOffset += it.size.height
+                        }
+
+                        portsLayout?.let {
+                            drawText(
+                                textLayoutResult = it,
+                                topLeft = Offset(
+                                    x = mappedNode.x - (it.size.width / 2f),
+                                    y = mappedNode.y + labelYOffset
+                                )
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

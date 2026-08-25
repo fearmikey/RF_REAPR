@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -24,12 +25,12 @@ fun IperfScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val interfaces by viewModel.interfaces.collectAsState()
-    val selectedInterface by viewModel.selectedInterface.collectAsState()
-    val serverIp by viewModel.serverIp.collectAsState()
-    val isServerMode by viewModel.isServerMode.collectAsState()
-    val testOutput by viewModel.testOutput.collectAsState()
-    val isRunning by viewModel.isRunning.collectAsState()
+    val interfaces by viewModel.interfaces.collectAsStateWithLifecycle()
+    val selectedInterface by viewModel.selectedInterface.collectAsStateWithLifecycle()
+    val serverIp by viewModel.serverIp.collectAsStateWithLifecycle()
+    val isServerMode by viewModel.isServerMode.collectAsStateWithLifecycle()
+    val testOutput by viewModel.testOutput.collectAsStateWithLifecycle()
+    val isRunning by viewModel.isRunning.collectAsStateWithLifecycle()
 
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp

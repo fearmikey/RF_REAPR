@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -36,10 +37,10 @@ fun RecycleBinScreen(
     viewModel: RecycleBinViewModel,
     onBack: () -> Unit
 ) {
-    val deletedProjects by viewModel.deletedProjects.collectAsState()
-    val deletedFolders by viewModel.deletedFolders.collectAsState()
-    val deletedEvidence by viewModel.deletedEvidence.collectAsState()
-    val isEmpty by viewModel.isEmpty.collectAsState()
+    val deletedProjects by viewModel.deletedProjects.collectAsStateWithLifecycle()
+    val deletedFolders by viewModel.deletedFolders.collectAsStateWithLifecycle()
+    val deletedEvidence by viewModel.deletedEvidence.collectAsStateWithLifecycle()
+    val isEmpty by viewModel.isEmpty.collectAsStateWithLifecycle()
 
     var showEmptyConfirm by remember { mutableStateOf(false) }
 

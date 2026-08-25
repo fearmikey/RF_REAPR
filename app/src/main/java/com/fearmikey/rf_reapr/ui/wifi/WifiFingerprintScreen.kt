@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,10 +30,10 @@ fun WifiFingerprintScreen(
     viewModel: WifiFingerprintViewModel,
     onBackClick: () -> Unit,
 ) {
-    val filteredAccessPoints by viewModel.filteredAccessPoints.collectAsState()
-    val isScanning by viewModel.isScanning.collectAsState()
-    val selectedRange by viewModel.selectedRange.collectAsState()
-    val hiddenBssids by viewModel.hiddenBssids.collectAsState()
+    val filteredAccessPoints by viewModel.filteredAccessPoints.collectAsStateWithLifecycle()
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
+    val selectedRange by viewModel.selectedRange.collectAsStateWithLifecycle()
+    val hiddenBssids by viewModel.hiddenBssids.collectAsStateWithLifecycle()
     
     val context = LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(

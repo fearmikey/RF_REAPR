@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,9 +33,9 @@ fun PingScreen(
 ) {
     var host by remember { mutableStateOf("google.com") }
     var continuous by remember { mutableStateOf(false) }
-    val uiState by viewModel.uiState.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val pingLines by viewModel.pingLines.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val pingLines by viewModel.pingLines.collectAsStateWithLifecycle()
     val isRunning = uiState is PingStatus.Loading || uiState is PingStatus.Progress
     val listState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current

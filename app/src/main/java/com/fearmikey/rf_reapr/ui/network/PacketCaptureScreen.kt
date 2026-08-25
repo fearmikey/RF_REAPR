@@ -1,7 +1,6 @@
 package com.fearmikey.rf_reapr.ui.network
 
 import android.app.Activity
-import android.content.Intent
 import android.net.VpnService
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,6 +14,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,17 +26,17 @@ import com.fearmikey.rf_reapr.ui.theme.PhysicalRed
 @Composable
 fun PacketCaptureScreen(
     onBack: () -> Unit,
-    viewModel: PacketCaptureViewModel = viewModel()
+    viewModel: PacketCaptureViewModel = viewModel(),
 ) {
     val context = LocalContext.current
-    val isCapturing by viewModel.isCapturing.collectAsState()
-    val isRootMode by viewModel.isRootMode.collectAsState()
-    val hasRoot by viewModel.hasRoot.collectAsState()
-    val hasTcpdump by viewModel.hasTcpdump.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
-    val activePath by viewModel.activeFilePath.collectAsState()
+    val isCapturing by viewModel.isCapturing.collectAsStateWithLifecycle()
+    val isRootMode by viewModel.isRootMode.collectAsStateWithLifecycle()
+    val hasRoot by viewModel.hasRoot.collectAsStateWithLifecycle()
+    val hasTcpdump by viewModel.hasTcpdump.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val activePath by viewModel.activeFilePath.collectAsStateWithLifecycle()
 
-    var showRootWarningDialog by remember { mutableStateOf(false) }
+    var showRootWarningDialog by remember { mutableStateOf(value = false) }
 
     val vpnLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -180,7 +180,7 @@ fun PacketCaptureScreen(
                         color = if (isCapturing) PhysicalRed else MaterialTheme.colorScheme.onSurface
                     )
                     
-                    AnimatedVisibility(visible = isCapturing && isRootMode && activePath != null) {
+                    AnimatedVisibility(visible = (isCapturing && isRootMode) && (activePath != null)) {
                         Text(
                             text = "Writing to: $activePath",
                             style = MaterialTheme.typography.bodySmall,
@@ -192,7 +192,7 @@ fun PacketCaptureScreen(
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Button(
                             onClick = {
@@ -208,11 +208,11 @@ fun PacketCaptureScreen(
                                 }
                             },
                             enabled = !isCapturing,
-                            modifier = Modifier.size(120.dp, 48.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Start")
+                            Text("Start", style = MaterialTheme.typography.labelMedium)
                         }
                         
                         FilledTonalButton(
@@ -228,11 +228,11 @@ fun PacketCaptureScreen(
                                 containerColor = if (isCapturing) PhysicalRed else MaterialTheme.colorScheme.surfaceVariant,
                                 contentColor = if (isCapturing) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurfaceVariant
                             ),
-                            modifier = Modifier.size(120.dp, 48.dp)
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                         ) {
                             Icon(Icons.Default.Stop, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Stop")
+                            Text("Stop", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }

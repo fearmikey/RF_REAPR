@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -39,9 +40,9 @@ fun TracerouteScreen(
     onBackClick: () -> Unit
 ) {
     var hostInput by remember { mutableStateOf("8.8.8.8") }
-    val hops by viewModel.hops.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val isScanning by viewModel.isScanning.collectAsState()
+    val hops by viewModel.hops.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
     val clipboardManager = LocalClipboardManager.current

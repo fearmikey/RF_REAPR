@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,9 +32,9 @@ fun SdrScreen(
     viewModel: SdrViewModel,
     onNavigateBack: () -> Unit,
 ) {
-    val config by viewModel.config.collectAsState()
-    val fftData by viewModel.fftData.collectAsState()
-    val error by viewModel.error.collectAsState()
+    val config by viewModel.config.collectAsStateWithLifecycle()
+    val fftData by viewModel.fftData.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 

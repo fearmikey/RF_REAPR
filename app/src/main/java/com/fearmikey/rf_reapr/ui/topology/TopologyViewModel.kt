@@ -23,15 +23,16 @@ class TopologyViewModel(
     private val discoveryRepository: NetworkDiscoveryRepository,
     private val scanSessionRepository: ScanSessionRepository,
     private val portScannerRepository: PortScannerRepository,
+    private val internetDbRepository: InternetDbRepository,
     private val vulnerabilityRepository: VulnerabilityRepository,
     private val snmpRepository: SnmpRepository,
     private val logRepository: LogRepository,
-    private val settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     val isApiKeySet: StateFlow<Boolean> = settingsRepository.vulnerabilityApiKey
         .map { it.isNotBlank() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), initialValue = true)
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -44,12 +45,6 @@ class TopologyViewModel(
 
     private val _isAuditing = MutableStateFlow(false)
     val isAuditing: StateFlow<Boolean> = _isAuditing.asStateFlow()
-
-    private val _autoPortScan = MutableStateFlow(false)
-    val autoPortScan: StateFlow<Boolean> = _autoPortScan.asStateFlow()
-
-    private val _autoSnmpDiscovery = MutableStateFlow(false)
-    val autoSnmpDiscovery: StateFlow<Boolean> = _autoSnmpDiscovery.asStateFlow()
 
     private val _showNetworkMismatchDialog = MutableStateFlow(false)
     val showNetworkMismatchDialog: StateFlow<Boolean> = _showNetworkMismatchDialog.asStateFlow()
@@ -113,37 +108,7 @@ class TopologyViewModel(
                         networkName = "Local Network",
                         gatewayIp = networkInfo.gatewayIp
                     )
-
-                    // After discovery, perform auto actions if enabled
-                    if (autoPortScan.value || autoSnmpDiscovery.value) {
-                        performAutoDiscoveryActions(nodes)
-                    }
                 }
-            }
-        }
-    }
-
-    private fun performAutoDiscoveryActions(nodes: List<NetworkNode>) {
-        viewModelScope.launch {
-            _isAuditing.value = true
-            nodes.forEach { node ->
-                if (autoPortScan.value) {
-                    scanSingleNode(node)
-                }
-                if (autoSnmpDiscovery.value) {
-                    querySnmpForNode(node)
-                }
-            }
-            _isAuditing.value = false
-            
-            // Log the completion of discovery + auto audit
-            val currentGraph = _mappedGraph.value
-            if (currentGraph != null) {
-                logRepository.saveLog(
-                    type = "TOPOLOGY",
-                    summary = "Completed network discovery and auto-audit of ${currentGraph.nodes.size} devices",
-                    detailJson = gson.toJson(currentGraph)
-                )
             }
         }
     }
@@ -162,14 +127,6 @@ class TopologyViewModel(
         }
     }
 
-    fun toggleAutoPortScan() {
-        _autoPortScan.value = !_autoPortScan.value
-    }
-
-    fun toggleAutoSnmpDiscovery() {
-        _autoSnmpDiscovery.value = !_autoSnmpDiscovery.value
-    }
-
     /**
      * Checks if current network matches the one from the last scan.
      * If not, prompts for rescan. Otherwise, starts audit.
@@ -180,7 +137,7 @@ class TopologyViewModel(
             val currentNetwork = discoveryRepository.getLocalNetworkInfo()
             val lastGatewayIp = scanSessionRepository.getLastSessionGatewayIp()
 
-            if (lastGatewayIp != null && currentNetwork.gatewayIp != lastGatewayIp) {
+            if ((lastGatewayIp != null && currentNetwork.gatewayIp != lastGatewayIp)) {
                 _showNetworkMismatchDialog.value = true
             } else {
                 viewModelScope.launch {
@@ -188,15 +145,15 @@ class TopologyViewModel(
                     val nodes = _mappedGraph.value?.nodes?.map { it.node } ?: emptyList()
                     nodes.forEach { node ->
                         scanSingleNode(node)
+                        querySnmpForNode(node)
                     }
                     _isAuditing.value = false
                     
                     // Log the audit completion
-                    val currentGraph = _mappedGraph.value
-                    if (currentGraph != null) {
+                    _mappedGraph.value?.let { currentGraph ->
                         logRepository.saveLog(
                             type = "TOPOLOGY",
-                            summary = "Completed audit of ${currentGraph.nodes.size} network nodes",
+                            summary = "Completed audit (Ports & SNMP) of ${currentGraph.nodes.size} network nodes",
                             detailJson = gson.toJson(currentGraph)
                         )
                     }
@@ -232,6 +189,28 @@ class TopologyViewModel(
                 summary = "Completed individual SNMP audit for ${node.ipAddress}",
                 detailJson = gson.toJson(node)
             )
+        }
+    }
+
+    fun checkExternalExposure(node: NetworkNode) {
+        viewModelScope.launch {
+            internetDbRepository.getIpInfo(node.ipAddress).onSuccess { response ->
+                // If InternetDB has info, this node might be externally exposed or it's a public IP
+                // For simplicity, we just log it and maybe update node details in a real scenario
+                logRepository.saveLog(
+                    type = "TOPOLOGY",
+                    summary = "External exposure detected for ${node.ipAddress} via InternetDB",
+                    detailJson = gson.toJson(response)
+                )
+                
+                // We could also add a tag or update the node risk level
+                if (response.vulns.isNotEmpty() || response.ports.isNotEmpty()) {
+                    val updatedNode = node.copy(
+                        riskLevel = if (response.vulns.isNotEmpty()) RiskLevel.HIGH else node.riskLevel
+                    )
+                    scanSessionRepository.updateNodeDetails(updatedNode)
+                }
+            }
         }
     }
 

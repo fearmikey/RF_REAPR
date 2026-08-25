@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,9 +29,9 @@ fun DhcpMonitorScreen(
     onBack: () -> Unit,
     onDeviceClick: (MonitoredDevice) -> Unit
 ) {
-    val status by viewModel.status.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val devices by viewModel.devices.collectAsState()
+    val status by viewModel.status.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val devices by viewModel.devices.collectAsStateWithLifecycle()
 
     var showInfoDialog by remember { mutableStateOf(false) }
     var showWarningDialog by remember { mutableStateOf(false) }

@@ -12,9 +12,9 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -32,17 +32,14 @@ fun TopologyScreen(
     onBack: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
-    val mappedGraph by viewModel.mappedGraph.collectAsState()
-    val discoveryState by viewModel.discoveryState.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val isAuditing by viewModel.isAuditing.collectAsState()
-    val isApiKeySet by viewModel.isApiKeySet.collectAsState()
-    val showNetworkMismatchDialog by viewModel.showNetworkMismatchDialog.collectAsState()
-    val autoPortScan by viewModel.autoPortScan.collectAsState()
-    val autoSnmpDiscovery by viewModel.autoSnmpDiscovery.collectAsState()
+    val mappedGraph by viewModel.mappedGraph.collectAsStateWithLifecycle()
+    val discoveryState by viewModel.discoveryState.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val isAuditing by viewModel.isAuditing.collectAsStateWithLifecycle()
+    val isApiKeySet by viewModel.isApiKeySet.collectAsStateWithLifecycle()
+    val showNetworkMismatchDialog by viewModel.showNetworkMismatchDialog.collectAsStateWithLifecycle()
     
     var isListView by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
     var selectedNodeId by remember { mutableStateOf<String?>(null) }
     
     val selectedNode = remember(selectedNodeId, mappedGraph) {
@@ -95,34 +92,6 @@ fun TopologyScreen(
                     }
                 },
                 actions = {
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Scan Options")
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Checkbox(checked = autoPortScan, onCheckedChange = { viewModel.toggleAutoPortScan() })
-                                        Text("Common Port Scan")
-                                    }
-                                },
-                                onClick = { viewModel.toggleAutoPortScan() }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Checkbox(checked = autoSnmpDiscovery, onCheckedChange = { viewModel.toggleAutoSnmpDiscovery() })
-                                        Text("Discover SNMP Services")
-                                    }
-                                },
-                                onClick = { viewModel.toggleAutoSnmpDiscovery() }
-                            )
-                        }
-                    }
                     IconButton(onClick = { showInfoDialog = true }) {
                         Icon(Icons.Default.Info, contentDescription = "Information")
                     }
@@ -155,7 +124,7 @@ fun TopologyScreen(
             )
         },
         floatingActionButton = {
-            if (!isPassiveMode) {
+            if (!isPassiveMode && mappedGraph != null) {
                 FloatingActionButton(onClick = { showDiscoveryWarning = true }) {
                     Icon(Icons.Default.Refresh, contentDescription = "Rescan Network")
                 }
@@ -170,8 +139,9 @@ fun TopologyScreen(
         ) {
             mappedGraph?.let { graph ->
                 if (isListView) {
-                    val nodesState = remember(graph) { 
-                        NetworkNodeListState(graph.nodes.map { it.node }) 
+                    val nodes = remember(graph) { graph.nodes.map { it.node } }
+                    val nodesState = remember(nodes) { 
+                        NetworkNodeListState(nodes) 
                     }
                     val onNodeClickRemembered = remember { { node: NetworkNode -> selectedNodeId = node.id } }
                     NetworkNodeList(
@@ -197,7 +167,10 @@ fun TopologyScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { showDiscoveryWarning = true }) {
+                    Button(
+                        onClick = { showDiscoveryWarning = true },
+                        enabled = discoveryState !is NetworkScanner.ScanResult.Progress
+                    ) {
                         Text("Start Network Discovery")
                     }
                 }
@@ -216,7 +189,7 @@ fun TopologyScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Uses ARP sweeps and active probing to identify all live devices on the local subnet. If enabled, it automatically performs port scans and SNMP discovery to enrich device data.",
+                                text = "Uses ARP sweeps and active probing to identify all live devices on the local subnet. It identifies manufacturers via MAC addresses and resolves hostnames to build a visual map.",
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Spacer(modifier = Modifier.height(12.dp))
@@ -419,6 +392,19 @@ fun TopologyScreen(
                         )
                     }
                 }
+            } else if (discoveryState is NetworkScanner.ScanResult.Finished && !isAuditing && !isPassiveMode) {
+                Button(
+                    onClick = { showAuditWarning = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = 24.dp, end = 24.dp, bottom = 88.dp)
+                        .fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Icon(Icons.Default.BugReport, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Run Deep Scan (Ports & SNMP)")
+                }
             }
         }
 
@@ -439,6 +425,9 @@ fun TopologyScreen(
                 },
                 onScanSnmp = { nodeToScan ->
                     viewModel.scanSnmpSingleNodeTrigger(nodeToScan)
+                },
+                onCheckExternalExposure = { nodeToScan ->
+                    viewModel.checkExternalExposure(nodeToScan)
                 }
             )
         }

@@ -9,8 +9,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,7 +23,7 @@ fun HidAssetsScreen(
     viewModel: HidAssetsViewModel,
     onBack: () -> Unit
 ) {
-    val assets by viewModel.assets.collectAsState()
+    val assets by viewModel.assets.collectAsStateWithLifecycle()
     val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
     Scaffold(

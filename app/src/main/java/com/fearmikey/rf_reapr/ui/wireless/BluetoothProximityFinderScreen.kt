@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -45,14 +46,14 @@ fun BluetoothProximityFinderScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val targetAddress by viewModel.targetAddress.collectAsState()
-    val targetName by viewModel.targetName.collectAsState()
-    val currentRssi by viewModel.currentRssi.collectAsState()
-    val rssiHistory by viewModel.rssiHistory.collectAsState()
-    val isTracking by viewModel.isTracking.collectAsState()
-    val isDiscoveryActive by viewModel.isDiscoveryActive.collectAsState()
-    val isActiveMode by viewModel.isActiveMode.collectAsState()
-    val recentlySeen by viewModel.recentlySeen.collectAsState()
+    val targetAddress by viewModel.targetAddress.collectAsStateWithLifecycle()
+    val targetName by viewModel.targetName.collectAsStateWithLifecycle()
+    val currentRssi by viewModel.currentRssi.collectAsStateWithLifecycle()
+    val rssiHistory by viewModel.rssiHistory.collectAsStateWithLifecycle()
+    val isTracking by viewModel.isTracking.collectAsStateWithLifecycle()
+    val isDiscoveryActive by viewModel.isDiscoveryActive.collectAsStateWithLifecycle()
+    val isActiveMode by viewModel.isActiveMode.collectAsStateWithLifecycle()
+    val recentlySeen by viewModel.recentlySeen.collectAsStateWithLifecycle()
 
     var showInfoDialog by remember { mutableStateOf(false) }
 

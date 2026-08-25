@@ -23,7 +23,7 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PcapLogListScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     var pcapFiles by remember { mutableStateOf(listOf<File>()) }
@@ -32,7 +32,7 @@ fun PcapLogListScreen(
     LaunchedEffect(Unit) {
         val pcapDir = File(context.filesDir, "pcaps")
         if (pcapDir.exists()) {
-            pcapFiles = pcapDir.listFiles()?.filter { it.extension == "pcap" }?.sortedByDescending { it.lastModified() } ?: emptyList()
+            pcapFiles = pcapDir.listFiles()?.asSequence()?.filter { it.extension == "pcap" }?.sortedByDescending { it.lastModified() }?.toList() ?: emptyList()
         }
     }
 
@@ -46,13 +46,15 @@ fun PcapLogListScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        val pcapDir = File(context.filesDir, "pcaps")
-                        if (pcapDir.exists()) {
-                            pcapDir.listFiles()?.forEach { it.delete() }
-                            pcapFiles = emptyList()
+                    IconButton(
+                        onClick = {
+                            val pcapDir = File(context.filesDir, "pcaps")
+                            if (pcapDir.exists()) {
+                                pcapDir.listFiles()?.forEach { it.delete() }
+                                pcapFiles = emptyList()
+                            }
                         }
-                    }) {
+                    ) {
                         Icon(Icons.Default.Delete, contentDescription = "Clear All")
                     }
                 }
@@ -92,7 +94,7 @@ fun PcapLogListScreen(
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
                             context.startActivity(Intent.createChooser(shareIntent, "Export PCAP"))
-                        }
+                        },
                     )
                 }
             }

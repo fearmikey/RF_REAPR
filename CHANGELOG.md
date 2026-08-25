@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-08-25
+
+### Added
+- **Guided Workflows**: Introduced a new "Operation Modes" start screen (`AppStartMenuScreen`) offering guided, step-by-step audit workflows alongside the classic manual toolkit, complete with mandatory step tracking and per-mode security warnings.
+- **Web & Infrastructure**:
+    - Integrated **InternetDB** for fast, no-API-key IP reconnaissance as a lightweight alternative/companion to Shodan.
+    - Shodan tools now resolve hostnames to IPs automatically and log all manual lookups (Host Recon, Search, InternetDB Quick Recon) for reporting.
+- **Performance**: Added Baseline Profile support (`androidx.profileinstaller`) to improve app startup performance.
+
+### Changed
+- **Build**: Release builds now enable code and resource shrinking (`isMinifyEnabled`/`isShrinkResources`) with expanded ProGuard rules; added a dedicated debug build type (`.debug` suffix).
+- **Dependencies**: Upgraded Compose BOM to `2025.09.00` and Lifecycle libraries to `2.9.4`.
+- **UI/UX**: Refreshed Main Menu layout, Topology map, Wi-Fi channel graph, and report graph rendering with numerous polish and stability improvements.
+- **Compliance & Reporting**: Further expanded report generation to cover Shodan/InternetDB results.
+- **Maintenance**: Version bump to 1.5.0; addressed Android 14+ foreground service and predictive back-gesture requirements.
+
 ## [1.4.9] - 2026-08-18
 
 ### Added

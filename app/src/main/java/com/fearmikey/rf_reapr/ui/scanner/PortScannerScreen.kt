@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -34,7 +35,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.OpenPort
 import com.fearmikey.rf_reapr.domain.model.RiskLevel
-import com.fearmikey.rf_reapr.domain.scanner.NetworkScanner
 import com.fearmikey.rf_reapr.ui.theme.WebGold
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,12 +53,12 @@ fun PortScannerScreen(
     var startPort by remember { mutableStateOf("1") }
     var endPort by remember { mutableStateOf("65535") }
     
-    val foundPorts by viewModel.foundPorts.collectAsState()
-    val progress by viewModel.progress.collectAsState()
-    val isScanning by viewModel.isScanning.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val eta by viewModel.eta.collectAsState()
-    val isApiKeySet by viewModel.isApiKeySet.collectAsState()
+    val foundPorts by viewModel.foundPorts.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val eta by viewModel.eta.collectAsStateWithLifecycle()
+    val isApiKeySet by viewModel.isApiKeySet.collectAsStateWithLifecycle()
 
     var showWarningDialog by remember { mutableStateOf(false) }
     var showManualPortDialog by remember { mutableStateOf(false) }
@@ -127,7 +127,7 @@ fun PortScannerScreen(
                     }
 
                     // 2. Filter input to only allowed characters
-                    val text = newValue.text.filter { it.isDigit() || it == '.' }
+                    val text = newValue.text.filter { (it.isDigit() || it == '.') }
                     
                     // 3. Apply auto-formatting (dots) and limits
                     val parts = text.split('.')
@@ -396,8 +396,6 @@ fun PortScannerScreen(
                     }
                 )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
             
             PortResultsList(
                 foundPorts = foundPorts,
@@ -410,9 +408,8 @@ fun PortScannerScreen(
         selectedPortDetails?.let { port ->
             PortDetailsDialog(
                 ipAddress = ipAddress.text,
-                port = port,
-                onDismiss = { selectedPortDetails = null }
-            )
+                port = port
+            ) { selectedPortDetails = null }
             if (isPassiveMode) {
                 Text(
                     "Passive Mode (Stealth). Scanning is inhibited.",
@@ -466,8 +463,9 @@ fun PortResultsList(
 fun Modifier.verticalScrollbar(
     state: androidx.compose.foundation.lazy.LazyListState,
     width: androidx.compose.ui.unit.Dp = 4.dp
-): Modifier = this.then(Modifier.drawWithContent {
-    drawContent()
+): Modifier = this.then(
+    Modifier.drawWithContent {
+        drawContent()
 
     val layoutInfo = state.layoutInfo
     val visibleItemsInfo = layoutInfo.visibleItemsInfo

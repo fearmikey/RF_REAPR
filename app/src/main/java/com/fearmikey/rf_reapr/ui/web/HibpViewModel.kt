@@ -17,7 +17,8 @@ import kotlinx.coroutines.launch
 
 class HibpViewModel(
     private val repository: HibpRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val logRepository: com.fearmikey.rf_reapr.domain.repository.LogRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HibpUiState>(HibpUiState.Idle)
@@ -55,6 +56,19 @@ class HibpViewModel(
                 } else {
                     _uiState.value = HibpUiState.Success(breaches, pastes)
                 }
+
+                // Log the manual check for reporting
+                logRepository.saveLog(
+                    type = "HIBP",
+                    summary = "HIBP Check: $account",
+                    detailJson = com.google.gson.Gson().toJson(
+                        mapOf(
+                            "account" to account,
+                            "breaches" to breaches,
+                            "pastes" to pastes
+                        )
+                    )
+                )
             } else {
                 val error = breachResult.exceptionOrNull()?.message 
                     ?: pasteResult.exceptionOrNull()?.message 

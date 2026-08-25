@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,12 +31,12 @@ fun HidInjectorScreen(
     onBack: () -> Unit,
     onNavigateToAssets: () -> Unit
 ) {
-    val scripts by viewModel.scripts.collectAsState()
-    val currentScript by viewModel.currentScript.collectAsState()
-    val scriptName by viewModel.scriptName.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val logs by viewModel.logs.collectAsState()
-    val isFlashing by viewModel.isFlashing.collectAsState()
+    val scripts by viewModel.scripts.collectAsStateWithLifecycle()
+    val currentScript by viewModel.currentScript.collectAsStateWithLifecycle()
+    val scriptName by viewModel.scriptName.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val logs by viewModel.logs.collectAsStateWithLifecycle()
+    val isFlashing by viewModel.isFlashing.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     var showScriptList by remember { mutableStateOf(false) }

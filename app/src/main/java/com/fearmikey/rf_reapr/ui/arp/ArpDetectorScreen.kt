@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,8 +30,8 @@ fun ArpDetectorScreen(
     viewModel: ArpDetectorViewModel,
     onBack: () -> Unit
 ) {
-    val gatewayInfo by viewModel.gatewayInfo.collectAsState()
-    val alerts by viewModel.alerts.collectAsState()
+    val gatewayInfo by viewModel.gatewayInfo.collectAsStateWithLifecycle()
+    val alerts by viewModel.alerts.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.startMonitoring()

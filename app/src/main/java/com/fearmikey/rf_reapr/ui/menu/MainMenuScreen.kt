@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -58,11 +59,297 @@ fun MainMenuScreen(
     settingsViewModel: SettingsViewModel? = null,
     onNavigate: (String) -> Unit
 ) {
-    val isPassiveMode by settingsViewModel?.isPassiveMode?.collectAsState() ?: remember { mutableStateOf(false) }
+    val isPassiveMode by settingsViewModel?.isPassiveMode?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val highlightAlpha = remember { Animatable(0f) }
     var showActiveWarning by remember { mutableStateOf(false) }
+
+    val allTools = remember {
+        listOf(
+            ToolkitTool(
+                "Port Scanner",
+                "Identify open TCP ports and services.",
+                Icons.Default.Search,
+                Screen.PortScanner.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "Network Discovery",
+                "Map connected devices and automatically audit services.",
+                Icons.AutoMirrored.Filled.List,
+                Screen.TopologyMap.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "DHCP Monitor",
+                "Detect rogue devices and new hardware.",
+                Icons.Default.NotificationsActive,
+                Screen.DhcpMonitor.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "Ping Tool",
+                "Send ICMP echo requests to a host or IP.",
+                Icons.Default.NetworkCheck,
+                Screen.PingTool.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "Service Discovery",
+                "Discover mDNS/Bonjour services on the network.",
+                Icons.Default.SettingsRemote,
+                Screen.ServiceDiscovery.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "UPnP/NAT-PMP Auditor",
+                "Audit router port mapping vulnerabilities.",
+                Icons.Default.Router,
+                Screen.UpnpAuditor.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "DNS Security Auditor",
+                "Detect DNS hijacking and security leaks.",
+                Icons.Default.LockPerson,
+                Screen.DnsAuditor.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "Visual Traceroute",
+                "Map the path packets take to a destination.",
+                Icons.Default.Route,
+                Screen.Traceroute.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "iPerf Tester",
+                "Measure network throughput using iPerf3.",
+                Icons.Default.NetworkPing,
+                Screen.IperfTester.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "Packet Capture",
+                "Capture network traffic to a PCAP file.",
+                Icons.Default.Waves,
+                Screen.PacketCapture.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "SNMP Browser",
+                "Query routers and switches for system info and traffic.",
+                Icons.Default.Router,
+                Screen.SnmpBrowser.route,
+                ToolCategory.NETWORK,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "ARP Spoofing Detector",
+                "Monitor network for ARP spoofing attempts.",
+                Icons.Default.NotificationsActive,
+                Screen.ArpDetector.route,
+                ToolCategory.NETWORK
+            ),
+            ToolkitTool(
+                "Bluetooth Proximity Finder",
+                "Consolidated auditor and locator for BLE devices.",
+                Icons.Default.Bluetooth,
+                Screen.BluetoothProximityFinder.route,
+                ToolCategory.WIRELESS,
+                BluetoothBlue
+            ),
+            ToolkitTool(
+                "WiFi Spectrum Analyzer",
+                "Interactive visualization of WiFi channel overlap and bandwidth.",
+                Icons.Default.Wifi,
+                Screen.WifiFingerprinter.route,
+                ToolCategory.WIRELESS,
+                WifiOrange
+            ),
+            ToolkitTool(
+                "SDR Controller",
+                "Real-time spectrum analysis via RTL-SDR (rtl_tcp).",
+                Icons.Default.Waves,
+                Screen.SdrController.route,
+                ToolCategory.WIRELESS,
+                NetworkGreen
+            ),
+            ToolkitTool(
+                "NFC Scanner",
+                "Audit physical access tags and NDEF messages.",
+                Icons.Default.Nfc,
+                Screen.NfcScanner.route,
+                ToolCategory.WIRELESS, // Note: NFC is in Wireless category but using NfcPurple
+                NfcPurple
+            ),
+            ToolkitTool(
+                "HID Injector",
+                "Deploy keystroke payloads via USB HID emulation.",
+                Icons.Default.Usb,
+                Screen.HidInjector.route,
+                ToolCategory.PHYSICAL,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "Evidence Capture",
+                "Securely document physical security findings with metadata.",
+                Icons.Default.CameraAlt,
+                Screen.EvidenceCapture.route,
+                ToolCategory.COMPLIANCE
+            ),
+            ToolkitTool(
+                "Magnetometer",
+                "Detect hidden electronics and wiring via magnetic fields.",
+                Icons.Default.Waves,
+                Screen.Magnetometer.route,
+                ToolCategory.PHYSICAL
+            ),
+            ToolkitTool(
+                "Website Inspector",
+                "Combined HTTP, TLS, DNS, and RDAP audit tool.",
+                Icons.Default.Language,
+                Screen.WebsiteInspector.route,
+                ToolCategory.WEB,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "Subdomain Enumerator",
+                "Map attack surface via DNS brute-force.",
+                Icons.Default.Dns,
+                Screen.SubdomainFinder.route,
+                ToolCategory.WEB,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "TLS Cipher Scanner",
+                "Identify weak protocols and supported cipher suites.",
+                Icons.Default.Lock,
+                Screen.TlsCipherScanner.route,
+                ToolCategory.WEB,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "Cloud Asset Discovery",
+                "Search for public S3, GCS, and Azure buckets.",
+                Icons.Default.Cloud,
+                Screen.CloudAssetScanner.route,
+                ToolCategory.WEB,
+                isAggressive = true
+            ),
+            ToolkitTool(
+                "HaveIBeenPwned Checker",
+                "Check if accounts are in known data breaches.",
+                Icons.Default.LockPerson,
+                Screen.HibpChecker.route,
+                ToolCategory.WEB,
+                requiresApiKey = true
+            ),
+            ToolkitTool(
+                "Cloud Recon (Shodan)",
+                "Search for exposed devices by IP, domain, or IoT query.",
+                Icons.Default.Language,
+                Screen.ShodanScanner.route,
+                ToolCategory.WEB,
+                isAggressive = true,
+                requiresApiKey = false
+            ),
+            // Compliance Tools
+            ToolkitTool(
+                "Audit Checklists",
+                "NIST, ISO 27001, and SOC2 automated audit checklists.",
+                Icons.AutoMirrored.Filled.Assignment,
+                Screen.ComplianceChecklists.route,
+                ToolCategory.COMPLIANCE
+            ),
+            ToolkitTool(
+                "Report Generator",
+                "Compile scan results and evidence into PDF/Word reports.",
+                Icons.AutoMirrored.Filled.Assignment,
+                Screen.ReportBuilder.route,
+                ToolCategory.COMPLIANCE
+            ),
+            // Log Tools
+            ToolkitTool(
+                "WiFi Spectrum Logs",
+                "Export event logs for WiFi scans.",
+                Icons.Default.Wifi,
+                Screen.WifiLogs.route,
+                ToolCategory.LOGS
+            ),
+            ToolkitTool(
+                "Bluetooth Scanning Logs",
+                "Export event logs for BLE scans.",
+                Icons.Default.Bluetooth,
+                Screen.BleLogs.route,
+                ToolCategory.LOGS
+            ),
+            ToolkitTool(
+                "Network Discovery Logs",
+                "Export network discovery and audit logs.",
+                Icons.AutoMirrored.Filled.List,
+                Screen.TopologyLogs.route,
+                ToolCategory.LOGS
+            ),
+            ToolkitTool(
+                "Port Scanning Logs",
+                "Export detailed port scan results.",
+                Icons.Default.Search,
+                Screen.PortLogs.route,
+                ToolCategory.LOGS
+            ),
+            ToolkitTool(
+                "Website Inspector Logs",
+                "Export web infrastructure audit logs.",
+                Icons.Default.Language,
+                Screen.WebLogs.route,
+                ToolCategory.LOGS
+            ),
+            ToolkitTool(
+                "Ping Report Logs",
+                "Export ICMP ping response logs.",
+                Icons.Default.NetworkCheck,
+                Screen.PingLogs.route,
+                ToolCategory.LOGS
+            ),
+            ToolkitTool(
+                "iPerf Tester Logs",
+                "Export network throughput logs.",
+                Icons.Default.NetworkPing,
+                Screen.IperfLogs.route,
+                ToolCategory.LOGS
+            ),
+            ToolkitTool(
+                "SNMP Browser Logs",
+                "Export SNMP query results.",
+                Icons.Default.Router,
+                Screen.SnmpLogs.route,
+                ToolCategory.LOGS
+            ),
+            ToolkitTool(
+                "Packet Capture Logs",
+                "Export raw PCAP files.",
+                Icons.Default.Waves,
+                Screen.PacketCaptureLogs.route,
+                ToolCategory.LOGS
+            )
+        )
+    }
+
+    val toolsByCategory = remember(allTools) {
+        allTools.groupBy { it.category }
+    }
 
     val onInhibitedClick: () -> Unit = {
         scope.launch {
@@ -73,286 +360,6 @@ fun MainMenuScreen(
             }
         }
     }
-
-    val allTools = listOf(
-        ToolkitTool(
-            "Port Scanner",
-            "Identify open TCP ports and services.",
-            Icons.Default.Search,
-            Screen.PortScanner.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "Network Discovery",
-            "Map connected devices and automatically audit services.",
-            Icons.AutoMirrored.Filled.List,
-            Screen.TopologyMap.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "DHCP Monitor",
-            "Detect rogue devices and new hardware.",
-            Icons.Default.NotificationsActive,
-            Screen.DhcpMonitor.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "Ping Tool",
-            "Send ICMP echo requests to a host or IP.",
-            Icons.Default.NetworkCheck,
-            Screen.PingTool.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "Service Discovery",
-            "Discover mDNS/Bonjour services on the network.",
-            Icons.Default.SettingsRemote,
-            Screen.ServiceDiscovery.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "UPnP/NAT-PMP Auditor",
-            "Audit router port mapping vulnerabilities.",
-            Icons.Default.Router,
-            Screen.UpnpAuditor.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "DNS Security Auditor",
-            "Detect DNS hijacking and security leaks.",
-            Icons.Default.LockPerson,
-            Screen.DnsAuditor.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "Visual Traceroute",
-            "Map the path packets take to a destination.",
-            Icons.Default.Route,
-            Screen.Traceroute.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "iPerf Tester",
-            "Measure network throughput using iPerf3.",
-            Icons.Default.NetworkPing,
-            Screen.IperfTester.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "Packet Capture",
-            "Capture network traffic to a PCAP file.",
-            Icons.Default.Waves,
-            Screen.PacketCapture.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "SNMP Browser",
-            "Query routers and switches for system info and traffic.",
-            Icons.Default.Router,
-            Screen.SnmpBrowser.route,
-            ToolCategory.NETWORK,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "ARP Spoofing Detector",
-            "Monitor network for ARP spoofing attempts.",
-            Icons.Default.NotificationsActive,
-            Screen.ArpDetector.route,
-            ToolCategory.NETWORK
-        ),
-        ToolkitTool(
-            "Bluetooth Proximity Finder",
-            "Consolidated auditor and locator for BLE devices.",
-            Icons.Default.Bluetooth,
-            Screen.BluetoothProximityFinder.route,
-            ToolCategory.WIRELESS,
-            BluetoothBlue
-        ),
-        ToolkitTool(
-            "WiFi Spectrum Analyzer",
-            "Interactive visualization of WiFi channel overlap and bandwidth.",
-            Icons.Default.Wifi,
-            Screen.WifiFingerprinter.route,
-            ToolCategory.WIRELESS,
-            WifiOrange
-        ),
-        ToolkitTool(
-            "SDR Controller",
-            "Real-time spectrum analysis via RTL-SDR (rtl_tcp).",
-            Icons.Default.Waves,
-            Screen.SdrController.route,
-            ToolCategory.WIRELESS,
-            NetworkGreen
-        ),
-        ToolkitTool(
-            "NFC Scanner",
-            "Audit physical access tags and NDEF messages.",
-            Icons.Default.Nfc,
-            Screen.NfcScanner.route,
-            ToolCategory.WIRELESS, // Note: NFC is in Wireless category but using NfcPurple
-            NfcPurple
-        ),
-        ToolkitTool(
-            "HID Injector",
-            "Deploy keystroke payloads via USB HID emulation.",
-            Icons.Default.Usb,
-            Screen.HidInjector.route,
-            ToolCategory.PHYSICAL,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "Evidence Capture",
-            "Securely document physical security findings with metadata.",
-            Icons.Default.CameraAlt,
-            Screen.EvidenceCapture.route,
-            ToolCategory.COMPLIANCE
-        ),
-        ToolkitTool(
-            "Magnetometer",
-            "Detect hidden electronics and wiring via magnetic fields.",
-            Icons.Default.Waves,
-            Screen.Magnetometer.route,
-            ToolCategory.PHYSICAL
-        ),
-        ToolkitTool(
-            "Website Inspector",
-            "Combined HTTP, TLS, DNS, and RDAP audit tool.",
-            Icons.Default.Language,
-            Screen.WebsiteInspector.route,
-            ToolCategory.WEB,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "Subdomain Enumerator",
-            "Map attack surface via DNS brute-force.",
-            Icons.Default.Dns,
-            Screen.SubdomainFinder.route,
-            ToolCategory.WEB,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "TLS Cipher Scanner",
-            "Identify weak protocols and supported cipher suites.",
-            Icons.Default.Lock,
-            Screen.TlsCipherScanner.route,
-            ToolCategory.WEB,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "Cloud Asset Discovery",
-            "Search for public S3, GCS, and Azure buckets.",
-            Icons.Default.Cloud,
-            Screen.CloudAssetScanner.route,
-            ToolCategory.WEB,
-            isAggressive = true
-        ),
-        ToolkitTool(
-            "HaveIBeenPwned Checker",
-            "Check if accounts are in known data breaches.",
-            Icons.Default.LockPerson,
-            Screen.HibpChecker.route,
-            ToolCategory.WEB,
-            requiresApiKey = true
-        ),
-        ToolkitTool(
-            "Shodan IoT Scanner",
-            "Search for exposed IoT devices and open WAN ports.",
-            Icons.Default.Search,
-            Screen.ShodanScanner.route,
-            ToolCategory.WEB,
-            isAggressive = true,
-            requiresApiKey = true
-        ),
-        // Compliance Tools
-        ToolkitTool(
-            "Audit Checklists",
-            "NIST, ISO 27001, and SOC2 automated audit checklists.",
-            Icons.AutoMirrored.Filled.Assignment,
-            Screen.ComplianceChecklists.route,
-            ToolCategory.COMPLIANCE
-        ),
-        ToolkitTool(
-            "Report Generator",
-            "Compile scan results and evidence into PDF/Word reports.",
-            Icons.AutoMirrored.Filled.Assignment,
-            Screen.ReportBuilder.route,
-            ToolCategory.COMPLIANCE
-        ),
-        // Log Tools
-        ToolkitTool(
-            "WiFi Spectrum Logs",
-            "Export event logs for WiFi scans.",
-            Icons.Default.Wifi,
-            Screen.WifiLogs.route,
-            ToolCategory.LOGS
-        ),
-        ToolkitTool(
-            "Bluetooth Scanning Logs",
-            "Export event logs for BLE scans.",
-            Icons.Default.Bluetooth,
-            Screen.BleLogs.route,
-            ToolCategory.LOGS
-        ),
-        ToolkitTool(
-            "Network Discovery Logs",
-            "Export network discovery and audit logs.",
-            Icons.AutoMirrored.Filled.List,
-            Screen.TopologyLogs.route,
-            ToolCategory.LOGS
-        ),
-        ToolkitTool(
-            "Port Scanning Logs",
-            "Export detailed port scan results.",
-            Icons.Default.Search,
-            Screen.PortLogs.route,
-            ToolCategory.LOGS
-        ),
-        ToolkitTool(
-            "Website Inspector Logs",
-            "Export web infrastructure audit logs.",
-            Icons.Default.Language,
-            Screen.WebLogs.route,
-            ToolCategory.LOGS
-        ),
-        ToolkitTool(
-            "Ping Report Logs",
-            "Export ICMP ping response logs.",
-            Icons.Default.NetworkCheck,
-            Screen.PingLogs.route,
-            ToolCategory.LOGS
-        ),
-        ToolkitTool(
-            "iPerf Tester Logs",
-            "Export network throughput logs.",
-            Icons.Default.NetworkPing,
-            Screen.IperfLogs.route,
-            ToolCategory.LOGS
-        ),
-        ToolkitTool(
-            "SNMP Browser Logs",
-            "Export SNMP query results.",
-            Icons.Default.Router,
-            Screen.SnmpLogs.route,
-            ToolCategory.LOGS
-        ),
-        ToolkitTool(
-            "Packet Capture Logs",
-            "Export raw PCAP files.",
-            Icons.Default.Waves,
-            Screen.PacketCaptureLogs.route,
-            ToolCategory.LOGS
-        )
-    )
 
     var expandedCategory by remember { mutableStateOf<ToolCategory?>(null) }
 
@@ -440,14 +447,14 @@ fun MainMenuScreen(
             }
 
             ToolCategory.entries.forEach { category ->
-                item {
+                item(key = category.name) {
                     CategoryCard(
                         category = category,
                         isExpanded = expandedCategory == category,
                         onClick = {
                             expandedCategory = if (expandedCategory == category) null else category
                         },
-                        tools = allTools.filter { it.category == category },
+                        tools = toolsByCategory[category] ?: emptyList(),
                         isPassiveMode = isPassiveMode,
                         settingsViewModel = settingsViewModel,
                         onNavigate = onNavigate,
@@ -527,9 +534,10 @@ fun CategoryCard(
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .fillMaxWidth()
                 ) {
-                    tools.forEach { tool ->
+                    val lastIndex = tools.size - 1
+                    tools.forEachIndexed { index, tool ->
                         ToolItem(tool, isPassiveMode, settingsViewModel, onNavigate, onInhibitedClick)
-                        if (tool != tools.last()) {
+                        if (index != lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 4.dp),
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
@@ -556,8 +564,8 @@ fun ToolItem(
     // Check if the required API key is missing
     val isApiKeyMissing = if (isApiKeyRequired) {
         when (tool.route) {
-            Screen.HibpChecker.route -> settingsViewModel?.hibpApiKey?.collectAsState()?.value.isNullOrBlank()
-            Screen.ShodanScanner.route -> settingsViewModel?.shodanApiKey?.collectAsState()?.value.isNullOrBlank()
+            Screen.HibpChecker.route -> settingsViewModel?.hibpApiKey?.collectAsStateWithLifecycle()?.value.isNullOrBlank()
+            Screen.ShodanScanner.route -> settingsViewModel?.shodanApiKey?.collectAsStateWithLifecycle()?.value.isNullOrBlank()
             else -> false
         }
     } else {

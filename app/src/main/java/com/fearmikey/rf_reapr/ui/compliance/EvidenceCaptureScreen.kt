@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.*
@@ -81,10 +82,10 @@ fun EvidenceCaptureScreen(
         )
     )
 
-    val currentProject by viewModel.currentProject.collectAsState()
-    val currentFolder by viewModel.currentFolder.collectAsState()
-    val folders by viewModel.folders.collectAsState()
-    val projects by viewModel.projects.collectAsState()
+    val currentProject by viewModel.currentProject.collectAsStateWithLifecycle()
+    val currentFolder by viewModel.currentFolder.collectAsStateWithLifecycle()
+    val folders by viewModel.folders.collectAsStateWithLifecycle()
+    val projects by viewModel.projects.collectAsStateWithLifecycle()
     
     var showFolderSelector by remember { mutableStateOf(false) }
     var selectedEvidenceForAction by remember { mutableStateOf<Evidence?>(null) }
@@ -365,9 +366,9 @@ fun CameraContent(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val evidenceList by viewModel.evidenceList.collectAsState()
-    val isCapturing by viewModel.isCapturing.collectAsState()
-    val flashMode by viewModel.flashMode.collectAsState()
+    val evidenceList by viewModel.evidenceList.collectAsStateWithLifecycle()
+    val isCapturing by viewModel.isCapturing.collectAsStateWithLifecycle()
+    val flashMode by viewModel.flashMode.collectAsStateWithLifecycle()
 
     var camera by remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
     

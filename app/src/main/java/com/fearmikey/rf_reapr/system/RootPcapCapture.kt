@@ -15,7 +15,7 @@ class RootPcapCapture(private val context: Context) {
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
             process.waitFor() == 0
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -24,7 +24,7 @@ class RootPcapCapture(private val context: Context) {
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "which tcpdump"))
             process.waitFor() == 0
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
@@ -75,7 +75,7 @@ class RootPcapCapture(private val context: Context) {
                     os.writeBytes("exit\n")
                     os.flush()
                     os.close()
-                } catch(e: Exception) {}
+                } catch(_: Exception) {}
                 
                 tcpdumpProcess?.destroy()
                 tcpdumpProcess = null

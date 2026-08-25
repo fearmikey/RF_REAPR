@@ -16,16 +16,16 @@ class PacketCaptureViewModel(application: Application) : AndroidViewModel(applic
 
     private val rootCapture = RootPcapCapture(application)
 
-    private val _isCapturing = MutableStateFlow(false)
+    private val _isCapturing = MutableStateFlow(value = false)
     val isCapturing: StateFlow<Boolean> = _isCapturing.asStateFlow()
 
-    private val _isRootMode = MutableStateFlow(false)
+    private val _isRootMode = MutableStateFlow(value = false)
     val isRootMode: StateFlow<Boolean> = _isRootMode.asStateFlow()
     
-    private val _hasRoot = MutableStateFlow(false)
+    private val _hasRoot = MutableStateFlow(value = false)
     val hasRoot: StateFlow<Boolean> = _hasRoot.asStateFlow()
     
-    private val _hasTcpdump = MutableStateFlow(false)
+    private val _hasTcpdump = MutableStateFlow(value = false)
     val hasTcpdump: StateFlow<Boolean> = _hasTcpdump.asStateFlow()
     
     private val _errorMessage = MutableStateFlow<String?>(null)

@@ -6,6 +6,9 @@ RF-REAPR is a comprehensive Android-based security auditing and network reconnai
 
 RF-REAPR integrates a wide range of security modules:
 
+### Guided Workflows
+*   **Operation Modes**: Step-by-step guided audit workflows for common scenarios, with mandatory step tracking and per-mode security warnings, alongside the classic manual toolkit.
+
 ### Compliance & Auditing
 *   **Audit Checklists**: Built-in checklists for various security frameworks (ISO 27001, SOC2, etc.).
 *   **Evidence Capture**: Integrated camera system to capture and tag physical security evidence.
@@ -20,7 +23,7 @@ RF-REAPR integrates a wide range of security modules:
 *   **Ping Tool**: Network latency and connectivity testing.
 *   **Network Throughput (iPerf)**: High-performance bandwidth testing via integrated iperf3.
 *   **SNMP Browser**: Query and analyze network devices using the SNMP protocol.
-*   **Shodan Intelligence**: Search for host details and vulnerabilities using the Shodan API.
+*   **Shodan Intelligence**: Search for host details and vulnerabilities using the Shodan API, with InternetDB fallback for quick, no-key IP recon.
 *   **DNS Enumerator**: Discover subdomains and DNS records.
 *   **DHCP Monitor**: Monitor DHCP traffic for rogue servers.
 *   **RDAP Auditor**: Query registration data for domains and IP ranges.
@@ -58,7 +61,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.4.9.apk` from the root of this repository.
+1.  Download the latest `RF_REAPR_v1.5.0.apk` from the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.LockPerson
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,9 +21,9 @@ fun DnsAuditorScreen(
     viewModel: DnsAuditorViewModel,
     onBackClick: () -> Unit
 ) {
-    val result by viewModel.auditResult.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val result by viewModel.auditResult.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {

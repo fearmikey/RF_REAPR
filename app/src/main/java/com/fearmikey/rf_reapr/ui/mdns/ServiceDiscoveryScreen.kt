@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,9 +23,9 @@ fun ServiceDiscoveryScreen(
     viewModel: ServiceDiscoveryViewModel,
     onBackClick: () -> Unit
 ) {
-    val services by viewModel.services.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
-    val isScanning by viewModel.isScanning.collectAsState()
+    val services by viewModel.services.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {

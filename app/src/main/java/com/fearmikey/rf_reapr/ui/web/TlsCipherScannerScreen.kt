@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -30,8 +31,8 @@ fun TlsCipherScannerScreen(
     onBack: () -> Unit
 ) {
     var url by remember { mutableStateOf("https://google.com") }
-    val uiState by viewModel.uiState.collectAsState()
-    val isPassiveMode by viewModel.isPassiveMode.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
     val keyboardController = LocalSoftwareKeyboardController.current
     val clipboardManager = LocalClipboardManager.current
 

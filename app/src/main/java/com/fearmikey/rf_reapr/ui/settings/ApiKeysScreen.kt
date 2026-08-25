@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,10 +34,10 @@ fun ApiKeysScreen(
     onBack: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
-    val currentTheme by viewModel.themePreference.collectAsState()
-    val apiKey by viewModel.vulnerabilityApiKey.collectAsState()
-    val hibpApiKey by viewModel.hibpApiKey.collectAsState()
-    val shodanApiKey by viewModel.shodanApiKey.collectAsState()
+    val currentTheme by viewModel.themePreference.collectAsStateWithLifecycle()
+    val apiKey by viewModel.vulnerabilityApiKey.collectAsStateWithLifecycle()
+    val hibpApiKey by viewModel.hibpApiKey.collectAsStateWithLifecycle()
+    val shodanApiKey by viewModel.shodanApiKey.collectAsStateWithLifecycle()
     
     var editedApiKey by remember(apiKey) { mutableStateOf(apiKey) }
     var editedHibpApiKey by remember(hibpApiKey) { mutableStateOf(hibpApiKey) }

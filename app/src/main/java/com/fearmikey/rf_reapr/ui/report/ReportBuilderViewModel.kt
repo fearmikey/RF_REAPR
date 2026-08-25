@@ -7,6 +7,7 @@ import com.fearmikey.rf_reapr.domain.model.*
 import com.fearmikey.rf_reapr.domain.repository.ReportRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
 class ReportBuilderViewModel(
     private val repository: ReportRepository
@@ -28,13 +29,47 @@ class ReportBuilderViewModel(
                         availableScans = scans,
                         availableProjects = projects,
                         availableCompliance = compliance,
-                        availableLogs = logs.filter { it.type != "WIFI" && it.type != "IPERF" && it.type != "SNMP" },
+                        availableLogs = logs.filter { it.type !in listOf("WIFI", "IPERF", "SNMP", "SUBDOMAIN", "CLOUD", "WEBSITE", "TLS", "SHODAN", "HIBP", "WEB_SUBDOMAIN", "WEB_CLOUD", "WEB_TLS") },
                         availableWifiScans = logs.filter { it.type == "WIFI" },
                         availableIperfTests = logs.filter { it.type == "IPERF" },
-                        availableSnmpResults = logs.filter { it.type == "SNMP" }
+                        availableSnmpResults = logs.filter { it.type == "SNMP" },
+                        availableExternalRecon = logs.filter { it.type in listOf("SUBDOMAIN", "CLOUD", "WEBSITE", "TLS", "SHODAN", "HIBP", "WEB_SUBDOMAIN", "WEB_CLOUD", "WEB_TLS") }
                     )
                 }
             }.collect()
+        }
+    }
+
+    fun autoSelectAndGenerate(format: ReportFormat = ReportFormat.PDF, startTime: Long? = null) {
+        viewModelScope.launch {
+            // Wait for data to load if needed (Room flows take a moment to emit after insertion)
+            kotlinx.coroutines.delay(2.seconds)
+            
+            _uiState.update { state ->
+                state.copy(
+                    selectedScanIds = state.availableScans
+                        .filter { startTime == null || it.timestamp >= startTime }
+                        .map { it.id }.toSet(),
+                    selectedLogIds = state.availableLogs
+                        .filter { startTime == null || it.timestamp >= startTime }
+                        .map { it.id }.toSet(),
+                    selectedWifiScanIds = state.availableWifiScans
+                        .filter { startTime == null || it.timestamp >= startTime }
+                        .map { it.id }.toSet(),
+                    selectedIperfTestIds = state.availableIperfTests
+                        .filter { startTime == null || it.timestamp >= startTime }
+                        .map { it.id }.toSet(),
+                    selectedSnmpLogIds = state.availableSnmpResults
+                        .filter { startTime == null || it.timestamp >= startTime }
+                        .map { it.id }.toSet(),
+                    selectedExternalReconIds = state.availableExternalRecon
+                        .filter { startTime == null || it.timestamp >= startTime }
+                        .map { it.id }.toSet(),
+                    title = "Automated Recon Report",
+                    executiveSummary = "This report was automatically generated following an OSINT Recon workflow."
+                )
+            }
+            generateReport(format)
         }
     }
 
@@ -127,6 +162,17 @@ class ReportBuilderViewModel(
         }
     }
 
+    fun toggleExternalRecon(logId: Long) {
+        _uiState.update { state ->
+            val newSelected = if (logId in state.selectedExternalReconIds) {
+                state.selectedExternalReconIds - logId
+            } else {
+                state.selectedExternalReconIds + logId
+            }
+            state.copy(selectedExternalReconIds = newSelected)
+        }
+    }
+
     fun generateReport(format: ReportFormat) {
         val state = _uiState.value
         if (state.isGenerating) return
@@ -158,7 +204,8 @@ class ReportBuilderViewModel(
                 snmpResults = state.availableSnmpResults.filter { it.id in state.selectedSnmpLogIds },
                 evidenceProjects = selectedProjects,
                 complianceFindings = selectedCompliance,
-                eventLogs = state.availableLogs.filter { it.id in state.selectedLogIds }
+                eventLogs = state.availableLogs.filter { it.id in state.selectedLogIds } + 
+                            state.availableExternalRecon.filter { it.id in state.selectedExternalReconIds }
             )
 
             val result = when (format) {
@@ -192,6 +239,7 @@ data class ReportBuilderUiState(
     val availableWifiScans: List<EventLog> = emptyList(),
     val availableIperfTests: List<EventLog> = emptyList(),
     val availableSnmpResults: List<EventLog> = emptyList(),
+    val availableExternalRecon: List<EventLog> = emptyList(),
     val selectedScanIds: Set<Long> = emptySet(),
     val selectedProjectIds: Set<String> = emptySet(),
     val selectedComplianceIds: Set<String> = emptySet(),
@@ -199,6 +247,7 @@ data class ReportBuilderUiState(
     val selectedWifiScanIds: Set<Long> = emptySet(),
     val selectedIperfTestIds: Set<Long> = emptySet(),
     val selectedSnmpLogIds: Set<Long> = emptySet(),
+    val selectedExternalReconIds: Set<Long> = emptySet(),
     val isGenerating: Boolean = false,
     val generatedUri: Uri? = null,
     val error: String? = null

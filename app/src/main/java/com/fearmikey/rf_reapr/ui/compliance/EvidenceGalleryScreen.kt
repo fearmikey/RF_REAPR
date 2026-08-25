@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,10 +69,10 @@ fun EvidenceGalleryScreen(
     onBack: () -> Unit,
     onNavigateToCapture: () -> Unit
 ) {
-    val folders by viewModel.folders.collectAsState()
-    val evidenceList by viewModel.evidenceList.collectAsState()
-    val currentProject by viewModel.currentProject.collectAsState()
-    val currentFolder by viewModel.currentFolder.collectAsState()
+    val folders by viewModel.folders.collectAsStateWithLifecycle()
+    val evidenceList by viewModel.evidenceList.collectAsStateWithLifecycle()
+    val currentProject by viewModel.currentProject.collectAsStateWithLifecycle()
+    val currentFolder by viewModel.currentFolder.collectAsStateWithLifecycle()
     
     var selectedEvidenceForDetail by remember { mutableStateOf<Evidence?>(null) }
     var showCreationDialog by remember { mutableStateOf<CreationType?>(null) }

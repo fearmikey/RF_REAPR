@@ -68,8 +68,8 @@ object ReportGraphRenderer {
             canvas.drawText("$dbm", 5f, y + 6f, labelPaint)
         }
 
-        // Access Points
-        aps.forEach { ap ->
+        // Access Points - humps
+        aps.sortedBy { it.signalLevel }.forEach { ap ->
             val color = getColorForBssid(ap.bssid)
             val centerX = freqToX(ap.frequency.toFloat())
             val bandwidthWidth = (ap.bandwidth.toFloat() / (maxFreq - minFreq)) * chartWidth
@@ -103,16 +103,34 @@ object ReportGraphRenderer {
 
             canvas.drawPath(path, fillPaint)
             canvas.drawPath(path, strokePaint)
-
-            // Labels
-            val apLabelPaint = Paint().apply {
-                this.color = Color.BLACK
-                textSize = 16f
-                isFakeBoldText = true
-                textAlign = Paint.Align.CENTER
+        }
+        
+        // Labels grouped by frequency to prevent overlap
+        val apsByFreq = aps.groupBy { it.frequency }
+        apsByFreq.forEach { (_, groupAps) ->
+            val sortedAps = groupAps.sortedByDescending { it.signalLevel }
+            var lastLabelBottomY = -Float.MAX_VALUE
+            val labelSpacing = 20f
+            
+            val labelPositions = sortedAps.map { ap ->
+                val topY = rssiToY(ap.signalLevel)
+                val baseY = maxOf(topY, lastLabelBottomY + labelSpacing)
+                lastLabelBottomY = baseY
+                ap to baseY
             }
-            val ssidLabel = if (ap.ssid.isEmpty()) "[Hidden]" else ap.ssid
-            canvas.drawText(ssidLabel.take(15), centerX, topY - 10f, apLabelPaint)
+            
+            labelPositions.reversed().forEach { (ap, baseY) ->
+                val centerX = freqToX(ap.frequency.toFloat())
+                
+                val apLabelPaint = Paint().apply {
+                    this.color = Color.BLACK
+                    textSize = 16f
+                    isFakeBoldText = true
+                    textAlign = Paint.Align.CENTER
+                }
+                val ssidLabel = if (ap.ssid.isEmpty()) "[Hidden]" else ap.ssid
+                canvas.drawText(ssidLabel.take(15), centerX, baseY - 10f, apLabelPaint)
+            }
         }
 
         return bitmap

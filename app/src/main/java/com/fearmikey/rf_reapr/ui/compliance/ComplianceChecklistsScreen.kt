@@ -8,8 +8,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,7 +29,7 @@ fun ComplianceChecklistsScreen(
     onFrameworkClick: (String) -> Unit,
     onBack: () -> Unit
 ) {
-    val frameworks by viewModel.frameworks.collectAsState()
+    val frameworks by viewModel.frameworks.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {

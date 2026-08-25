@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,7 +35,7 @@ fun AuditChecklistScreen(
     viewModel: ComplianceViewModel,
     onBack: () -> Unit
 ) {
-    val controls by viewModel.controls.collectAsState()
+    val controls by viewModel.controls.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showExportDialog by remember { mutableStateOf(false) }
 

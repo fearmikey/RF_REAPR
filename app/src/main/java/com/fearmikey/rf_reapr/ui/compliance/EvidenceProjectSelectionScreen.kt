@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -26,7 +27,7 @@ fun EvidenceProjectSelectionScreen(
     onNavigateToRecycleBin: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val projects by viewModel.projects.collectAsState()
+    val projects by viewModel.projects.collectAsStateWithLifecycle()
     var showProjectCreator by remember { mutableStateOf(value = false) }
     var projectToDelete by remember { mutableStateOf<EvidenceProject?>(value = null) }
     

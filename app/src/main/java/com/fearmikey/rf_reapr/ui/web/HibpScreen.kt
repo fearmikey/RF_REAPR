@@ -1,7 +1,6 @@
 package com.fearmikey.rf_reapr.ui.web
 
 import android.text.Html
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,10 +13,13 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.Breach
 import com.fearmikey.rf_reapr.domain.model.Paste
@@ -26,11 +28,11 @@ import com.fearmikey.rf_reapr.domain.model.Paste
 @Composable
 fun HibpScreen(
     viewModel: HibpViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     var account by remember { mutableStateOf("") }
-    val uiState by viewModel.uiState.collectAsState()
-    val isApiKeyMissing by viewModel.isApiKeyMissing.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isApiKeyMissing by viewModel.isApiKeyMissing.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -57,10 +59,14 @@ fun HibpScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 placeholder = { Text("example@email.com") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    autoCorrect = false
+                ),
                 trailingIcon = {
                     IconButton(
                         onClick = { viewModel.checkAccount(account) },
-                        enabled = account.isNotBlank() && uiState !is HibpUiState.Loading
+                        enabled = account.isNotBlank() && (uiState !is HibpUiState.Loading)
                     ) {
                         Icon(Icons.Default.Search, contentDescription = "Search")
                     }
