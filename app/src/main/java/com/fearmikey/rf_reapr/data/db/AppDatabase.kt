@@ -13,6 +13,7 @@ import com.fearmikey.rf_reapr.data.db.dao.HidAssetDao
 import com.fearmikey.rf_reapr.data.db.dao.HidScriptDao
 import com.fearmikey.rf_reapr.data.db.dao.NetworkDao
 import com.fearmikey.rf_reapr.data.db.dao.ScanSessionDao
+import com.fearmikey.rf_reapr.data.db.dao.UsbDriveDao
 import com.fearmikey.rf_reapr.data.db.dao.VulnerabilityDao
 import com.fearmikey.rf_reapr.data.db.entity.VulnerabilityEntity
 import com.fearmikey.rf_reapr.data.db.entity.ComplianceFindingEntity
@@ -25,6 +26,7 @@ import com.fearmikey.rf_reapr.data.db.entity.HidScriptEntity
 import com.fearmikey.rf_reapr.data.db.entity.NetworkNodeEntity
 import com.fearmikey.rf_reapr.data.db.entity.ScanSessionEntity
 import com.fearmikey.rf_reapr.data.db.entity.SessionNodeCrossRef
+import com.fearmikey.rf_reapr.data.db.entity.UsbDriveEntity
 
 @Database(
     entities = [
@@ -39,8 +41,9 @@ import com.fearmikey.rf_reapr.data.db.entity.SessionNodeCrossRef
         VulnerabilityEntity::class,
         HidScriptEntity::class,
         HidAssetEntity::class,
+        UsbDriveEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -53,6 +56,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun vulnerabilityDao(): VulnerabilityDao
     abstract fun hidScriptDao(): HidScriptDao
     abstract fun hidAssetDao(): HidAssetDao
+    abstract fun usbDriveDao(): UsbDriveDao
 
     companion object {
         @Volatile

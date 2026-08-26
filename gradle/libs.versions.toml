@@ -27,6 +27,7 @@ mockito = "5.11.0"
 poi = "5.5.1"
 jtransforms = "3.1"
 snmp4j = "3.13.1"
+documentfile = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -75,6 +76,7 @@ poi-ooxml = { group = "org.apache.poi", name = "poi-ooxml", version.ref = "poi" 
 jtransforms = { group = "com.github.wendykierp", name = "JTransforms", version.ref = "jtransforms" }
 snmp4j = { group = "org.snmp4j", name = "snmp4j", version.ref = "snmp4j" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
+androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -26,7 +26,7 @@ class IperfRepository {
             val networkInterfaces = NetworkInterface.getNetworkInterfaces()
             while (networkInterfaces.hasMoreElements()) {
                 val ni = networkInterfaces.nextElement()
-                if (ni.isUp && !ni.isLoopback) {
+                if (ni.isUp && !ni.isLoopback && !isCellularInterface(ni.name)) {
                     var ipAddress: String? = null
                     val addresses = ni.inetAddresses
                     while (addresses.hasMoreElements()) {
@@ -98,5 +98,26 @@ class IperfRepository {
      */
     fun stopTest() {
         IperfNative.stopIperf()
+    }
+
+    /**
+     * Identifies interfaces backed by the cellular radio so they can be excluded from the
+     * bindable interface list. iPerf tests should only run over Ethernet/Wi-Fi adapters.
+     */
+    private fun isCellularInterface(name: String): Boolean {
+        val lower = name.lowercase()
+        return CELLULAR_INTERFACE_PREFIXES.any { lower.startsWith(it) }
+    }
+
+    companion object {
+        // Common cellular/mobile-data interface name prefixes across Android chipsets/vendors.
+        private val CELLULAR_INTERFACE_PREFIXES = listOf(
+            "rmnet",   // Qualcomm
+            "ccmni",   // MediaTek
+            "ccemni",  // MediaTek (variant)
+            "pdp",     // Older basebands
+            "cellular",
+            "clat"     // 464xlat, layered on top of cellular
+        )
     }
 }

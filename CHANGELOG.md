@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.1] - 2026-08-26
+
+### Added
+- **Physical Security**:
+    - **HID Injector Enhancements**: Integrated USB Drive support via Storage Access Framework (SAF).
+    - Added **Ducky Script Builder**: A new interactive sheet to compose and save Ducky Scripts directly to connected USB drives.
+    - Implemented `UsbDriveRepository` for persistence and management of testing payloads across different storage providers.
+- **System**:
+    - Added `androidx.documentfile` dependency to support robust SAF operations.
+
+### Fixed
+- **Network Auditing**: Resolved stability issues in `iperf3` native execution and improved log reporting in `IperfViewModel`.
+- **Submodules**: Fixed signed/unsigned comparison warnings in `iperf3`'s cJSON library.
+
 ## [1.5.0] - 2026-08-25
 
 ### Added

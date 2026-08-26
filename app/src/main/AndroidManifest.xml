@@ -23,6 +23,7 @@
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
     <queries>
         <package android:name="com.martinmarinov.rtl_tcp_driver" />

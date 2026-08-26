@@ -183,6 +183,7 @@ class MainActivity : ComponentActivity() {
         val internetDbRepository = InternetDbRepositoryImpl(okHttpClient)
         val hidRepository = LocalHidRepository(database.hidScriptDao())
         val hidAssetRepository = LocalHidAssetRepository(this, database.hidAssetDao())
+        val usbDriveRepository = UsbDriveRepositoryImpl(this, database.usbDriveDao())
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
 
@@ -526,7 +527,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.HidInjector.route) {
                             val hidInjectorViewModel: HidInjectorViewModel = viewModel {
-                                                    HidInjectorViewModel(hidRepository, hidAssetRepository, settingsRepository)
+                                                    HidInjectorViewModel(hidRepository, hidAssetRepository, settingsRepository, usbDriveRepository)
                                                 }
                             HidInjectorScreen(
                                 viewModel = hidInjectorViewModel,

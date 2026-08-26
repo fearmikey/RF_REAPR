@@ -42,13 +42,20 @@ class IperfViewModel(
         viewModelScope.launch {
             val available = repository.getAvailableNetworkInterfaces()
             _interfaces.value = available
-            
-            // Auto-select eth0 if it exists
-            val eth0 = available.find { it.name.startsWith("eth") }
-            if (eth0 != null) {
-                _selectedInterface.value = eth0
-            } else if (available.isNotEmpty() && _selectedInterface.value == null) {
-                _selectedInterface.value = available.first()
+
+            // If the currently selected interface still exists (matched by name), refresh it
+            // with the latest data (e.g. a new IPv4 address after switching Wi-Fi networks)
+            // instead of leaving the stale, previously-selected entry in place.
+            val currentName = _selectedInterface.value?.name
+            val refreshedSelection = currentName?.let { name -> available.find { it.name == name } }
+
+            _selectedInterface.value = when {
+                refreshedSelection != null -> refreshedSelection
+                else -> {
+                    // Previously selected interface is gone (or nothing was selected yet).
+                    // Auto-select eth0 if it exists, otherwise fall back to the first interface.
+                    available.find { it.name.startsWith("eth") } ?: available.firstOrNull()
+                }
             }
         }
     }

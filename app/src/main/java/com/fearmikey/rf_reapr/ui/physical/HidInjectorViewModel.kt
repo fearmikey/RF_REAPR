@@ -1,13 +1,16 @@
 package com.fearmikey.rf_reapr.ui.physical
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.HidPayload
+import com.fearmikey.rf_reapr.domain.model.UsbDriveInfo
 import com.fearmikey.rf_reapr.domain.repository.HidAssetRepository
 import com.fearmikey.rf_reapr.domain.repository.HidRepository
 import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
+import com.fearmikey.rf_reapr.domain.repository.UsbDriveRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +25,8 @@ import java.io.OutputStreamWriter
 class HidInjectorViewModel(
     private val repository: HidRepository,
     private val assetRepository: HidAssetRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val usbDriveRepository: UsbDriveRepository
 ) : ViewModel() {
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
@@ -43,11 +47,57 @@ class HidInjectorViewModel(
     private val _isFlashing = MutableStateFlow(false)
     val isFlashing: StateFlow<Boolean> = _isFlashing.asStateFlow()
 
+    val usbDrives: StateFlow<List<UsbDriveInfo>> = usbDriveRepository.observeDrives()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         viewModelScope.launch {
             repository.getAllScripts().collect {
                 _scripts.value = it
             }
+        }
+    }
+
+    /** Appends a single DuckyScript line (as produced by the script builder) to the current script. */
+    fun appendScriptLine(line: String) {
+        val current = _currentScript.value
+        _currentScript.value = if (current.isBlank()) line else "$current\n$line"
+    }
+
+    /** Intent used to request write access to the root of [drive], or null if it's no longer attached. */
+    fun getDriveAccessIntent(drive: UsbDriveInfo): Intent? = usbDriveRepository.createAccessIntent(drive)
+
+    /** Called once the system document-tree picker returns a granted [treeUri] for [drive]. */
+    fun onDriveAccessGranted(drive: UsbDriveInfo, treeUri: Uri) {
+        viewModelScope.launch {
+            usbDriveRepository.onAccessGranted(drive.id, drive.name, treeUri)
+            addLog("Access granted for USB drive: ${drive.name}")
+            flashToUsbDrive(drive.copy(treeUri = treeUri.toString(), isAuthorized = true))
+        }
+    }
+
+    /** Writes the current script to the root of an already-authorized [drive]. */
+    fun flashToUsbDrive(drive: UsbDriveInfo, fileName: String = "payload.txt") {
+        if (_isFlashing.value) return
+        if (isPassiveMode.value) {
+            addLog("Passive Mode enabled. HID injection inhibited.")
+            return
+        }
+        viewModelScope.launch {
+            _isFlashing.value = true
+            addLog("Flashing script to ${drive.name}...")
+            usbDriveRepository.writeToDrive(drive, fileName, _currentScript.value)
+                .onSuccess { addLog("Flashing successful: ${drive.name}") }
+                .onFailure { addLog("Flashing failed: ${it.message}") }
+            _isFlashing.value = false
+        }
+    }
+
+    /** Forgets a previously authorized USB drive, releasing the persisted permission grant. */
+    fun forgetUsbDrive(drive: UsbDriveInfo) {
+        viewModelScope.launch {
+            usbDriveRepository.forgetDrive(drive.id)
+            addLog("Forgot USB drive: ${drive.name}")
         }
     }
 
