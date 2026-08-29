@@ -10,6 +10,8 @@ interface SettingsRepository {
     val isCameraShortcutEnabled: Flow<Boolean>
     val isPassiveMode: Flow<Boolean>
     val shodanApiKey: Flow<String>
+    val sdrIp: Flow<String>
+    val sdrPort: Flow<Int>
 
     suspend fun setThemePreference(preference: ThemePreference)
     suspend fun setVulnerabilityApiKey(key: String)
@@ -17,4 +19,6 @@ interface SettingsRepository {
     suspend fun setCameraShortcutEnabled(enabled: Boolean)
     suspend fun setPassiveMode(enabled: Boolean)
     suspend fun setShodanApiKey(key: String)
+    suspend fun setSdrIp(ip: String)
+    suspend fun setSdrPort(port: Int)
 }

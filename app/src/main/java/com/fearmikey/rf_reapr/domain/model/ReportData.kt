@@ -9,6 +9,7 @@ data class ReportData(
     val timestamp: Date = Date(),
     val networkScans: List<ReportScanSession> = emptyList(),
     val wifiScans: List<EventLog> = emptyList(),
+    val bleScans: List<EventLog> = emptyList(),
     val iperfTests: List<EventLog> = emptyList(),
     val snmpResults: List<EventLog> = emptyList(),
     val evidenceProjects: List<ReportEvidenceProject> = emptyList(),

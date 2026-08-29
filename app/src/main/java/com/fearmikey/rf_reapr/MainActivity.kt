@@ -290,6 +290,19 @@ class MainActivity : ComponentActivity() {
                                     WorkflowStep("shodan_search", "Shodan Quick Search", "Query Shodan for exposed infrastructure.", Screen.ShodanScanner.route, Icons.Default.Search),
                                     WorkflowStep("hibp_audit", "HIBP Breach Check", "Check for domain-related data breaches.", Screen.HibpChecker.route, Icons.Default.Shield)
                                 )
+                            ),
+                            AppMode(
+                                id = "wireless_security_audit",
+                                title = "Wireless Security Audit",
+                                description = "Map the radio perimeter: WiFi, Bluetooth, and SDR sweeps.",
+                                icon = Icons.Default.Wifi,
+                                securityWarning = "Wireless Security Audit performs active and passive radio frequency scanning. Ensure you have authorization to monitor wireless traffic in this area.",
+                                steps = listOf(
+                                    WorkflowStep("wifi_scan", "WiFi Spectrum Analysis", "Map access points and identify hidden SSIDs.", Screen.WifiFingerprinter.route, Icons.Default.Wifi, isMandatory = true),
+                                    WorkflowStep("ble_scan", "Bluetooth Proximity", "Detect nearby BLE devices and tracking beacons.", Screen.BluetoothProximityFinder.route, Icons.Default.Bluetooth),
+                                    WorkflowStep("sdr_sweep", "SDR Frequency Sweep", "Search for unauthorized transmissions (Requires RTL-SDR).", Screen.SdrController.route, Icons.Default.SettingsInputAntenna),
+                                    WorkflowStep("evidence_capture", "Evidence Capture", "Document physical locations of rogue transmitters.", Screen.EvidenceCapture.route, Icons.Default.CameraAlt)
+                                )
                             )
                         )
                     }
@@ -365,7 +378,11 @@ class MainActivity : ComponentActivity() {
                                         tlsCipherScannerRepository = tlsCipherScannerRepository,
                                         shodanRepository = shodanRepository,
                                         hibpRepository = hibpRepository,
-                                        logRepository = logRepository
+                                        logRepository = logRepository,
+                                        wifiRepository = wifiRepository,
+                                        bleRepository = bleRepository,
+                                        sdrRepository = sdrRepository,
+                                        settingsRepository = settingsRepository
                                     )
                                 }
                                 WorkflowScreen(

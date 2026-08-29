@@ -125,6 +125,16 @@ fun ReportBuilderScreen(
                 )
             }
 
+            item { SectionHeader("Bluetooth Audit Scans", Icons.Default.Bluetooth) }
+            items(state.availableBleScans) { scan ->
+                SelectionItem(
+                    title = scan.summary,
+                    subtitle = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(scan.timestamp)),
+                    isSelected = scan.id in state.selectedBleScanIds,
+                    onToggle = { viewModel.toggleBleScan(scan.id) }
+                )
+            }
+
             item { SectionHeader("iPerf Throughput Tests", Icons.Default.NetworkPing) }
             items(state.availableIperfTests) { test ->
                 SelectionItem(

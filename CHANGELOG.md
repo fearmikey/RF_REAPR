@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.2] - 2026-08-28
+
+### Added
+- **Compliance & Reporting**:
+    - Integrated **Bluetooth Proximity Analysis** into the automated Report Builder (PDF and DOCX).
+    - Added structured tables for BLE devices, including RSSI levels, device names, and manufacturer data.
+    - Improved report layout logic for multi-page data tables.
+- **Wireless Auditing**: Bluetooth scans are now logged with full device metadata for audit persistence.
+
+### Changed
+- **Maintenance**: Version bump to 1.5.2.
+
 ## [1.5.1] - 2026-08-26
 
 ### Added

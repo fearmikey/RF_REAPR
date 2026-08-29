@@ -88,6 +88,30 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         emit(prefs.getString("shodan_api_key", "") ?: "")
     }
 
+    override val sdrIp: Flow<String> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "sdr_ip") {
+                trySend(p.getString(key, "127.0.0.1") ?: "127.0.0.1")
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.onStart {
+        emit(prefs.getString("sdr_ip", "127.0.0.1") ?: "127.0.0.1")
+    }
+
+    override val sdrPort: Flow<Int> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "sdr_port") {
+                trySend(p.getInt(key, 1234))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.onStart {
+        emit(prefs.getInt("sdr_port", 1234))
+    }
+
     override suspend fun setThemePreference(preference: ThemePreference) {
         prefs.edit().putString("theme_preference", preference.name).apply()
     }
@@ -124,5 +148,13 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
 
     override suspend fun setShodanApiKey(key: String) {
         prefs.edit().putString("shodan_api_key", key).apply()
+    }
+
+    override suspend fun setSdrIp(ip: String) {
+        prefs.edit().putString("sdr_ip", ip).apply()
+    }
+
+    override suspend fun setSdrPort(port: Int) {
+        prefs.edit().putInt("sdr_port", port).apply()
     }
 }

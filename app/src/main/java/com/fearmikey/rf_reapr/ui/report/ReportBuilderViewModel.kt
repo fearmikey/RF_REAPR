@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 
 class ReportBuilderViewModel(
-    private val repository: ReportRepository
+    private val repository: ReportRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReportBuilderUiState())
@@ -29,8 +29,9 @@ class ReportBuilderViewModel(
                         availableScans = scans,
                         availableProjects = projects,
                         availableCompliance = compliance,
-                        availableLogs = logs.filter { it.type !in listOf("WIFI", "IPERF", "SNMP", "SUBDOMAIN", "CLOUD", "WEBSITE", "TLS", "SHODAN", "HIBP", "WEB_SUBDOMAIN", "WEB_CLOUD", "WEB_TLS") },
+                        availableLogs = logs.filter { it.type !in listOf("WIFI", "IPERF", "SNMP", "SUBDOMAIN", "CLOUD", "WEBSITE", "TLS", "SHODAN", "HIBP", "WEB_SUBDOMAIN", "WEB_CLOUD", "WEB_TLS", "BLE") },
                         availableWifiScans = logs.filter { it.type == "WIFI" },
+                        availableBleScans = logs.filter { it.type == "BLE" },
                         availableIperfTests = logs.filter { it.type == "IPERF" },
                         availableSnmpResults = logs.filter { it.type == "SNMP" },
                         availableExternalRecon = logs.filter { it.type in listOf("SUBDOMAIN", "CLOUD", "WEBSITE", "TLS", "SHODAN", "HIBP", "WEB_SUBDOMAIN", "WEB_CLOUD", "WEB_TLS") }
@@ -47,23 +48,26 @@ class ReportBuilderViewModel(
             
             _uiState.update { state ->
                 state.copy(
-                    selectedScanIds = state.availableScans
-                        .filter { startTime == null || it.timestamp >= startTime }
+                    selectedScanIds = state.availableScans.asSequence()
+                        .filter { (startTime == null) || (it.timestamp >= startTime) }
                         .map { it.id }.toSet(),
-                    selectedLogIds = state.availableLogs
-                        .filter { startTime == null || it.timestamp >= startTime }
+                    selectedLogIds = state.availableLogs.asSequence()
+                        .filter { (startTime == null) || (it.timestamp >= startTime) }
                         .map { it.id }.toSet(),
-                    selectedWifiScanIds = state.availableWifiScans
-                        .filter { startTime == null || it.timestamp >= startTime }
+                    selectedWifiScanIds = state.availableWifiScans.asSequence()
+                        .filter { (startTime == null) || (it.timestamp >= startTime) }
                         .map { it.id }.toSet(),
-                    selectedIperfTestIds = state.availableIperfTests
-                        .filter { startTime == null || it.timestamp >= startTime }
+                    selectedBleScanIds = state.availableBleScans.asSequence()
+                        .filter { (startTime == null) || (it.timestamp >= startTime) }
                         .map { it.id }.toSet(),
-                    selectedSnmpLogIds = state.availableSnmpResults
-                        .filter { startTime == null || it.timestamp >= startTime }
+                    selectedIperfTestIds = state.availableIperfTests.asSequence()
+                        .filter { (startTime == null) || (it.timestamp >= startTime) }
                         .map { it.id }.toSet(),
-                    selectedExternalReconIds = state.availableExternalRecon
-                        .filter { startTime == null || it.timestamp >= startTime }
+                    selectedSnmpLogIds = state.availableSnmpResults.asSequence()
+                        .filter { (startTime == null) || (it.timestamp >= startTime) }
+                        .map { it.id }.toSet(),
+                    selectedExternalReconIds = state.availableExternalRecon.asSequence()
+                        .filter { (startTime == null) || (it.timestamp >= startTime) }
                         .map { it.id }.toSet(),
                     title = "Automated Recon Report",
                     executiveSummary = "This report was automatically generated following an OSINT Recon workflow."
@@ -140,6 +144,17 @@ class ReportBuilderViewModel(
         }
     }
 
+    fun toggleBleScan(logId: Long) {
+        _uiState.update { state ->
+            val newSelected = if (logId in state.selectedBleScanIds) {
+                state.selectedBleScanIds - logId
+            } else {
+                state.selectedBleScanIds + logId
+            }
+            state.copy(selectedBleScanIds = newSelected)
+        }
+    }
+
     fun toggleIperfTest(logId: Long) {
         _uiState.update { state ->
             val newSelected = if (logId in state.selectedIperfTestIds) {
@@ -200,6 +215,7 @@ class ReportBuilderViewModel(
                 executiveSummary = state.executiveSummary,
                 networkScans = selectedScans,
                 wifiScans = state.availableWifiScans.filter { it.id in state.selectedWifiScanIds },
+                bleScans = state.availableBleScans.filter { it.id in state.selectedBleScanIds },
                 iperfTests = state.availableIperfTests.filter { it.id in state.selectedIperfTestIds },
                 snmpResults = state.availableSnmpResults.filter { it.id in state.selectedSnmpLogIds },
                 evidenceProjects = selectedProjects,
@@ -237,6 +253,7 @@ data class ReportBuilderUiState(
     val availableCompliance: List<ReportComplianceFramework> = emptyList(),
     val availableLogs: List<EventLog> = emptyList(),
     val availableWifiScans: List<EventLog> = emptyList(),
+    val availableBleScans: List<EventLog> = emptyList(),
     val availableIperfTests: List<EventLog> = emptyList(),
     val availableSnmpResults: List<EventLog> = emptyList(),
     val availableExternalRecon: List<EventLog> = emptyList(),
@@ -245,6 +262,7 @@ data class ReportBuilderUiState(
     val selectedComplianceIds: Set<String> = emptySet(),
     val selectedLogIds: Set<Long> = emptySet(),
     val selectedWifiScanIds: Set<Long> = emptySet(),
+    val selectedBleScanIds: Set<Long> = emptySet(),
     val selectedIperfTestIds: Set<Long> = emptySet(),
     val selectedSnmpLogIds: Set<Long> = emptySet(),
     val selectedExternalReconIds: Set<Long> = emptySet(),

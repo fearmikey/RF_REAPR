@@ -193,7 +193,7 @@ class ReportRepositoryImpl(
             }
 
             fun checkNewPage(neededHeight: Float) {
-                if (y + neededHeight > pageHeight - margin) {
+                if (y + neededHeight > (pageHeight - margin)) {
                     startNewPage()
                 }
             }
@@ -364,6 +364,48 @@ class ReportRepositoryImpl(
                 }
             }
 
+            // Bluetooth Scans
+            if (data.bleScans.isNotEmpty()) {
+                checkNewPage(40f)
+                paint.textSize = 16f
+                paint.isFakeBoldText = true
+                canvas.drawText("Bluetooth Proximity Analysis", margin, y, paint)
+                y += 30f
+
+                data.bleScans.forEach { log ->
+                    checkNewPage(40f)
+                    paint.textSize = 13f
+                    paint.isFakeBoldText = true
+                    canvas.drawText(log.summary, margin, y, paint)
+                    y += 20f
+
+                    try {
+                        val type = object : TypeToken<List<BleDevice>>() {}.type
+                        val devices: List<BleDevice> = gson.fromJson(log.detailJson, type)
+                        
+                        if (devices.isNotEmpty()) {
+                            val cols = listOf("Device Name" to 10f, "Address" to 150f, "RSSI" to 350f, "Manufacturer" to 420f)
+                            drawTableHeader(cols)
+                            paint.textSize = 10f
+                            devices.forEach { device ->
+                                if (y > pageHeight - margin - 30f) {
+                                    startNewPage()
+                                    drawTableHeader(cols)
+                                }
+                                canvas.drawText(device.name ?: "Unknown", margin + 10f, y + 15f, paint)
+                                canvas.drawText(device.address, margin + 150f, y + 15f, paint)
+                                canvas.drawText("${device.rssi}dBm", margin + 350f, y + 15f, paint)
+                                canvas.drawText(device.manufacturer?.take(25) ?: "N/A", margin + 420f, y + 15f, paint)
+                                y += 20f
+                            }
+                        }
+                    } catch (_: Exception) {
+                        drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
+                    }
+                    y += 10f
+                }
+            }
+
             // iPerf Throughput Tests
             if (data.iperfTests.isNotEmpty()) {
                 checkNewPage(40f)
@@ -443,6 +485,48 @@ class ReportRepositoryImpl(
                             y += 15f
                         }
                     } catch (_: Exception) {}
+                }
+            }
+
+            // Bluetooth Scans
+            if (data.bleScans.isNotEmpty()) {
+                checkNewPage(40f)
+                paint.textSize = 16f
+                paint.isFakeBoldText = true
+                canvas.drawText("Bluetooth Proximity Analysis", margin, y, paint)
+                y += 30f
+
+                data.bleScans.forEach { log ->
+                    checkNewPage(40f)
+                    paint.textSize = 13f
+                    paint.isFakeBoldText = true
+                    canvas.drawText(log.summary, margin, y, paint)
+                    y += 20f
+
+                    try {
+                        val type = object : TypeToken<List<BleDevice>>() {}.type
+                        val devices: List<BleDevice> = gson.fromJson(log.detailJson, type)
+                        
+                        if (devices.isNotEmpty()) {
+                            val cols = listOf("Device Name" to 10f, "Address" to 150f, "RSSI" to 350f, "Manufacturer" to 420f)
+                            drawTableHeader(cols)
+                            paint.textSize = 10f
+                            devices.forEach { device ->
+                                if (y > pageHeight - margin - 30f) {
+                                    startNewPage()
+                                    drawTableHeader(cols)
+                                }
+                                canvas.drawText(device.name ?: "Unknown", margin + 10f, y + 15f, paint)
+                                canvas.drawText(device.address, margin + 150f, y + 15f, paint)
+                                canvas.drawText("${device.rssi}dBm", margin + 350f, y + 15f, paint)
+                                canvas.drawText(device.manufacturer?.take(25) ?: "N/A", margin + 420f, y + 15f, paint)
+                                y += 20f
+                            }
+                        }
+                    } catch (_: Exception) {
+                        drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
+                    }
+                    y += 10f
                 }
             }
 
@@ -577,7 +661,7 @@ class ReportRepositoryImpl(
                                         gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>
                                     }
 
-                                    if (assets != null && assets.isNotEmpty()) {
+                                    if (!assets.isNullOrEmpty()) {
                                         val cols = listOf("Platform" to 10f, "URL" to 100f, "Status" to 400f)
                                         drawTableHeader(cols)
                                         paint.textSize = 9f
@@ -787,6 +871,30 @@ class ReportRepositoryImpl(
                                         } else {
                                             drawWrappedText("No Shodan data available for this target.", 10f, color = Color.GRAY)
                                         }
+                                    }
+                                } catch (_: Exception) {
+                                    drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
+                                }
+                            }
+                            "BLE" -> {
+                                try {
+                                    val type = object : TypeToken<List<BleDevice>>() {}.type
+                                    val devices: List<BleDevice> = gson.fromJson(log.detailJson, type)
+                                    
+                                    if (devices.isNotEmpty()) {
+                                        val cols = listOf("Device Name" to 10f, "Address" to 150f, "RSSI" to 350f, "Manufacturer" to 420f)
+                                        drawTableHeader(cols)
+                                        paint.textSize = 9f
+                                        devices.forEach { device ->
+                                            if (y > pageHeight - margin - 20f) { startNewPage(); drawTableHeader(cols) }
+                                            canvas.drawText(device.name ?: "Unknown", margin + 10f, y + 15f, paint)
+                                            canvas.drawText(device.address, margin + 150f, y + 15f, paint)
+                                            canvas.drawText("${device.rssi} dBm", margin + 350f, y + 15f, paint)
+                                            canvas.drawText(device.manufacturer?.take(25) ?: "N/A", margin + 420f, y + 15f, paint)
+                                            y += 18f
+                                        }
+                                    } else {
+                                        drawWrappedText("No Bluetooth devices discovered.", 10f, color = Color.GRAY)
                                     }
                                 } catch (_: Exception) {
                                     drawWrappedText(log.detailJson, 10f, color = Color.DKGRAY)
@@ -1015,6 +1123,46 @@ class ReportRepositoryImpl(
                 }
             }
 
+            // Bluetooth Scans
+            if (data.bleScans.isNotEmpty()) {
+                val bleSection = document.createParagraph()
+                bleSection.createRun().apply {
+                    addBreak()
+                    isBold = true
+                    fontSize = 14
+                    setText("Bluetooth Proximity Analysis")
+                }
+
+                data.bleScans.forEach { log ->
+                    document.createParagraph().createRun().apply {
+                        isBold = true
+                        setText(log.summary)
+                    }
+
+                    try {
+                        val type = object : TypeToken<List<BleDevice>>() {}.type
+                        val devices: List<BleDevice> = gson.fromJson(log.detailJson, type)
+                        
+                        if (devices.isNotEmpty()) {
+                            val table = document.createTable(devices.size + 1, 4)
+                            val header = table.getRow(0)
+                            header.getCell(0).text = "Device Name"
+                            header.getCell(1).text = "Address"
+                            header.getCell(2).text = "RSSI"
+                            header.getCell(3).text = "Manufacturer"
+                            
+                            devices.forEachIndexed { index, device ->
+                                val row = table.getRow(index + 1)
+                                row.getCell(0).text = device.name ?: "Unknown"
+                                row.getCell(1).text = device.address
+                                row.getCell(2).text = "${device.rssi} dBm"
+                                row.getCell(3).text = device.manufacturer ?: "N/A"
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+
             // iPerf Throughput Tests
             if (data.iperfTests.isNotEmpty()) {
                 val iperfSection = document.createParagraph()
@@ -1086,6 +1234,7 @@ class ReportRepositoryImpl(
                     } catch (_: Exception) {}
                 }
             }
+
 
             // Compliance
             if (data.complianceFindings.isNotEmpty()) {
@@ -1175,7 +1324,7 @@ class ReportRepositoryImpl(
                                         gson.fromJson(log.detailJson, object : TypeToken<List<Map<String, Any>>>() {}.type) as? List<*>
                                     }
 
-                                    if (assets != null && assets.isNotEmpty()) {
+                                    if (!assets.isNullOrEmpty()) {
                                         val table = document.createTable(assets.size + 1, 3)
                                         table.getRow(0).apply {
                                             getCell(0).text = "Platform"
@@ -1396,6 +1545,33 @@ class ReportRepositoryImpl(
                                         }
                                     }
                                 } catch (_: Exception) {}
+                            }
+                            "BLE" -> {
+                                try {
+                                    val type = object : TypeToken<List<BleDevice>>() {}.type
+                                    val devices: List<BleDevice> = gson.fromJson(log.detailJson, type)
+                                    
+                                    if (devices.isNotEmpty()) {
+                                        val table = document.createTable(devices.size + 1, 4)
+                                        table.getRow(0).apply {
+                                            getCell(0).text = "Device Name"
+                                            getCell(1).text = "Address"
+                                            getCell(2).text = "RSSI"
+                                            getCell(3).text = "Manufacturer"
+                                        }
+                                        devices.forEachIndexed { i, device ->
+                                            val row = table.getRow(i + 1)
+                                            row.getCell(0).text = device.name ?: "Unknown"
+                                            row.getCell(1).text = device.address
+                                            row.getCell(2).text = "${device.rssi} dBm"
+                                            row.getCell(3).text = device.manufacturer ?: "N/A"
+                                        }
+                                    } else {
+                                        document.createParagraph().createRun().setText("No Bluetooth devices discovered.")
+                                    }
+                                } catch (_: Exception) {
+                                    document.createParagraph().createRun().setText(log.detailJson)
+                                }
                             }
                             "PING" -> {
                                 val dataMap: Map<String, Any> = gson.fromJson(log.detailJson, object : TypeToken<Map<String, Any>>() {}.type)

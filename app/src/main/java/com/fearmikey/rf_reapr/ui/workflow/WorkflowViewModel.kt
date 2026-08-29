@@ -12,8 +12,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.seconds
 
 class WorkflowViewModel(
@@ -29,7 +31,11 @@ class WorkflowViewModel(
     private val tlsCipherScannerRepository: TlsCipherScannerRepository,
     private val shodanRepository: ShodanRepository,
     private val hibpRepository: HibpRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val wifiRepository: WifiFingerprintRepository,
+    private val bleRepository: BleScannerRepository,
+    private val sdrRepository: SdrRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
     private val _currentStepIndex = MutableStateFlow(0)
     val currentStepIndex: StateFlow<Int> = _currentStepIndex.asStateFlow()
@@ -134,6 +140,11 @@ class WorkflowViewModel(
             "tls_scanner" -> runTlsScanner()
             "shodan_search" -> runShodanSearch()
             "hibp_audit" -> runHibpAudit()
+            
+            // Wireless Steps
+            "wifi_scan" -> runWifiScan()
+            "ble_scan" -> runBleScan()
+            "sdr_sweep" -> runSdrSweep()
         }
     }
 
@@ -311,6 +322,85 @@ class WorkflowViewModel(
             )
         }.onFailure { e ->
             log("HIBP check failed: ${e.message}")
+        }
+    }
+
+    // --- Wireless Steps ---
+
+    private suspend fun runWifiScan() {
+        log("Analyzing WiFi spectrum (20s scan)...")
+        var results: List<com.fearmikey.rf_reapr.domain.model.WifiAccessPoint> = emptyList()
+        withTimeoutOrNull(20.seconds) {
+            wifiRepository.startWifiScan().collect { aps ->
+                results = aps
+            }
+        }
+        wifiRepository.stopWifiScan()
+        
+        if (results.isNotEmpty()) {
+            log("Discovered ${results.size} access points.")
+            logRepository.saveLog(
+                type = "WIFI",
+                summary = "WiFi Audit: ${results.size} APs",
+                detailJson = com.google.gson.Gson().toJson(results)
+            )
+        } else {
+            log("No WiFi access points found.")
+        }
+    }
+
+    private suspend fun runBleScan() {
+        log("Scanning Bluetooth proximity (20s scan)...")
+        var results: List<com.fearmikey.rf_reapr.domain.model.BleDevice> = emptyList()
+        withTimeoutOrNull(20.seconds) {
+            bleRepository.startScan(false).collect { result ->
+                if (result is NetworkScanner.ScanResult.Finished) {
+                    results = result.foundData
+                } else if (result is NetworkScanner.ScanResult.Progress) {
+                    results = result.foundData
+                }
+            }
+        }
+        
+        if (results.isNotEmpty()) {
+            log("Discovered ${results.size} Bluetooth devices.")
+            logRepository.saveLog(
+                type = "BLE",
+                summary = "Bluetooth Audit: ${results.size} Devices",
+                detailJson = com.google.gson.Gson().toJson(results)
+            )
+        } else {
+            log("No Bluetooth devices found.")
+        }
+    }
+
+    private suspend fun runSdrSweep() {
+        val sdrIp = settingsRepository.sdrIp.first()
+        val sdrPort = settingsRepository.sdrPort.first()
+        
+        log("Attempting SDR connection to $sdrIp:$sdrPort...")
+        
+        // This is a simplified sweep for the workflow
+        try {
+            sdrRepository.connect(sdrIp, sdrPort)
+            log("Connected to SDR. Performing 15s frequency sweep...")
+            
+            val frequencies = listOf(433920000L, 868000000L, 2400000000L)
+            for (freq in frequencies) {
+                log("Sweeping ${freq / 1000000.0} MHz...")
+                sdrRepository.setFrequency(freq)
+                kotlinx.coroutines.delay(5.seconds) // Watch each band for 5s
+            }
+            
+            sdrRepository.disconnect()
+            log("SDR sweep complete.")
+            logRepository.saveLog(
+                type = "SDR",
+                summary = "SDR Frequency Sweep Complete",
+                detailJson = "{ \"status\": \"success\", \"bands_swept\": 3 }"
+            )
+        } catch (e: Exception) {
+            log("SDR Error: ${e.message}. Ensure hardware is connected and rtl_tcp is running.")
         }
     }
 
