@@ -1,5 +1,6 @@
 package com.fearmikey.rf_reapr.system
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -17,7 +18,7 @@ class ScanNotificationManager(private val context: Context) {
 
     companion object {
         private const val CHANNEL_ID = "background_audit_channel"
-        private const val NOTIFICATION_ID = 1001
+        const val NOTIFICATION_ID = 1001
     }
 
     init {
@@ -37,12 +38,20 @@ class ScanNotificationManager(private val context: Context) {
         }
     }
 
-    fun showBackgroundNotification() {
+    /**
+     * Builds the (live) notification content from [ActiveTaskMonitor]'s current state.
+     * Called both when the foreground service starts and every time task/status state
+     * changes, so the notification content stays up to date for the duration of a scan.
+     */
+    fun buildNotification(): Notification {
         val activeTasks = ActiveTaskMonitor.activeTasks.value
-        if (activeTasks.isEmpty()) return
+        val statusText = ActiveTaskMonitor.statusText.value
+        val contentText = when {
+            !statusText.isNullOrBlank() -> statusText
+            activeTasks.isNotEmpty() -> "Active: ${activeTasks.joinToString(", ")}"
+            else -> "Running..."
+        }
 
-        val taskList = activeTasks.joinToString(", ")
-        
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -50,28 +59,42 @@ class ScanNotificationManager(private val context: Context) {
 
         val stopIntent = Intent(context, StopAllReceiver::class.java)
         val stopPendingIntent = PendingIntent.getBroadcast(
-            context, 
-            0, 
-            stopIntent, 
+            context,
+            0,
+            stopIntent,
             PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground) // Using foreground launcher icon as fallback
             .setContentTitle("Network Audit in Progress")
-            .setContentText("Active: $taskList")
+            .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setContentIntent(pendingIntent)
             .addAction(R.drawable.ic_launcher_foreground, "Stop All Tasks", stopPendingIntent)
             .build()
+    }
 
+    /**
+     * Posts/updates the notification with the latest content, if there's anything active
+     * to show. Safe to call repeatedly (e.g. on every progress tick).
+     */
+    fun updateNotification() {
+        if (!ActiveTaskMonitor.hasActiveTasks()) {
+            cancelNotification()
+            return
+        }
         try {
-            notificationManager.notify(NOTIFICATION_ID, notification)
+            notificationManager.notify(NOTIFICATION_ID, buildNotification())
         } catch (_: SecurityException) {
             // Permission missing
         }
     }
+
+    @Deprecated("Use updateNotification(), kept for compatibility.", ReplaceWith("updateNotification()"))
+    fun showBackgroundNotification() = updateNotification()
 
     fun cancelNotification() {
         notificationManager.cancel(NOTIFICATION_ID)

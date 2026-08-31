@@ -1,5 +1,6 @@
 package com.fearmikey.rf_reapr.ui.topology.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,11 +11,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.NetworkNode
 import com.fearmikey.rf_reapr.domain.model.RiskLevel
 import com.fearmikey.rf_reapr.ui.scanner.SeverityBadge
+
+// Distinct accent color for the scanning device's own node - matches NetworkMapView.
+private val MyDeviceColor = Color(0xFF29B6F6)
 
 @Immutable
 data class NetworkNodeListState(
@@ -25,7 +30,8 @@ data class NetworkNodeListState(
 fun NetworkNodeList(
     state: NetworkNodeListState,
     onNodeClick: (NetworkNode) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    localDeviceIp: String? = null
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -37,7 +43,11 @@ fun NetworkNodeList(
             key = { it.id },
             contentType = { "network_node" }
         ) { node ->
-            NodeListItem(node = node, onClick = { onNodeClick(node) })
+            NodeListItem(
+                node = node,
+                isLocalDevice = localDeviceIp != null && node.ipAddress == localDeviceIp,
+                onClick = { onNodeClick(node) }
+            )
         }
     }
 }
@@ -45,7 +55,8 @@ fun NetworkNodeList(
 @Composable
 fun NodeListItem(
     node: NetworkNode,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isLocalDevice: Boolean = false
 ) {
     NodeListItemContent(
         hostname = node.hostname,
@@ -54,6 +65,7 @@ fun NodeListItem(
         manufacturer = node.manufacturer,
         riskLevel = node.riskLevel,
         hasSnmp = node.snmpData != null,
+        isLocalDevice = isLocalDevice,
         onClick = onClick
     )
 }
@@ -66,10 +78,12 @@ private fun NodeListItemContent(
     manufacturer: String?,
     riskLevel: RiskLevel,
     hasSnmp: Boolean,
+    isLocalDevice: Boolean = false,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        border = if (isLocalDevice) BorderStroke(2.dp, MyDeviceColor) else null,
         onClick = onClick
     ) {
         Row(
@@ -91,6 +105,14 @@ private fun NodeListItemContent(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
+                if (isLocalDevice) {
+                    Text(
+                        text = "MY DEVICE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MyDeviceColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
                     text = "IP: $ipAddress",
                     style = MaterialTheme.typography.bodySmall
@@ -112,7 +134,7 @@ private fun NodeListItemContent(
                     Text(
                         text = "SNMP Service Detected",
                         style = MaterialTheme.typography.labelSmall,
-                        color = androidx.compose.ui.graphics.Color(0xFF00ACC1),
+                        color = Color(0xFF00ACC1),
                         fontWeight = FontWeight.Bold
                     )
                 }

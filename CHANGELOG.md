@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.3] - 2026-08-31
+
+### Added
+- **System & Services**:
+    - Introduced `ScanForegroundService` and `ScanNotificationManager` for persistent background scan execution with real-time status notifications.
+    - Added `ScanTimeEstimator` utility for calculating accurate ETA estimates during network discovery scans.
+    - Centralized application initialization (`RfReaprApplication`) for notification channels and system service setups.
+- **Topology & Network Discovery**:
+    - Added live estimated scan time display and progress indicators to `TopologyScreen` and `NetworkMapView`.
+    - Improved node filtering, interaction controls, and discovery status rendering.
+- **Wireless Auditing**:
+    - Enhanced `WifiChannelGraph` rendering with cleaner channel distribution visuals and improved fingerprint metrics.
+- **Compliance & Guided Workflows**:
+    - Redesigned `EvidenceCaptureScreen` UI layout and improved camera state handling.
+    - Integrated live task status monitoring into `WorkflowScreen`.
+
+### Changed
+- **Maintenance**: Version bump to 1.5.3.
+
 ## [1.5.2] - 2026-08-28
 
 ### Added

@@ -34,7 +34,8 @@ fun WifiFingerprintScreen(
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val selectedRange by viewModel.selectedRange.collectAsStateWithLifecycle()
     val hiddenBssids by viewModel.hiddenBssids.collectAsStateWithLifecycle()
-    
+    val simplifyGraph by viewModel.simplifyGraph.collectAsStateWithLifecycle()
+
     val context = LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -143,10 +144,36 @@ fun WifiFingerprintScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Simplify View",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Group duplicate SSIDs & limit labels to the strongest signals",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = simplifyGraph,
+                            onCheckedChange = { viewModel.toggleSimplifyGraph() }
+                        )
+                    }
+                }
+
+                item {
                     WifiChannelGraph(
                         accessPoints = filteredAccessPoints,
                         hiddenBssids = hiddenBssids,
-                        range = selectedRange
+                        range = selectedRange,
+                        simplifyGraph = simplifyGraph
                     )
                 }
                 

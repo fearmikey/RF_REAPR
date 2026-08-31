@@ -38,7 +38,8 @@ fun TopologyScreen(
     val isAuditing by viewModel.isAuditing.collectAsStateWithLifecycle()
     val isApiKeySet by viewModel.isApiKeySet.collectAsStateWithLifecycle()
     val showNetworkMismatchDialog by viewModel.showNetworkMismatchDialog.collectAsStateWithLifecycle()
-    
+    val localDeviceIp by viewModel.localDeviceIp.collectAsStateWithLifecycle()
+
     var isListView by remember { mutableStateOf(false) }
     var selectedNodeId by remember { mutableStateOf<String?>(null) }
     
@@ -146,12 +147,14 @@ fun TopologyScreen(
                     val onNodeClickRemembered = remember { { node: NetworkNode -> selectedNodeId = node.id } }
                     NetworkNodeList(
                         state = nodesState,
-                        onNodeClick = onNodeClickRemembered
+                        onNodeClick = onNodeClickRemembered,
+                        localDeviceIp = localDeviceIp
                     )
                 } else {
                     NetworkMapView(
                         mappedGraph = graph,
-                        onNodeClick = { selectedNodeId = it.id }
+                        onNodeClick = { selectedNodeId = it.id },
+                        localDeviceIp = localDeviceIp
                     )
                 }
             } ?: run {

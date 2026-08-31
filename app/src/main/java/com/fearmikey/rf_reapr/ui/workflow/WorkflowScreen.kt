@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fearmikey.rf_reapr.domain.model.WorkflowStep
+import com.fearmikey.rf_reapr.domain.util.ScanTimeEstimator
 import com.fearmikey.rf_reapr.ui.theme.NetworkGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +41,7 @@ fun WorkflowScreen(
     val overallProgress by viewModel.overallProgress.collectAsStateWithLifecycle()
     val targetDomain by viewModel.targetDomain.collectAsStateWithLifecycle()
     val workflowStartTime by viewModel.workflowStartTime.collectAsStateWithLifecycle()
+    val stepEstimates by viewModel.stepEstimates.collectAsStateWithLifecycle()
     val mode = viewModel.mode
 
     Scaffold(
@@ -74,6 +76,7 @@ fun WorkflowScreen(
                         mode = mode,
                         selectedStepIds = selectedStepIds,
                         targetDomain = targetDomain,
+                        stepEstimates = stepEstimates,
                         onTargetChange = { viewModel.updateTargetDomain(it) },
                         onToggle = { viewModel.toggleStepSelection(it) }
                     ) { viewModel.startWorkflow() }
@@ -83,7 +86,9 @@ fun WorkflowScreen(
                         mode = mode,
                         currentStepIndex = currentStepIndex,
                         executionLogs = executionLogs,
-                        overallProgress = overallProgress
+                        overallProgress = overallProgress,
+                        selectedStepIds = selectedStepIds,
+                        stepEstimates = stepEstimates
                     ) { viewModel.cancelWorkflow() }
                 }
                 WorkflowViewModel.WorkflowState.SUMMARY -> {
@@ -105,6 +110,8 @@ fun AutomatedExecutionContent(
     currentStepIndex: Int,
     executionLogs: List<String>,
     overallProgress: Float,
+    selectedStepIds: Set<String> = mode.steps.map { it.id }.toSet(),
+    stepEstimates: Map<String, ScanTimeEstimator.EstimateRange> = emptyMap(),
     onCancel: () -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -161,6 +168,29 @@ fun AutomatedExecutionContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = NetworkGreen
                 )
+
+                val remainingStepIds = mode.steps.drop(currentStepIndex)
+                    .map { it.id }
+                    .filter { selectedStepIds.contains(it) }
+                if (remainingStepIds.isNotEmpty()) {
+                    // Prefer the per-step estimates already computed by the view model
+                    // (which factor in real subnet/device counts) when all are available,
+                    // falling back to default assumptions otherwise.
+                    val fromMap = remainingStepIds.mapNotNull { stepEstimates[it] }
+                    val remainingLabel = if (fromMap.size == remainingStepIds.size) {
+                        ScanTimeEstimator.EstimateRange(
+                            fromMap.sumOf { it.lowSeconds },
+                            fromMap.sumOf { it.highSeconds }
+                        ).label
+                    } else {
+                        ScanTimeEstimator.totalEstimate(remainingStepIds).label
+                    }
+                    Text(
+                        text = "Est. remaining: ~$remainingLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
             }
         }
 
@@ -220,6 +250,7 @@ fun SelectionContent(
     mode: com.fearmikey.rf_reapr.domain.model.AppMode,
     selectedStepIds: Set<String>,
     targetDomain: String,
+    stepEstimates: Map<String, ScanTimeEstimator.EstimateRange> = emptyMap(),
     onTargetChange: (String) -> Unit,
     onToggle: (String) -> Unit,
     onStart: () -> Unit
@@ -263,12 +294,26 @@ fun SelectionContent(
                 SelectionItem(
                     step = step,
                     isSelected = selectedStepIds.contains(step.id),
+                    estimate = stepEstimates[step.id],
                     onToggle = { onToggle(step.id) }
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val selectedEstimates = selectedStepIds.mapNotNull { stepEstimates[it] }
+        if (selectedEstimates.isNotEmpty()) {
+            val totalLow = selectedEstimates.sumOf { it.lowSeconds }
+            val totalHigh = selectedEstimates.sumOf { it.highSeconds }
+            Text(
+                text = "Estimated total time: ~${ScanTimeEstimator.EstimateRange(totalLow, totalHigh).label}",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color = NetworkGreen
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         Button(
             onClick = { showWarning = true },
@@ -323,6 +368,7 @@ fun SelectionContent(
 fun SelectionItem(
     step: WorkflowStep,
     isSelected: Boolean,
+    estimate: ScanTimeEstimator.EstimateRange? = null,
     onToggle: () -> Unit
 ) {
     Card(
@@ -346,6 +392,13 @@ fun SelectionItem(
             Column {
                 Text(text = step.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
                 Text(text = step.description, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                if (estimate != null && (estimate.lowSeconds > 0 || estimate.highSeconds > 0)) {
+                    Text(
+                        text = "~${estimate.label}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NetworkGreen
+                    )
+                }
             }
         }
     }

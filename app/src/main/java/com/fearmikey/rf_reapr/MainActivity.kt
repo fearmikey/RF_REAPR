@@ -19,10 +19,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -35,8 +31,6 @@ import com.fearmikey.rf_reapr.data.repository.*
 import com.fearmikey.rf_reapr.data.worker.RecycleBinWorker
 import com.fearmikey.rf_reapr.data.worker.VulnerabilityUpdateWorker
 import com.fearmikey.rf_reapr.domain.model.ThemePreference
-import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
-import com.fearmikey.rf_reapr.system.ScanNotificationManager
 import com.fearmikey.rf_reapr.ui.dhcp.DhcpMonitorScreen
 import com.fearmikey.rf_reapr.ui.dhcp.DhcpMonitorViewModel
 import com.fearmikey.rf_reapr.ui.logs.LogListScreen
@@ -107,25 +101,13 @@ import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
 class MainActivity : ComponentActivity() {
     private var nfcAdapter: NfcAdapter? = null
     private lateinit var nfcRepository: NfcScannerRepositoryImpl
-    private lateinit var notificationManager: ScanNotificationManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        notificationManager = ScanNotificationManager(this)
 
-        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) {
-                notificationManager.cancelNotification()
-            }
-
-            override fun onStop(owner: LifecycleOwner) {
-                if (ActiveTaskMonitor.hasActiveTasks()) {
-                    notificationManager.showBackgroundNotification()
-                }
-            }
-        })
-        
+        // Background execution + live status notifications for active scans/workflows are
+        // now handled by RfReaprApplication + ScanForegroundService, independent of this
+        // Activity's lifecycle.
         handleCameraShortcuts(intent)
 
         // Manual DI

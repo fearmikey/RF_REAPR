@@ -27,12 +27,25 @@ fun getColorForBssid(bssid: String): Color {
     return Color.hsv(hue, 0.7f, 0.8f)
 }
 
+/**
+ * A group of access points sharing the same SSID + frequency (e.g. mesh/repeater nodes
+ * broadcasting the same network). Only the strongest [representative] gets a label, with
+ * [duplicateCount] shown as a "×N" badge when greater than 1.
+ */
+private data class WifiLabelGroup(val representative: WifiAccessPoint, val duplicateCount: Int)
+
+/** Default cap on the number of full text labels drawn when [WifiChannelGraph]'s
+ *  `simplifyGraph` is enabled, to keep dense environments readable. */
+private const val DEFAULT_MAX_LABELED_GROUPS = 12
+
 @Composable
 fun WifiChannelGraph(
     accessPoints: List<WifiAccessPoint>,
     hiddenBssids: Set<String>,
     range: FrequencyRange,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    simplifyGraph: Boolean = true,
+    maxLabeledGroups: Int = DEFAULT_MAX_LABELED_GROUPS
 ) {
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val surfaceColor = MaterialTheme.colorScheme.surfaceVariant
@@ -71,12 +84,45 @@ fun WifiChannelGraph(
         accessPoints.filter { !hiddenBssids.contains(it.bssid) }
     }
 
-    val apsByFreq = remember(visibleAps) {
-        visibleAps.groupBy { it.frequency }
-    }
-
     val sortedApsForDrawing = remember(visibleAps) {
         visibleAps.sortedBy { it.signalLevel }
+    }
+
+    // Group APs sharing the same SSID + frequency (mesh/repeater setups broadcast
+    // identical SSIDs on the same channel) into a single label with a "×N" count, instead
+    // of drawing a separate overlapping label for each radio.
+    val allLabelGroups = remember(visibleAps, simplifyGraph) {
+        if (simplifyGraph) {
+            visibleAps.groupBy { it.ssid to it.frequency }.map { (_, group) ->
+                WifiLabelGroup(group.maxBy { it.signalLevel }, group.size)
+            }
+        } else {
+            visibleAps.map { WifiLabelGroup(it, 1) }
+        }
+    }
+
+    // Cap the number of fully-labeled groups to the strongest N so dense environments
+    // with many SSIDs stay readable; every AP's curve is still drawn regardless.
+    val labeledBssids = remember(allLabelGroups, simplifyGraph, maxLabeledGroups) {
+        if (simplifyGraph) {
+            allLabelGroups
+                .sortedByDescending { it.representative.signalLevel }
+                .take(maxLabeledGroups)
+                .map { it.representative.bssid }
+                .toSet()
+        } else {
+            allLabelGroups.map { it.representative.bssid }.toSet()
+        }
+    }
+
+    val hiddenLabelCount = remember(allLabelGroups, labeledBssids) {
+        (allLabelGroups.size - labeledBssids.size).coerceAtLeast(0)
+    }
+
+    val labelGroupsByFreq = remember(allLabelGroups, labeledBssids) {
+        allLabelGroups
+            .filter { it.representative.bssid in labeledBssids }
+            .groupBy { it.representative.frequency }
     }
 
     Column(modifier = modifier
@@ -209,11 +255,13 @@ fun WifiChannelGraph(
                 drawPath(path = path, color = color, style = Stroke(width = 2.dp.toPx()))
             }
             
-            // Draw labels, grouped by frequency to prevent overlap
-            apsByFreq.forEach { (_, aps) ->
+            // Draw labels, grouped by frequency to prevent overlap. Groups already exclude
+            // any labels beyond the strongest-N cap (see labelGroupsByFreq above), and merge
+            // duplicate SSIDs on the same channel (e.g. mesh/repeater nodes) into one label.
+            labelGroupsByFreq.forEach { (_, groups) ->
                 // Sort by signal strength descending (strongest first, so it gets placed at the top visually)
                 // If signal strengths are the same, they just get stacked because of the logic below.
-                val sortedAps = aps.sortedByDescending { it.signalLevel }
+                val sortedGroups = groups.sortedByDescending { it.representative.signalLevel }
                 
                 var lastLabelBottomY = -Float.MAX_VALUE
                 val labelSpacing = 40f // Vertical space required for a label block
@@ -222,20 +270,21 @@ fun WifiChannelGraph(
                 // However, doing so means the weakest label is drawn LAST (on top in Z-order).
                 // To ensure the strongest text is drawn ON TOP of weaker text, we calculate positions first, then draw in reverse.
                 
-                val labelPositions = sortedAps.map { ap ->
-                    val topY = rssiToY(ap.signalLevel)
+                val labelPositions = sortedGroups.map { group ->
+                    val topY = rssiToY(group.representative.signalLevel)
                     val baseY = maxOf(topY, lastLabelBottomY + labelSpacing)
                     lastLabelBottomY = baseY
-                    ap to baseY
+                    group to baseY
                 }
                 
                 // Draw in reverse (weakest first) so strongest text is on top Z-order
-                labelPositions.reversed().forEach { (ap, baseY) ->
+                labelPositions.reversed().forEach { (group, baseY) ->
+                    val ap = group.representative
                     val centerX = freqToX(ap.frequency.toFloat())
                     
                     if (centerX < 0 || centerX > width) return@forEach
                     
-                    // Draw SSID
+                    // Draw SSID (with a ×N badge if multiple radios share this SSID + channel)
                     val labelPaint = android.graphics.Paint().apply {
                         this.color = onSurfaceColor.toArgb()
                         this.textSize = 28f
@@ -243,7 +292,8 @@ fun WifiChannelGraph(
                         this.textAlign = android.graphics.Paint.Align.CENTER
                     }
                     
-                    val ssidLabel = if (ap.ssid.isEmpty()) "[Hidden]" else ap.ssid
+                    val baseSsidLabel = if (ap.ssid.isEmpty()) "[Hidden]" else ap.ssid
+                    val ssidLabel = if (group.duplicateCount > 1) "$baseSsidLabel ×${group.duplicateCount}" else baseSsidLabel
                     drawContext.canvas.nativeCanvas.drawText(
                         ssidLabel,
                         centerX,
@@ -275,5 +325,14 @@ fun WifiChannelGraph(
             modifier = Modifier.fillMaxWidth(),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
+        if (hiddenLabelCount > 0) {
+            Text(
+                text = "$hiddenLabelCount label${if (hiddenLabelCount == 1) "" else "s"} hidden to reduce clutter — curves are still shown, or turn off \"Simplify View\" to see all",
+                style = MaterialTheme.typography.labelSmall,
+                color = onSurfaceColor.copy(alpha = 0.6f),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }

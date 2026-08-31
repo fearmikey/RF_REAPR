@@ -27,7 +27,8 @@ import com.fearmikey.rf_reapr.domain.model.*
 fun NetworkMapView(
     mappedGraph: MappedGraph,
     onNodeClick: (NetworkNode) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    localDeviceIp: String? = null
 ) {
     var scale by remember { mutableFloatStateOf(0.8f) } // Slightly zoomed out by default
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -44,7 +45,12 @@ fun NetworkMapView(
     val snmpLabelStyle = remember(onSurfaceColor) {
         TextStyle(color = Color(0xFF00ACC1), fontSize = 10.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
     }
-    
+    // Distinct accent color for the scanning device's own node - not used by any RiskLevel.
+    val myDeviceColor = Color(0xFF29B6F6)
+    val myDeviceLabelStyle = remember {
+        TextStyle(color = myDeviceColor, fontSize = 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+    }
+
     val edgeColor = remember(onSurfaceColor) { onSurfaceColor.copy(alpha = 0.2f) }
 
     // Pre-calculate text layouts to avoid measuring during draw calls
@@ -69,6 +75,10 @@ fun NetworkMapView(
             
             node.id to Quadruple(primaryLayout, secondaryLayout, snmpLayout, portsLayout)
         }
+    }
+
+    val myDeviceLayout = remember(myDeviceLabelStyle) {
+        textMeasurer.measure("MY DEVICE", myDeviceLabelStyle)
     }
 
     Box(
@@ -131,6 +141,17 @@ fun NetworkMapView(
                         RiskLevel.MEDIUM -> Color.Yellow
                         RiskLevel.HIGH -> Color(0xFFFFA500)
                         RiskLevel.CRITICAL -> Color.Red
+                    }
+                    val isLocalDevice = localDeviceIp != null && mappedNode.node.ipAddress == localDeviceIp
+
+                    if (isLocalDevice) {
+                        // Highlight ring behind the node shape to call out "my device".
+                        drawCircle(
+                            color = myDeviceColor,
+                            radius = 34f / scale,
+                            center = Offset(mappedNode.x, mappedNode.y),
+                            style = Stroke(width = 4f / scale)
+                        )
                     }
 
                     when (mappedNode.node.deviceType) {
@@ -228,6 +249,17 @@ fun NetworkMapView(
                                 textLayoutResult = it,
                                 topLeft = Offset(
                                     x = mappedNode.x - (it.size.width / 2f),
+                                    y = mappedNode.y + labelYOffset
+                                )
+                            )
+                            labelYOffset += it.size.height
+                        }
+
+                        if (isLocalDevice) {
+                            drawText(
+                                textLayoutResult = myDeviceLayout,
+                                topLeft = Offset(
+                                    x = mappedNode.x - (myDeviceLayout.size.width / 2f),
                                     y = mappedNode.y + labelYOffset
                                 )
                             )

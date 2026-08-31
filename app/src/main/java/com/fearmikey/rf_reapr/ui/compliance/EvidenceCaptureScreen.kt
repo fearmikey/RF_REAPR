@@ -1,6 +1,7 @@
 package com.fearmikey.rf_reapr.ui.compliance
 
 import android.Manifest
+import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.OrientationEventListener
@@ -10,6 +11,7 @@ import android.view.ViewGroup
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.ZoomState
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +66,7 @@ import com.fearmikey.rf_reapr.domain.model.EvidenceFolder
 import com.fearmikey.rf_reapr.domain.model.EvidenceProject
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -87,13 +91,16 @@ fun EvidenceCaptureScreen(
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     
-    var showFolderSelector by remember { mutableStateOf(false) }
+    var showFolderSelector by rememberSaveable { mutableStateOf(false) }
     var selectedEvidenceForAction by remember { mutableStateOf<Evidence?>(null) }
-    var showTransferDialog by remember { mutableStateOf<TransferType?>(null) }
-    var showProjectSettings by remember { mutableStateOf(false) }
-    var captureNotes by remember { mutableStateOf("") }
+    var showTransferDialog by rememberSaveable { mutableStateOf<TransferType?>(null) }
+    var showProjectSettings by rememberSaveable { mutableStateOf(false) }
+    var captureNotes by rememberSaveable { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { 
@@ -131,7 +138,10 @@ fun EvidenceCaptureScreen(
                 modifier = Modifier.padding(padding),
                 onEvidenceDetail = { selectedEvidenceForAction = it },
                 captureNotes = captureNotes,
-                onNotesChange = { captureNotes = it }
+                onNotesChange = { captureNotes = it },
+                onCameraError = { message ->
+                    coroutineScope.launch { snackbarHostState.showSnackbar(message) }
+                }
             )
         } else {
             PermissionDeniedContent(
@@ -362,7 +372,8 @@ fun CameraContent(
     modifier: Modifier = Modifier,
     onEvidenceDetail: (Evidence) -> Unit,
     captureNotes: String,
-    onNotesChange: (String) -> Unit
+    onNotesChange: (String) -> Unit,
+    onCameraError: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -462,6 +473,8 @@ fun CameraContent(
                         }
 
                     } catch (e: Exception) {
+                        Log.e("EvidenceCapture", "Failed to bind camera use cases", e)
+                        onCameraError("Camera failed to start: ${e.message ?: "Unknown error"}")
                     }
                 }, ContextCompat.getMainExecutor(ctx))
                 previewView
@@ -484,57 +497,6 @@ fun CameraContent(
             )
         }
 
-        // Zoom Controls
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 120.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // Zoom Ratio Indicator
-                zoomState?.let { state ->
-                    if (state.zoomRatio > 1.05f || state.zoomRatio < 0.95f) {
-                        Surface(
-                            color = Color.Black.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        ) {
-                            Text(
-                                text = "%.1fx".format(Locale.US, state.zoomRatio),
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Zoom Shortcuts
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    val shortcuts = listOf(0.5f, 1f, 2f, 5f)
-                    shortcuts.forEach { ratio ->
-                        val isSupported = zoomState?.let { ratio >= it.minZoomRatio && ratio <= it.maxZoomRatio } ?: (ratio == 1f)
-                        if (isSupported) {
-                            val isSelected = zoomState?.let { Math.abs(it.zoomRatio - ratio) < 0.05f } ?: (ratio == 1f)
-                            ZoomShortcutButton(
-                                ratio = ratio,
-                                isSelected = isSelected,
-                                onClick = {
-                                    camera?.cameraControl?.setZoomRatio(ratio)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
         if (evidenceList.isNotEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(horizontal = 16.dp, vertical = 64.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.5f)).padding(8.dp)
@@ -554,17 +516,69 @@ fun CameraContent(
             }
         }
 
-        // Live Notes Input Overlay
-        Box(
+        // Bottom control cluster: zoom controls, notes, and shutter are stacked
+        // vertically (instead of overlapping absolute-positioned boxes) and the
+        // whole cluster is pushed above the IME + nav bar so nothing overlaps
+        // and the notes field stays visible while the keyboard is open.
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 120.dp, start = 32.dp, end = 32.dp)
+                .fillMaxWidth()
+                .imePadding()
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Zoom Ratio Indicator
+            zoomState?.let { state ->
+                if (state.zoomRatio > 1.05f || state.zoomRatio < 0.95f) {
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        Text(
+                            text = "%.1fx".format(Locale.US, state.zoomRatio),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            // Zoom Shortcuts
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                val shortcuts = listOf(0.5f, 1f, 2f, 5f)
+                shortcuts.forEach { ratio ->
+                    val isSupported = zoomState?.let { ratio >= it.minZoomRatio && ratio <= it.maxZoomRatio } ?: (ratio == 1f)
+                    if (isSupported) {
+                        val isSelected = zoomState?.let { Math.abs(it.zoomRatio - ratio) < 0.05f } ?: (ratio == 1f)
+                        ZoomShortcutButton(
+                            ratio = ratio,
+                            isSelected = isSelected,
+                            onClick = {
+                                camera?.cameraControl?.setZoomRatio(ratio)
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Live Notes Input - multiline so longer audit notes aren't truncated
             OutlinedTextField(
                 value = captureNotes,
                 onValueChange = onNotesChange,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
                 placeholder = { Text("Add capture notes...", color = Color.White.copy(alpha = 0.6f)) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,
@@ -575,30 +589,38 @@ fun CameraContent(
                     focusedBorderColor = MaterialTheme.colorScheme.primary
                 ),
                 shape = RoundedCornerShape(12.dp),
-                singleLine = true
+                minLines = 1,
+                maxLines = 4
             )
-        }
 
-        Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp)) {
-            IconButton(
-                onClick = {
-                    imageCapture.takePicture(
-                        cameraExecutor,
-                        object : ImageCapture.OnImageCapturedCallback() {
-                            override fun onCaptureSuccess(image: ImageProxy) {
-                                viewModel.captureEvidence(context, image, captureNotes)
-                                onNotesChange("") // Clear notes after capture
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Box {
+                IconButton(
+                    onClick = {
+                        imageCapture.takePicture(
+                            cameraExecutor,
+                            object : ImageCapture.OnImageCapturedCallback() {
+                                override fun onCaptureSuccess(image: ImageProxy) {
+                                    viewModel.captureEvidence(context, image, captureNotes)
+                                    onNotesChange("") // Clear notes after capture
+                                }
+
+                                override fun onError(exception: ImageCaptureException) {
+                                    Log.e("EvidenceCapture", "Image capture failed", exception)
+                                    onCameraError("Capture failed: ${exception.message ?: "Unknown error"}")
+                                }
                             }
-                        }
-                    )
-                },
-                enabled = !isCapturing,
-                modifier = Modifier.size(80.dp).background(if (isCapturing) Color.Gray else MaterialTheme.colorScheme.primary, CircleShape)
-            ) {
-                if (isCapturing) {
-                    CircularProgressIndicator(color = Color.White)
-                } else {
-                    Icon(Icons.Default.Camera, contentDescription = "Capture", tint = Color.White, modifier = Modifier.size(40.dp))
+                        )
+                    },
+                    enabled = !isCapturing,
+                    modifier = Modifier.size(80.dp).background(if (isCapturing) Color.Gray else MaterialTheme.colorScheme.primary, CircleShape)
+                ) {
+                    if (isCapturing) {
+                        CircularProgressIndicator(color = Color.White)
+                    } else {
+                        Icon(Icons.Default.Camera, contentDescription = "Capture", tint = Color.White, modifier = Modifier.size(40.dp))
+                    }
                 }
             }
         }

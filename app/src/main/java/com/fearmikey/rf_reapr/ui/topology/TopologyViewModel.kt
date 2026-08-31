@@ -7,6 +7,7 @@ import com.fearmikey.rf_reapr.domain.mapper.TopologyMapper
 import com.fearmikey.rf_reapr.domain.model.*
 import com.fearmikey.rf_reapr.domain.repository.*
 import com.fearmikey.rf_reapr.domain.scanner.NetworkScanner
+import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import com.fearmikey.rf_reapr.domain.service.DeviceIdentificationService
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -48,11 +49,24 @@ class TopologyViewModel(
 
     private val _showNetworkMismatchDialog = MutableStateFlow(false)
     val showNetworkMismatchDialog: StateFlow<Boolean> = _showNetworkMismatchDialog.asStateFlow()
-    
+
+    // IP address of the phone/tablet running the scan, used to highlight "my device" on
+    // the map and list views.
+    private val _localDeviceIp = MutableStateFlow<String?>(null)
+    val localDeviceIp: StateFlow<String?> = _localDeviceIp.asStateFlow()
+
     private val gson = Gson()
 
     init {
         loadPersistedNodes()
+
+        // Allow the "Stop All Tasks" notification action to cancel an active discovery/audit.
+        viewModelScope.launch {
+            ActiveTaskMonitor.stopAllSignal.collect {
+                discoveryRepository.stopScan()
+                portScannerRepository.stopScan()
+            }
+        }
     }
 
     private fun loadPersistedNodes() {
@@ -60,6 +74,7 @@ class TopologyViewModel(
             scanSessionRepository.getAllPersistedNodes().collect { nodes ->
                 if (nodes.isNotEmpty()) {
                     val networkInfo = discoveryRepository.getLocalNetworkInfo()
+                    _localDeviceIp.value = networkInfo.localIp
                     val mapped = withContext(Dispatchers.Default) {
                         val graph = TopologyMapper.mapDiscoveredNodesToGraph(
                             nodes = nodes,
@@ -83,32 +98,60 @@ class TopologyViewModel(
      */
     fun startNetworkDiscovery() {
         if (isPassiveMode.value) return
+        val taskName = "Network Discovery"
         viewModelScope.launch {
-            // Clear previous scan data before starting a new discovery session
-            scanSessionRepository.clearAllData()
-            _mappedGraph.value = null
-            
-            val networkInfo = discoveryRepository.getLocalNetworkInfo()
-            discoveryRepository.discoverDevices().collect { result ->
-                _discoveryState.value = result
-                if (result is NetworkScanner.ScanResult.Finished) {
-                    val nodes = result.foundData.map { node ->
-                        node.copy(
-                            deviceType = DeviceIdentificationService.identifyDevice(
-                                ipAddress = node.ipAddress,
-                                macAddress = node.macAddress,
-                                hostname = node.hostname,
+            ActiveTaskMonitor.addTask(taskName)
+            try {
+                // Clear previous scan data before starting a new discovery session
+                scanSessionRepository.clearAllData()
+                _mappedGraph.value = null
+
+                val networkInfo = discoveryRepository.getLocalNetworkInfo()
+                _localDeviceIp.value = networkInfo.localIp
+                discoveryRepository.discoverDevices().collect { result ->
+                    _discoveryState.value = result
+                    when (result) {
+                        is NetworkScanner.ScanResult.Progress -> {
+                            val percent = (result.progress * 100).toInt()
+                            ActiveTaskMonitor.updateStatus("$taskName: $percent%")
+                        }
+                        is NetworkScanner.ScanResult.Finished -> {
+                            var nodes = result.foundData.map { node ->
+                                node.copy(
+                                    deviceType = DeviceIdentificationService.identifyDevice(
+                                        ipAddress = node.ipAddress,
+                                        macAddress = node.macAddress,
+                                        hostname = node.hostname,
+                                        gatewayIp = networkInfo.gatewayIp
+                                    ),
+                                    manufacturer = DeviceIdentificationService.getManufacturer(node.macAddress)
+                                )
+                            }
+
+                            // The scanning device itself doesn't always respond to its own
+                            // liveness probes (no open ports, pinging self can behave
+                            // differently across devices) - ensure it's always represented
+                            // on the map so it can be highlighted as "my device".
+                            val localIp = networkInfo.localIp
+                            if (nodes.none { it.ipAddress == localIp }) {
+                                nodes = nodes + NetworkNode(
+                                    id = localIp,
+                                    ipAddress = localIp,
+                                    deviceType = DeviceType.MOBILE
+                                )
+                            }
+
+                            scanSessionRepository.saveDiscoveredNodes(
+                                nodes = nodes,
+                                networkName = "Local Network",
                                 gatewayIp = networkInfo.gatewayIp
-                            ),
-                            manufacturer = DeviceIdentificationService.getManufacturer(node.macAddress)
-                        )
+                            )
+                        }
+                        else -> Unit
                     }
-                    scanSessionRepository.saveDiscoveredNodes(
-                        nodes = nodes,
-                        networkName = "Local Network",
-                        gatewayIp = networkInfo.gatewayIp
-                    )
                 }
+            } finally {
+                ActiveTaskMonitor.removeTask(taskName)
             }
         }
     }
@@ -140,22 +183,29 @@ class TopologyViewModel(
             if ((lastGatewayIp != null && currentNetwork.gatewayIp != lastGatewayIp)) {
                 _showNetworkMismatchDialog.value = true
             } else {
+                val taskName = "Deep Scan (Ports & SNMP)"
                 viewModelScope.launch {
-                    _isAuditing.value = true
-                    val nodes = _mappedGraph.value?.nodes?.map { it.node } ?: emptyList()
-                    nodes.forEach { node ->
-                        scanSingleNode(node)
-                        querySnmpForNode(node)
-                    }
-                    _isAuditing.value = false
-                    
-                    // Log the audit completion
-                    _mappedGraph.value?.let { currentGraph ->
-                        logRepository.saveLog(
-                            type = "TOPOLOGY",
-                            summary = "Completed audit (Ports & SNMP) of ${currentGraph.nodes.size} network nodes",
-                            detailJson = gson.toJson(currentGraph)
-                        )
+                    ActiveTaskMonitor.addTask(taskName)
+                    try {
+                        _isAuditing.value = true
+                        val nodes = _mappedGraph.value?.nodes?.map { it.node } ?: emptyList()
+                        nodes.forEachIndexed { index, node ->
+                            ActiveTaskMonitor.updateStatus("$taskName: ${index + 1}/${nodes.size} (${node.ipAddress})")
+                            scanSingleNode(node)
+                            querySnmpForNode(node)
+                        }
+                        _isAuditing.value = false
+
+                        // Log the audit completion
+                        _mappedGraph.value?.let { currentGraph ->
+                            logRepository.saveLog(
+                                type = "TOPOLOGY",
+                                summary = "Completed audit (Ports & SNMP) of ${currentGraph.nodes.size} network nodes",
+                                detailJson = gson.toJson(currentGraph)
+                            )
+                        }
+                    } finally {
+                        ActiveTaskMonitor.removeTask(taskName)
                     }
                 }
             }

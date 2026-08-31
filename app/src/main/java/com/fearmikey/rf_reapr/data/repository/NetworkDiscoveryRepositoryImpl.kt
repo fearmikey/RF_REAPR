@@ -140,11 +140,17 @@ class NetworkDiscoveryRepositoryImpl(
             }
         }
         
-        // Fallback 1: Native Ping (ICMP) - More reliable than isReachable on many Android versions
+        // Fallback 1: Native Ping (ICMP) - More reliable than isReachable on many Android versions.
+        // Bound the wait so a cancelled/slow scan can't leave orphaned ping processes running,
+        // or block scan shutdown indefinitely.
         try {
             val process = Runtime.getRuntime().exec("ping -c 1 -W 1 $host")
-            val exitCode = process.waitFor()
-            if (exitCode == 0) return true
+            val finished = process.waitFor(1500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            if (!finished) {
+                process.destroy()
+            } else if (process.exitValue() == 0) {
+                return true
+            }
         } catch (e: Exception) {
             // Fallback to next
         }

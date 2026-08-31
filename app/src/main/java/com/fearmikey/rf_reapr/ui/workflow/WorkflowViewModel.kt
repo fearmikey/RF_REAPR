@@ -8,14 +8,19 @@ import com.fearmikey.rf_reapr.domain.model.WorkflowStep
 import com.fearmikey.rf_reapr.domain.repository.DiscoveredService
 import com.fearmikey.rf_reapr.domain.repository.*
 import com.fearmikey.rf_reapr.domain.scanner.NetworkScanner
+import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.fearmikey.rf_reapr.domain.util.ScanTimeEstimator
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.seconds
 
 class WorkflowViewModel(
@@ -68,6 +73,47 @@ class WorkflowViewModel(
     private val _workflowStartTime = MutableStateFlow<Long?>(null)
     val workflowStartTime: StateFlow<Long?> = _workflowStartTime.asStateFlow()
 
+    // --- Time estimation ---
+    private val _hostCount = MutableStateFlow<Int?>(null)
+    private val _deviceCount = MutableStateFlow<Int?>(null)
+
+    /** Rough low/high second estimate per step id, refined once real data is known. */
+    val stepEstimates: StateFlow<Map<String, ScanTimeEstimator.EstimateRange>> =
+        combine(_hostCount, _deviceCount) { hosts, devices ->
+            mode.steps.associate { it.id to ScanTimeEstimator.estimateFor(it.id, hosts, devices) }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            mode.steps.associate { it.id to ScanTimeEstimator.estimateFor(it.id) }
+        )
+
+    init {
+        // If this workflow includes a local network scan, fetch the subnet size up front
+        // so we can show a realistic time estimate before the user starts the scan.
+        if (mode.steps.any { it.id == "net_disc" }) {
+            viewModelScope.launch {
+                try {
+                    val info = discoveryRepository.getLocalNetworkInfo()
+                    val hostBits = 32 - info.prefixLength
+                    if (hostBits in 1..16) {
+                        _hostCount.value = (1 shl hostBits) - 2
+                    }
+                } catch (e: Exception) {
+                    // Leave the default estimate in place if network info isn't available.
+                }
+            }
+        }
+
+        // Allow the "Stop All Tasks" notification action to cancel a running workflow.
+        viewModelScope.launch {
+            ActiveTaskMonitor.stopAllSignal.collect {
+                if (_workflowState.value == WorkflowState.EXECUTING) {
+                    cancelWorkflow()
+                }
+            }
+        }
+    }
+
     fun updateTargetDomain(domain: String) {
         _targetDomain.value = domain
     }
@@ -89,13 +135,26 @@ class WorkflowViewModel(
         _workflowState.value = WorkflowState.EXECUTING
         _workflowStartTime.value = System.currentTimeMillis()
         _executionLogs.value = listOf("Initializing workflow: ${mode.title}")
+        ActiveTaskMonitor.addTask(mode.title)
         workflowJob = viewModelScope.launch {
-            runAutomatedSteps()
+            try {
+                runAutomatedSteps()
+            } finally {
+                ActiveTaskMonitor.removeTask(mode.title)
+            }
         }
     }
 
     fun cancelWorkflow() {
         workflowJob?.cancel()
+        workflowJob = null
+        // Defensively stop any repositories that might still be running blocking native
+        // calls (e.g. Process.exec("ping")) so cancellation takes effect immediately
+        // instead of racing in the background.
+        discoveryRepository.stopScan()
+        portScannerRepository.stopScan()
+        upnpScannerRepository.stopScan()
+        ActiveTaskMonitor.removeTask(mode.title)
         _executionLogs.value = _executionLogs.value + "Workflow cancelled by user."
         _workflowState.value = WorkflowState.SELECTION
     }
@@ -108,11 +167,16 @@ class WorkflowViewModel(
             _currentStepIndex.value = mode.steps.indexOf(step)
             updateStepStatus(step.id, StepStatus.IN_PROGRESS)
             log("Starting: ${step.title}")
-            
+            ActiveTaskMonitor.updateStatus("${step.title} (${index + 1}/$totalSteps)")
+
             try {
                 executeStep(step)
                 updateStepStatus(step.id, StepStatus.COMPLETED)
                 log("Finished: ${step.title}")
+            } catch (e: CancellationException) {
+                // Let cancellation propagate so the workflow actually stops instead of
+                // treating it like a normal step failure and racing through the rest.
+                throw e
             } catch (e: Exception) {
                 updateStepStatus(step.id, StepStatus.FAILED)
                 log("Error in ${step.title}: ${e.message}")
@@ -156,6 +220,7 @@ class WorkflowViewModel(
             when (result) {
                 is NetworkScanner.ScanResult.Finished -> {
                     discoveredNodes = result.foundData
+                    _deviceCount.value = discoveredNodes.size
                     log("Discovered ${discoveredNodes.size} devices.")
                 }
                 is NetworkScanner.ScanResult.Error -> throw Exception(result.message)

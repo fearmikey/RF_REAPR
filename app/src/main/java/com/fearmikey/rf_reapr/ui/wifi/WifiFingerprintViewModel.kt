@@ -35,6 +35,15 @@ class WifiFingerprintViewModel(
     private val _hiddenBssids = MutableStateFlow<Set<String>>(emptySet())
     val hiddenBssids: StateFlow<Set<String>> = _hiddenBssids
 
+    // When enabled (default), WifiChannelGraph collapses duplicate/mesh SSIDs and caps the
+    // number of fully-labeled signals so dense environments stay readable.
+    private val _simplifyGraph = MutableStateFlow(true)
+    val simplifyGraph: StateFlow<Boolean> = _simplifyGraph
+
+    fun toggleSimplifyGraph() {
+        _simplifyGraph.value = !_simplifyGraph.value
+    }
+
     val filteredAccessPoints = combine(accessPoints, _selectedRange) { aps, range ->
         aps.filter { ap ->
             when (range) {
