@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.5.4] - 2026-08-31
+## [1.5.4] - 2026-10-07
 
 ### Added
 - **Compliance & FOSS**:
