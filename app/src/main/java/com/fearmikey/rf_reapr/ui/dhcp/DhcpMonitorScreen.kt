@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -179,6 +180,7 @@ fun DhcpMonitorScreen(
         if (showWarningDialog) {
             AlertDialog(
                 onDismissRequest = { showWarningDialog = false },
+                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 title = { Text("Enable Active Monitoring?") },
                 text = {
                     Text(
@@ -193,7 +195,7 @@ fun DhcpMonitorScreen(
                             showWarningDialog = false
                         }
                     ) {
-                        Text("I Understand, Enable")
+                        Text("Enable Monitoring", maxLines = 1)
                     }
                 },
                 dismissButton = {

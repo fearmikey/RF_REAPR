@@ -12,6 +12,17 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.fearmikey.rf_reapr.ui.web.HashCalculatorScreen
+import com.fearmikey.rf_reapr.ui.web.CertDecoderScreen
+import com.fearmikey.rf_reapr.ui.web.ReverseShellCheatsheetScreen
+import com.fearmikey.rf_reapr.ui.physical.UsbOtgAuditorScreen
+import com.fearmikey.rf_reapr.ui.wireless.CellularReconScreen
+import com.fearmikey.rf_reapr.ui.wireless.WpsPinCalculatorScreen
+import com.fearmikey.rf_reapr.ui.network.SubnetCalculatorScreen
+import com.fearmikey.rf_reapr.ui.network.MacLookupScreen
+import com.fearmikey.rf_reapr.ui.network.DnsQueryScreen
+import com.fearmikey.rf_reapr.ui.network.WolInjectorScreen
+import com.fearmikey.rf_reapr.ui.network.CaptivePortalDetectorScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -596,6 +607,43 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+
+                        // --- NEW TOOLS ---
+                        composable(Screen.SubnetCalculator.route) {
+                            SubnetCalculatorScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.MacLookup.route) {
+                            MacLookupScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.DnsQuery.route) {
+                            DnsQueryScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.WolInjector.route) {
+                            WolInjectorScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.CaptivePortalDetector.route) {
+                            CaptivePortalDetectorScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.HashCalculator.route) {
+                            HashCalculatorScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.CertDecoder.route) {
+                            CertDecoderScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.ReverseShellCheatsheet.route) {
+                            ReverseShellCheatsheetScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.UsbOtgAuditor.route) {
+                            UsbOtgAuditorScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.CellularRecon.route) {
+                            CellularReconScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.WpsPinCalculator.route) {
+                            WpsPinCalculatorScreen { navController.popBackStack() }
+                        }
+                        // ------------------------------
+
                         
                         // Log Routes
                         composable(Screen.WifiLogs.route) {

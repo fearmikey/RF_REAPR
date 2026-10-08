@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -285,6 +286,7 @@ fun PortScannerScreen(
             if (showWarningDialog) {
                 AlertDialog(
                     onDismissRequest = { showWarningDialog = false },
+                    icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                     title = { Text("Network Audit Warning") },
                     text = {
                         Text(
@@ -305,7 +307,7 @@ fun PortScannerScreen(
                                 showWarningDialog = false
                             }
                         ) {
-                            Text("I Understand, Start Scan")
+                            Text("Start Scan", maxLines = 1)
                         }
                     },
                     dismissButton = {

@@ -1,0 +1,2 @@
+- Updated F-Droid metadata recipe configuration.
+- General maintenance, stability, and UI enhancements.

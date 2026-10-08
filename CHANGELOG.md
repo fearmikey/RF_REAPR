@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.5] - 2026-10-07
+
+### Added
+- **New Security Modules & Auditing Tools**:
+    - **Network Auditing**: Added Captive Portal Detector, DNS Query Tool, MAC Vendor Lookup, Subnet IP Calculator, and Wake-on-LAN (WoL) Injector.
+    - **Wireless Auditing**: Added Cellular Tower Reconnaissance and WPS PIN Calculator.
+    - **Web & Infrastructure Security**: Added SSL/TLS X.509 Certificate Decoder, Cryptographic Hash Calculator (MD5, SHA-1, SHA-256), and interactive Reverse Shell Cheatsheet.
+    - **Physical & USB Hardware Security**: Added USB OTG Device Auditor and HID Injector SAF storage integration.
+- **100% FOSS & F-Droid Compliance**:
+    - Replaced Google Play Services Location dependency (`play-services-location`) with native Android `LocationManager` (`android.location.*`) for 100% FOSS compliance.
+    - Added Fastlane metadata structure (`full_description`, `short_description`, `title`, and versioned changelogs) under `fastlane/metadata/android/en-US/`.
+    - Added official F-Droid build recipe specification (`fdroid/com.fearmikey.rf_reapr.yml`) configured for reproducible builds.
+- **UI/UX & Community Support**:
+    - Introduced app launch counter tracking and milestone "Support RF-REAPR" community dialog.
+    - Added community support buttons ("Buy Me a Coffee", "Report Issues", and "Open Source MIT License" viewer) in Settings.
+    - Centralized toolkit navigation into a responsive, unified dashboard (`MainMenuScreen`).
+- **System & Foreground Scanning**:
+    - Integrated `ScanForegroundService` and `ScanNotificationManager` for persistent background network scans with live status notifications.
+    - Added `ScanTimeEstimator` for real-time ETA calculation during network topology discovery.
+
+### Fixed
+- **Vulnerability Auditor**:
+    - Hardened NVD vulnerability repository parsing to handle missing CPE entries gracefully and avoid NPEs on null CVE records.
+- **Unit Tests & Test Automation**:
+    - Added comprehensive unit test coverage and test runner script (`run_tests.sh`).
+
+### Changed
+- **Maintenance**: Version bump to 1.5.5 (versionCode 20).
+
 ## [1.5.4] - 2026-10-07
 
 ### Added

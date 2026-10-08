@@ -35,12 +35,13 @@ import com.fearmikey.rf_reapr.ui.theme.*
 import kotlinx.coroutines.launch
 
 enum class ToolCategory(val title: String, val icon: ImageVector, val tint: Color) {
-    NETWORK("Network Auditing", Icons.Default.Router, NetworkGreen),
-    WIRELESS("Wireless Auditing", Icons.Default.Wifi, WifiOrange),
+    NETWORK_AUDIT("Network Auditing", Icons.Default.Security, NetworkGreen),
+    NETWORK_RECON("Network Discovery", Icons.Default.Router, NetworkGreen),
+    NETWORK_DIAG("Network Diagnostics", Icons.Default.Build, NetworkGreen),
+    MONITORING("Intrusion Detection", Icons.Default.Visibility, NetworkGreen),
+    WIRELESS_PHYSICAL("Wireless & Physical", Icons.Default.Wifi, WifiOrange),
     WEB("Web & Infrastructure", Icons.Default.Language, WebGold),
-    PHYSICAL("Physical Access", Icons.Default.Nfc, PhysicalRed),
-    COMPLIANCE("Compliance & Reporting", Icons.AutoMirrored.Filled.Assignment, ComplianceGold),
-    LOGS("Log Exports", Icons.AutoMirrored.Filled.List, LogGrey)
+    COMPLIANCE("Reporting & Logs", Icons.AutoMirrored.Filled.Assignment, ComplianceGold)
 }
 
 data class ToolkitTool(
@@ -87,7 +88,7 @@ fun MainMenuScreen(
                 "Identify open TCP ports and services.",
                 Icons.Default.Search,
                 Screen.PortScanner.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_AUDIT,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -95,7 +96,7 @@ fun MainMenuScreen(
                 "Map connected devices and automatically audit services.",
                 Icons.AutoMirrored.Filled.List,
                 Screen.TopologyMap.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_RECON,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -103,7 +104,7 @@ fun MainMenuScreen(
                 "Detect rogue devices and new hardware.",
                 Icons.Default.NotificationsActive,
                 Screen.DhcpMonitor.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_RECON,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -111,7 +112,7 @@ fun MainMenuScreen(
                 "Send ICMP echo requests to a host or IP.",
                 Icons.Default.NetworkCheck,
                 Screen.PingTool.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_DIAG,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -119,7 +120,7 @@ fun MainMenuScreen(
                 "Discover mDNS/Bonjour services on the network.",
                 Icons.Default.SettingsRemote,
                 Screen.ServiceDiscovery.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_RECON,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -127,7 +128,7 @@ fun MainMenuScreen(
                 "Audit router port mapping vulnerabilities.",
                 Icons.Default.Router,
                 Screen.UpnpAuditor.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_AUDIT,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -135,7 +136,7 @@ fun MainMenuScreen(
                 "Detect DNS hijacking and security leaks.",
                 Icons.Default.LockPerson,
                 Screen.DnsAuditor.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_AUDIT,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -143,7 +144,7 @@ fun MainMenuScreen(
                 "Map the path packets take to a destination.",
                 Icons.Default.Route,
                 Screen.Traceroute.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_DIAG,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -151,7 +152,7 @@ fun MainMenuScreen(
                 "Measure network throughput using iPerf3.",
                 Icons.Default.NetworkPing,
                 Screen.IperfTester.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_DIAG,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -159,15 +160,50 @@ fun MainMenuScreen(
                 "Capture network traffic to a PCAP file.",
                 Icons.Default.Waves,
                 Screen.PacketCapture.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_DIAG,
                 isAggressive = true
+            ),
+            ToolkitTool(
+                "Subnet Calculator",
+                "Calculate CIDR network boundaries and host ranges.",
+                Icons.Default.Calculate,
+                Screen.SubnetCalculator.route,
+                ToolCategory.NETWORK_DIAG
+            ),
+            ToolkitTool(
+                "MAC OUI Lookup",
+                "Look up device manufacturers by MAC address offline.",
+                Icons.Default.Memory,
+                Screen.MacLookup.route,
+                ToolCategory.NETWORK_RECON
+            ),
+            ToolkitTool(
+                "DNS Query Tool",
+                "Perform manual DNS record lookups (A, MX, TXT, etc).",
+                Icons.Default.Dns,
+                Screen.DnsQuery.route,
+                ToolCategory.NETWORK_DIAG
+            ),
+            ToolkitTool(
+                "Wake-on-LAN Injector",
+                "Send Magic Packets to wake devices on the network.",
+                Icons.Default.PowerSettingsNew,
+                Screen.WolInjector.route,
+                ToolCategory.NETWORK_DIAG
+            ),
+            ToolkitTool(
+                "Captive Portal Detector",
+                "Detect HTTP interception and walled gardens.",
+                Icons.Default.Sensors,
+                Screen.CaptivePortalDetector.route,
+                ToolCategory.NETWORK_AUDIT
             ),
             ToolkitTool(
                 "SNMP Browser",
                 "Query routers and switches for system info and traffic.",
                 Icons.Default.Router,
                 Screen.SnmpBrowser.route,
-                ToolCategory.NETWORK,
+                ToolCategory.NETWORK_AUDIT,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -175,14 +211,14 @@ fun MainMenuScreen(
                 "Monitor network for ARP spoofing attempts.",
                 Icons.Default.NotificationsActive,
                 Screen.ArpDetector.route,
-                ToolCategory.NETWORK
+                ToolCategory.MONITORING
             ),
             ToolkitTool(
                 "Bluetooth Proximity Finder",
                 "Consolidated auditor and locator for BLE devices.",
                 Icons.Default.Bluetooth,
                 Screen.BluetoothProximityFinder.route,
-                ToolCategory.WIRELESS,
+                ToolCategory.WIRELESS_PHYSICAL,
                 BluetoothBlue
             ),
             ToolkitTool(
@@ -190,7 +226,7 @@ fun MainMenuScreen(
                 "Interactive visualization of WiFi channel overlap and bandwidth.",
                 Icons.Default.Wifi,
                 Screen.WifiFingerprinter.route,
-                ToolCategory.WIRELESS,
+                ToolCategory.WIRELESS_PHYSICAL,
                 WifiOrange
             ),
             ToolkitTool(
@@ -198,7 +234,7 @@ fun MainMenuScreen(
                 "Real-time spectrum analysis via RTL-SDR (rtl_tcp).",
                 Icons.Default.Waves,
                 Screen.SdrController.route,
-                ToolCategory.WIRELESS,
+                ToolCategory.WIRELESS_PHYSICAL,
                 NetworkGreen
             ),
             ToolkitTool(
@@ -206,7 +242,7 @@ fun MainMenuScreen(
                 "Audit physical access tags and NDEF messages.",
                 Icons.Default.Nfc,
                 Screen.NfcScanner.route,
-                ToolCategory.WIRELESS, // Note: NFC is in Wireless category but using NfcPurple
+                ToolCategory.WIRELESS_PHYSICAL,
                 NfcPurple
             ),
             ToolkitTool(
@@ -214,7 +250,7 @@ fun MainMenuScreen(
                 "Deploy keystroke payloads via USB HID emulation.",
                 Icons.Default.Usb,
                 Screen.HidInjector.route,
-                ToolCategory.PHYSICAL,
+                ToolCategory.WIRELESS_PHYSICAL,
                 isAggressive = true
             ),
             ToolkitTool(
@@ -229,7 +265,32 @@ fun MainMenuScreen(
                 "Detect hidden electronics and wiring via magnetic fields.",
                 Icons.Default.Waves,
                 Screen.Magnetometer.route,
-                ToolCategory.PHYSICAL
+                ToolCategory.WIRELESS_PHYSICAL
+            ),
+            ToolkitTool(
+                "USB OTG Auditor",
+                "Enumerate and inspect connected USB devices and interfaces.",
+                Icons.Default.Usb,
+                Screen.UsbOtgAuditor.route,
+                ToolCategory.WIRELESS_PHYSICAL,
+                NfcPurple
+            ),
+            ToolkitTool(
+                "Cellular Tower Recon",
+                "Map local LTE/5G cell towers and signal strength.",
+                Icons.Default.CellTower,
+                Screen.CellularRecon.route,
+                ToolCategory.WIRELESS_PHYSICAL,
+                NetworkGreen
+            ),
+            ToolkitTool(
+                "WPS PIN Calculator",
+                "Generate default WPS PINs for known vulnerable routers.",
+                Icons.Default.Password,
+                Screen.WpsPinCalculator.route,
+                ToolCategory.WIRELESS_PHYSICAL,
+                WifiOrange,
+                isAggressive = true
             ),
             ToolkitTool(
                 "Website Inspector",
@@ -280,6 +341,28 @@ fun MainMenuScreen(
                 isAggressive = true,
                 requiresApiKey = false
             ),
+            ToolkitTool(
+                "Hash Calculator",
+                "Generate and verify MD5, SHA-1, and SHA-256 hashes.",
+                Icons.Default.EnhancedEncryption,
+                Screen.HashCalculator.route,
+                ToolCategory.WEB
+            ),
+            ToolkitTool(
+                "Certificate Decoder",
+                "Decode and inspect PEM-encoded X.509 certificates.",
+                Icons.Default.VpnKey,
+                Screen.CertDecoder.route,
+                ToolCategory.WEB
+            ),
+            ToolkitTool(
+                "Reverse Shell Cheatsheet",
+                "Offline reference for generating reverse shell payloads.",
+                Icons.Default.Terminal,
+                Screen.ReverseShellCheatsheet.route,
+                ToolCategory.WEB,
+                isAggressive = true
+            ),
             // Compliance Tools
             ToolkitTool(
                 "Audit Checklists",
@@ -301,63 +384,63 @@ fun MainMenuScreen(
                 "Export event logs for WiFi scans.",
                 Icons.Default.Wifi,
                 Screen.WifiLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             ),
             ToolkitTool(
                 "Bluetooth Scanning Logs",
                 "Export event logs for BLE scans.",
                 Icons.Default.Bluetooth,
                 Screen.BleLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             ),
             ToolkitTool(
                 "Network Discovery Logs",
                 "Export network discovery and audit logs.",
                 Icons.AutoMirrored.Filled.List,
                 Screen.TopologyLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             ),
             ToolkitTool(
                 "Port Scanning Logs",
                 "Export detailed port scan results.",
                 Icons.Default.Search,
                 Screen.PortLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             ),
             ToolkitTool(
                 "Website Inspector Logs",
                 "Export web infrastructure audit logs.",
                 Icons.Default.Language,
                 Screen.WebLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             ),
             ToolkitTool(
                 "Ping Report Logs",
                 "Export ICMP ping response logs.",
                 Icons.Default.NetworkCheck,
                 Screen.PingLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             ),
             ToolkitTool(
                 "iPerf Tester Logs",
                 "Export network throughput logs.",
                 Icons.Default.NetworkPing,
                 Screen.IperfLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             ),
             ToolkitTool(
                 "SNMP Browser Logs",
                 "Export SNMP query results.",
                 Icons.Default.Router,
                 Screen.SnmpLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             ),
             ToolkitTool(
                 "Packet Capture Logs",
                 "Export raw PCAP files.",
                 Icons.Default.Waves,
                 Screen.PacketCaptureLogs.route,
-                ToolCategory.LOGS
+                ToolCategory.COMPLIANCE
             )
         )
     }
@@ -521,46 +604,50 @@ fun MainMenuScreen(
                 Icon(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = null,
-                    tint = PhysicalRed
+                    tint = PhysicalRed,
+                    modifier = Modifier.size(32.dp)
                 )
             },
             title = {
                 Text(
                     text = "Support RF-REAPR",
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {
-                Text(
-                    text = "Enjoying RF-REAPR? It is 100% free, open source, and privacy-first with zero ads. If you'd like to support ongoing development, consider buying me a coffee!",
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        settingsViewModel?.setSupportDialogNeverAsk(true)
-                        showSupportDialog = false
-                        uriHandler.openUri("https://buymeacoffee.com/ximw7nxi1j")
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Buy Me a Coffee")
-                }
-            },
-            dismissButton = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    TextButton(
+                    Text(
+                        text = "Enjoying RF-REAPR? It is 100% free, open source, and privacy-first with zero ads. If you'd like to support ongoing development, consider buying me a coffee!",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Button(
+                        onClick = {
+                            settingsViewModel?.setSupportDialogNeverAsk(true)
+                            showSupportDialog = false
+                            uriHandler.openUri("https://buymeacoffee.com/ximw7nxi1j")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Favorite,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Buy Me a Coffee")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
                         onClick = {
                             settingsViewModel?.setSupportDialogLastShownLaunch(appLaunchCount)
                             showSupportDialog = false
@@ -569,6 +656,9 @@ fun MainMenuScreen(
                     ) {
                         Text("Ask me later")
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     TextButton(
                         onClick = {
                             settingsViewModel?.setSupportDialogNeverAsk(true)
@@ -577,12 +667,14 @@ fun MainMenuScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            "Never ask again",
-                            color = MaterialTheme.colorScheme.outline
+                            "Don't ask again",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-            }
+            },
+            confirmButton = {},
+            dismissButton = {}
         )
     }
 }

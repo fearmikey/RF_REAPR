@@ -6,39 +6,53 @@ RF-REAPR is a comprehensive Android-based security auditing and network reconnai
 
 RF-REAPR integrates a wide range of security modules:
 
-### Guided Workflows
-*   **Operation Modes**: Step-by-step guided audit workflows for common scenarios, with mandatory step tracking and per-mode security warnings, alongside the classic manual toolkit.
+### Toolkit Dashboard & Operation Modes
+*   **Centralized Dashboard**: Categorized security audit toolkit with instant access to network, wireless, web, physical, and compliance modules.
+*   **Passive vs. Active Modes**: Global stealth mode toggle to inhibit active network transmissions when operating in sensitive environments.
+*   **Background Scanning Service**: Persistent foreground service with real-time progress notifications and accurate scan time estimation (ETA).
 
 ### Compliance & Auditing
 *   **Audit Checklists**: Built-in checklists for various security frameworks (ISO 27001, SOC2, etc.).
-*   **Evidence Capture**: Integrated camera system to capture and tag physical security evidence.
+*   **Evidence Capture**: Integrated camera system to capture and tag physical security evidence with FOSS location tagging.
 *   **Evidence Gallery**: Organize and review collected evidence by project and folder.
-*   **Recycle Bin**: Secure deletion with an automated 30-day retention and cleanup system.
+*   **Recycle Bin**: Secure deletion with an automated 30-day retention and cleanup worker.
 
 ### Network Discovery & Analysis
-*   **Network Topology Map**: Interactive visualization of network structure and connected devices.
+*   **Network Topology Map**: Interactive visualization of network structure and connected devices with persistent state.
 *   **Port Scanner**: Identify open ports and potential vulnerabilities on network devices.
 *   **Packet Capture (PCAP)**: Integrated traffic capture (VPN or Root) for deep packet analysis.
 *   **Website Inspector**: Basic web auditing and security header analysis.
 *   **Ping Tool**: Network latency and connectivity testing.
-*   **Network Throughput (iPerf)**: High-performance bandwidth testing via integrated iperf3.
+*   **Network Throughput (iPerf)**: High-performance bandwidth testing via integrated native iperf3.
 *   **SNMP Browser**: Query and analyze network devices using the SNMP protocol.
 *   **Shodan Intelligence**: Search for host details and vulnerabilities using the Shodan API, with InternetDB fallback for quick, no-key IP recon.
-*   **DNS Enumerator**: Discover subdomains and DNS records.
+*   **DNS Enumerator & Query**: Subdomain discovery and custom DNS record querying (A, AAAA, MX, TXT, NS).
+*   **Captive Portal Detector**: Test network connectivity and detect captive portal redirects.
+*   **MAC Vendor Lookup & Subnet Calculator**: Identify hardware vendors from OUI MACs and calculate CIDR ranges.
+*   **Wake-on-LAN (WoL) Injector**: Wake remote hosts via WoL magic packets.
 *   **DHCP Monitor**: Monitor DHCP traffic for rogue servers.
 *   **RDAP Auditor**: Query registration data for domains and IP ranges.
 
 ### Wireless Auditing
 *   **Bluetooth Proximity Finder**: Locate and track BLE devices based on signal strength (RSSI).
 *   **Wi-Fi Fingerprinting**: Analyze Wi-Fi environments, channel distribution, and signal quality.
+*   **Cellular Tower Recon**: Analyze cellular network towers, signal metrics, and operator information.
+*   **WPS PIN Calculator**: Audit router WPS PIN algorithms and security status.
 *   **SDR Controller**: Real-time spectrum analysis and waterfall display via RTL-SDR (rtl_tcp).
-*   **NFC Scanner**: Read and analyze NFC tag data and technology types (Now under Wireless Auditing).
+*   **NFC Scanner**: Read and analyze NFC tag data and technology types.
+
+### Web & Infrastructure Security
+*   **Cert Decoder**: Decode and inspect SSL/TLS X.509 certificate chains.
+*   **Hash Calculator**: Compute MD5, SHA-1, SHA-256, and SHA-512 cryptographic hashes.
+*   **Reverse Shell Cheatsheet**: Reference payload generator for authorized penetration testing.
 
 ### Physical & Hardware Tools
 *   **Magnetometer**: Detect magnetic fields and hidden electronic devices.
-*   **HID Injector**: Interface for planning or testing Human Interface Device (HID) payloads.
+*   **USB OTG Auditor**: Inspect connected USB hardware and OTG storage devices.
+*   **HID Injector**: Payload planner and interactive Ducky Script Builder with Storage Access Framework (SAF) USB drive support.
 
-### Logging & Management
+### Logging, Privacy & FOSS Compliance
+*   **100% FOSS & Offline-First**: Zero proprietary SDKs or tracking frameworks (F-Droid reproducible build compliant).
 *   **Centralized Logging**: Specialized log views for Wi-Fi, BLE, Port Scanning, Web, and Ping modules.
 *   **Local Storage**: Robust data persistence using Room database for sessions, nodes, and evidence.
 
@@ -61,7 +75,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.5.4.apk` from the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page of this repository.
+1.  Download the latest `RF_REAPR_v1.5.5.apk` from the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -235,6 +236,7 @@ fun TopologyScreen(
             if (showDiscoveryWarning) {
                 AlertDialog(
                     onDismissRequest = { showDiscoveryWarning = false },
+                    icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     title = { Text("Start Network Discovery?") },
                     text = {
                         Text(
@@ -249,7 +251,7 @@ fun TopologyScreen(
                                 showDiscoveryWarning = false
                             }
                         ) {
-                            Text("I Understand, Start Discovery")
+                            Text("Start Discovery", maxLines = 1)
                         }
                     },
                     dismissButton = {
@@ -264,6 +266,7 @@ fun TopologyScreen(
             if (showAuditWarning) {
                 AlertDialog(
                     onDismissRequest = { showAuditWarning = false },
+                    icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                     title = { Text("Run Network-Wide Audit?") },
                     text = {
                         Text(
@@ -279,7 +282,7 @@ fun TopologyScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                         ) {
-                            Text("I Understand, Start Audit")
+                            Text("Start Audit", maxLines = 1)
                         }
                     },
                     dismissButton = {

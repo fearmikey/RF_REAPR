@@ -34,6 +34,18 @@ sealed class Screen(val route: String) {
     data object Magnetometer : Screen("magnetometer")
 
     // New Network Monitoring Tools
+    data object SubnetCalculator : Screen("subnet_calculator")
+    data object MacLookup : Screen("mac_lookup")
+    data object DnsQuery : Screen("dns_query")
+    data object WolInjector : Screen("wol_injector")
+    data object CaptivePortalDetector : Screen("captive_portal_detector")
+    data object HashCalculator : Screen("hash_calculator")
+    data object CertDecoder : Screen("cert_decoder")
+    data object ReverseShellCheatsheet : Screen("reverse_shell_cheatsheet")
+    data object UsbOtgAuditor : Screen("usb_otg_auditor")
+    data object CellularRecon : Screen("cellular_recon")
+    data object WpsPinCalculator : Screen("wps_pin_calculator")
+
     data object SnmpBrowser : Screen("snmp_browser")
     data object ServiceDiscovery : Screen("service_discovery")
     data object DnsAuditor : Screen("dns_auditor")

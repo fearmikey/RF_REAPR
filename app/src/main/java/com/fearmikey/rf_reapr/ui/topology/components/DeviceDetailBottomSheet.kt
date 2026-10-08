@@ -160,24 +160,26 @@ fun DeviceDetailBottomSheet(
                     )
                 }
 
-                Button(
-                    onClick = { onCheckExternalExposure(node) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = com.fearmikey.rf_reapr.ui.theme.WebGold.copy(alpha = 0.8f),
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Quick Recon", 
-                        style = MaterialTheme.typography.labelLarge,
-                        textAlign = TextAlign.Center
-                    )
+                if (node.deviceType == DeviceType.GATEWAY && node.hasPublicIp) {
+                    Button(
+                        onClick = { onCheckExternalExposure(node) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = com.fearmikey.rf_reapr.ui.theme.WebGold.copy(alpha = 0.8f),
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Quick Recon", 
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
 
