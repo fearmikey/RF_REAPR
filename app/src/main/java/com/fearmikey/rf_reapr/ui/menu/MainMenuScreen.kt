@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -59,11 +60,25 @@ fun MainMenuScreen(
     settingsViewModel: SettingsViewModel? = null,
     onNavigate: (String) -> Unit
 ) {
+    val uriHandler = LocalUriHandler.current
     val isPassiveMode by settingsViewModel?.isPassiveMode?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
+    val appLaunchCount by settingsViewModel?.appLaunchCount?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(0) }
+    val supportDialogNeverAsk by settingsViewModel?.supportDialogNeverAsk?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
+
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val highlightAlpha = remember { Animatable(0f) }
     var showActiveWarning by remember { mutableStateOf(false) }
+    var showSupportDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(appLaunchCount, supportDialogNeverAsk) {
+        if (settingsViewModel != null && appLaunchCount >= 3 && !supportDialogNeverAsk) {
+            val lastShown = settingsViewModel.getSupportDialogLastShownLaunch()
+            if (lastShown != appLaunchCount) {
+                showSupportDialog = true
+            }
+        }
+    }
 
     val allTools = remember {
         listOf(
@@ -491,6 +506,81 @@ fun MainMenuScreen(
             dismissButton = {
                 TextButton(onClick = { showActiveWarning = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showSupportDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                settingsViewModel?.setSupportDialogLastShownLaunch(appLaunchCount)
+                showSupportDialog = false
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = PhysicalRed
+                )
+            },
+            title = {
+                Text(
+                    text = "Support RF-REAPR",
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "Enjoying RF-REAPR? It is 100% free, open source, and privacy-first with zero ads. If you'd like to support ongoing development, consider buying me a coffee!",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        settingsViewModel?.setSupportDialogNeverAsk(true)
+                        showSupportDialog = false
+                        uriHandler.openUri("https://buymeacoffee.com/ximw7nxi1j")
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Buy Me a Coffee")
+                }
+            },
+            dismissButton = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TextButton(
+                        onClick = {
+                            settingsViewModel?.setSupportDialogLastShownLaunch(appLaunchCount)
+                            showSupportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Ask me later")
+                    }
+                    TextButton(
+                        onClick = {
+                            settingsViewModel?.setSupportDialogNeverAsk(true)
+                            showSupportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "Never ask again",
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
             }
         )

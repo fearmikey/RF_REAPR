@@ -62,6 +62,42 @@ class SettingsViewModel(
             initialValue = false
         )
 
+    val supportDialogNeverAsk: StateFlow<Boolean> = repository.supportDialogNeverAsk
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
+    val appLaunchCount: StateFlow<Int> = repository.appLaunchCount
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
+    fun incrementAppLaunchCount() {
+        viewModelScope.launch {
+            repository.incrementAppLaunchCount()
+        }
+    }
+
+    fun setSupportDialogNeverAsk(neverAsk: Boolean) {
+        viewModelScope.launch {
+            repository.setSupportDialogNeverAsk(neverAsk)
+        }
+    }
+
+    fun setSupportDialogLastShownLaunch(launchCount: Int) {
+        viewModelScope.launch {
+            repository.setSupportDialogLastShownLaunch(launchCount)
+        }
+    }
+
+    fun getSupportDialogLastShownLaunch(): Int {
+        return repository.getSupportDialogLastShownLaunch()
+    }
+
     fun setThemePreference(preference: ThemePreference) {
         viewModelScope.launch {
             repository.setThemePreference(preference)

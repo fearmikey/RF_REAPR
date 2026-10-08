@@ -53,12 +53,6 @@ sealed class Screen(val route: String) {
             "report_builder?autoGenerate=$autoGenerate" + (if (startTime != null) "&startTime=$startTime" else "")
     }
     data object PermissionExplanation : Screen("permission_explanation")
-    
-    // App Start & Workflow
-    data object AppStartMenu : Screen("app_start_menu")
-    data object Workflow : Screen("workflow/{modeId}") {
-        fun createRoute(modeId: String) = "workflow/$modeId"
-    }
 
     // Log Screens
     data object WifiLogs : Screen("logs/wifi")

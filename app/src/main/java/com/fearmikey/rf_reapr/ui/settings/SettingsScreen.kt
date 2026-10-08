@@ -6,8 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,8 +24,6 @@ import com.fearmikey.rf_reapr.ui.theme.WebGold
 @Preview(showBackground = true)
 @Composable
 fun SettingsPreview() {
-    // We can't easily mock the ViewModel here without a proper factory or interface
-    // but for preview purposes we can show the layout with a dummy UI
     MaterialTheme {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Settings Preview", style = MaterialTheme.typography.headlineMedium)
@@ -52,6 +49,7 @@ fun SettingsScreen(
     val cameraShortcutEnabled by viewModel.isCameraShortcutEnabled.collectAsStateWithLifecycle()
     
     var expanded by remember { mutableStateOf(false) }
+    var showLicenseDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
 
@@ -59,6 +57,51 @@ fun SettingsScreen(
         viewModel.exportStatus.collect { message ->
             snackbarHostState.showSnackbar(message)
         }
+    }
+
+    if (showLicenseDialog) {
+        val licenseText = """
+            MIT License
+
+            Copyright (c) 2025 fearmikey
+
+            Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+            The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        """.trimIndent()
+
+        AlertDialog(
+            onDismissRequest = { showLicenseDialog = false },
+            title = { Text("MIT License") },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .heightIn(max = 300.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = licenseText,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLicenseDialog = false }) {
+                    Text("Close")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        uriHandler.openUri("https://github.com/fearmikey/RF_REAPR/License")
+                    }
+                ) {
+                    Text("View on GitHub")
+                }
+            }
+        )
     }
     
     Scaffold(
@@ -187,6 +230,47 @@ fun SettingsScreen(
                 Icon(Icons.Default.Security, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Manage 3rd Party API Keys")
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Support & Community",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = { uriHandler.openUri("https://buymeacoffee.com/ximw7nxi1j") },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Favorite, contentDescription = null, tint = WebGold)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Buy Me a Coffee")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = { uriHandler.openUri("https://github.com/fearmikey/RF_REAPR/issues") },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.BugReport, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Report Issues")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = { showLicenseDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Description, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Open Source MIT License")
             }
 
             val darkTheme = when (currentTheme) {

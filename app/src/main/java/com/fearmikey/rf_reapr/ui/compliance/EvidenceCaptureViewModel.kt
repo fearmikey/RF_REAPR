@@ -15,8 +15,8 @@ import com.fearmikey.rf_reapr.domain.model.EvidenceFolder
 import com.fearmikey.rf_reapr.domain.model.EvidenceProject
 import com.fearmikey.rf_reapr.domain.repository.EvidenceRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.tasks.Tasks
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -202,9 +202,18 @@ class EvidenceCaptureViewModel(
                 
                 imageProxy.close()
 
-                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
                 val location: Location? = try {
-                    Tasks.await(fusedLocationClient.lastLocation, 5, TimeUnit.SECONDS)
+                    if (context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                        context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                        val gpsLoc = locationManager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                        val netLoc = locationManager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                        val passLoc = locationManager?.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+                        listOfNotNull(gpsLoc, netLoc, passLoc).maxByOrNull { it.time }
+                    } else {
+                        null
+                    }
                 } catch (e: Exception) {
                     Log.e("EvidenceCapture", "Location fetch failed", e)
                     null

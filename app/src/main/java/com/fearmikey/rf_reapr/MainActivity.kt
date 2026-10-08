@@ -19,7 +19,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -54,12 +56,6 @@ import com.fearmikey.rf_reapr.ui.topology.TopologyViewModel
 import com.fearmikey.rf_reapr.ui.wifi.WifiFingerprintScreen
 import com.fearmikey.rf_reapr.ui.wifi.WifiFingerprintViewModel
 import com.fearmikey.rf_reapr.ui.permissions.PermissionExplanationScreen
-import com.fearmikey.rf_reapr.ui.menu.AppStartMenuScreen
-import com.fearmikey.rf_reapr.ui.workflow.WorkflowScreen
-import com.fearmikey.rf_reapr.ui.workflow.WorkflowViewModel
-import com.fearmikey.rf_reapr.domain.model.AppMode
-import com.fearmikey.rf_reapr.domain.model.WorkflowStep
-import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import com.fearmikey.rf_reapr.ui.physical.HidAssetsScreen
 import com.fearmikey.rf_reapr.ui.physical.HidAssetsViewModel
 import com.fearmikey.rf_reapr.ui.physical.HidInjectorScreen
@@ -126,6 +122,9 @@ class MainActivity : ComponentActivity() {
         )
         
         val settingsRepository = SettingsRepositoryImpl(this)
+        lifecycleScope.launch {
+            settingsRepository.incrementAppLaunchCount()
+        }
         val portRepository = PortScannerRepositoryImpl()
         val vulnerabilityRepository = VulnerabilityRepositoryImpl(apiService, database.vulnerabilityDao(), settingsRepository)
         val discoveryRepository = NetworkDiscoveryRepositoryImpl(this)
@@ -240,55 +239,6 @@ class MainActivity : ComponentActivity() {
                         EvidenceCaptureViewModel(evidenceRepository, logRepository)
                     }
                     
-                    val appModes = remember {
-                        listOf(
-                            AppMode(
-                                id = "internal_network_recon",
-                                title = "Internal Network Recon",
-                                description = "Automated discovery and vulnerability mapping for internal LANs.",
-                                icon = Icons.AutoMirrored.Filled.ManageSearch,
-                                securityWarning = "Internal Network Recon performs automated network scans, service discovery, and vulnerability checks on the local network. This may trigger intrusion detection systems (IDS) or cause instability on legacy devices. Ensure you have explicit authorization for the target network.",
-                                steps = listOf(
-                                    WorkflowStep("net_disc", "Network Discovery", "Map devices and identify targets.", Screen.TopologyMap.route, Icons.Default.Router, isMandatory = true),
-                                    WorkflowStep("port_scan", "Port Scanner", "Find open ports and running services.", Screen.PortScanner.route, Icons.Default.Search),
-                                    WorkflowStep("svc_disc", "Service Discovery", "Discover network services via mDNS/Bonjour.", Screen.ServiceDiscovery.route, Icons.Default.SettingsRemote),
-                                    WorkflowStep("dns_audit", "DNS Security Auditor", "Check for DNS hijacking and leaks.", Screen.DnsAuditor.route, Icons.Default.LockPerson),
-                                    WorkflowStep("upnp_audit", "UPnP Auditor", "Audit router port mappings.", Screen.UpnpAuditor.route, Icons.Default.Router)
-                                )
-                            ),
-                            AppMode(
-                                id = "external_business_recon",
-                                title = "External Business Recon",
-                                description = "Public-facing asset discovery and vulnerability auditing.",
-                                icon = Icons.Default.Language,
-                                requiresTarget = true,
-                                targetHint = "example.com",
-                                securityWarning = "External Business Recon performs OSINT, subdomain discovery, and automated vulnerability scanning of public-facing endpoints. Ensure you have explicit legal authorization to audit the target domain and associated infrastructure.",
-                                steps = listOf(
-                                    WorkflowStep("subdomain_finder", "Subdomain Finder", "Discover public-facing hostnames and IPs.", Screen.SubdomainFinder.route, Icons.Default.Language, isMandatory = true),
-                                    WorkflowStep("cloud_scanner", "Cloud Asset Scanner", "Identify exposed cloud storage and services.", Screen.CloudAssetScanner.route, Icons.Default.Cloud),
-                                    WorkflowStep("website_inspector", "Website Inspector", "Audit security headers, DNS, and RDAP info.", Screen.WebsiteInspector.route, Icons.Default.Info),
-                                    WorkflowStep("tls_scanner", "TLS Cipher Scanner", "Evaluate SSL/TLS configuration strength.", Screen.TlsCipherScanner.route, Icons.Default.Lock),
-                                    WorkflowStep("shodan_search", "Shodan Quick Search", "Query Shodan for exposed infrastructure.", Screen.ShodanScanner.route, Icons.Default.Search),
-                                    WorkflowStep("hibp_audit", "HIBP Breach Check", "Check for domain-related data breaches.", Screen.HibpChecker.route, Icons.Default.Shield)
-                                )
-                            ),
-                            AppMode(
-                                id = "wireless_security_audit",
-                                title = "Wireless Security Audit",
-                                description = "Map the radio perimeter: WiFi, Bluetooth, and SDR sweeps.",
-                                icon = Icons.Default.Wifi,
-                                securityWarning = "Wireless Security Audit performs active and passive radio frequency scanning. Ensure you have authorization to monitor wireless traffic in this area.",
-                                steps = listOf(
-                                    WorkflowStep("wifi_scan", "WiFi Spectrum Analysis", "Map access points and identify hidden SSIDs.", Screen.WifiFingerprinter.route, Icons.Default.Wifi, isMandatory = true),
-                                    WorkflowStep("ble_scan", "Bluetooth Proximity", "Detect nearby BLE devices and tracking beacons.", Screen.BluetoothProximityFinder.route, Icons.Default.Bluetooth),
-                                    WorkflowStep("sdr_sweep", "SDR Frequency Sweep", "Search for unauthorized transmissions (Requires RTL-SDR).", Screen.SdrController.route, Icons.Default.SettingsInputAntenna),
-                                    WorkflowStep("evidence_capture", "Evidence Capture", "Document physical locations of rogue transmitters.", Screen.EvidenceCapture.route, Icons.Default.CameraAlt)
-                                )
-                            )
-                        )
-                    }
-
                     NavHost(
                         navController = navController,
                         startDestination = Screen.Splash.route,
@@ -312,7 +262,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 
                                 if (hasBluetooth && hasLocation && hasCamera && hasNotifications) {
-                                    navController.navigate(Screen.AppStartMenu.route) {
+                                    navController.navigate(Screen.MainMenu.route) {
                                         popUpTo(Screen.Splash.route) { inclusive = true }
                                     }
                                 } else {
@@ -324,56 +274,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.PermissionExplanation.route) {
                             PermissionExplanationScreen {
-                                navController.navigate(Screen.AppStartMenu.route) {
+                                navController.navigate(Screen.MainMenu.route) {
                                     popUpTo(Screen.PermissionExplanation.route) { inclusive = true }
                                 }
-                            }
-                        }
-                        composable(Screen.AppStartMenu.route) {
-                            AppStartMenuScreen(
-                                modes = appModes,
-                                onNavigateToMode = { modeId ->
-                                    navController.navigate(Screen.Workflow.createRoute(modeId))
-                                },
-                                onNavigateToTools = {
-                                    navController.navigate(Screen.MainMenu.route)
-                                }
-                            ) {
-                                navController.navigate(Screen.Settings.route)
-                            }
-                        }
-                        composable(Screen.Workflow.route) { backStackEntry ->
-                            val modeId = backStackEntry.arguments?.getString("modeId")
-                            val mode = appModes.find { it.id == modeId }
-                            if (mode != null) {
-                                val workflowViewModel: WorkflowViewModel = viewModel {
-                                    WorkflowViewModel(
-                                        mode = mode,
-                                        discoveryRepository = discoveryRepository,
-                                        portScannerRepository = portRepository,
-                                        serviceDiscoveryRepository = serviceDiscoveryRepository,
-                                        dnsAuditorRepository = dnsAuditorRepository,
-                                        upnpScannerRepository = upnpScannerRepository,
-                                        subdomainFinderRepository = subdomainFinderRepository,
-                                        websiteInspectorRepository = websiteInspectorRepository,
-                                        cloudAssetScannerRepository = cloudAssetScannerRepository,
-                                        tlsCipherScannerRepository = tlsCipherScannerRepository,
-                                        shodanRepository = shodanRepository,
-                                        hibpRepository = hibpRepository,
-                                        logRepository = logRepository,
-                                        wifiRepository = wifiRepository,
-                                        bleRepository = bleRepository,
-                                        sdrRepository = sdrRepository,
-                                        settingsRepository = settingsRepository
-                                    )
-                                }
-                                WorkflowScreen(
-                                    viewModel = workflowViewModel,
-                                    onNavigateToReport = { startTime ->
-                                        navController.navigate(Screen.ReportBuilder.createRoute(autoGenerate = true, startTime = startTime))
-                                    },
-                                    onBack = { navController.popBackStack() }
-                                )
                             }
                         }
                         composable(Screen.MainMenu.route) {

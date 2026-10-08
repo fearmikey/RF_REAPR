@@ -1,0 +1,3 @@
+- Added foreground scan service with status notifications and ETA estimator.
+- Topology UI and node filtering enhancements.
+- Evidence capture camera state handling fixes.

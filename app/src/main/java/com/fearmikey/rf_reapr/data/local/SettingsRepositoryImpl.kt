@@ -157,4 +157,46 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
     override suspend fun setSdrPort(port: Int) {
         prefs.edit().putInt("sdr_port", port).apply()
     }
+
+    override val supportDialogNeverAsk: Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "support_dialog_never_ask") {
+                trySend(p.getBoolean(key, false))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.onStart {
+        emit(prefs.getBoolean("support_dialog_never_ask", false))
+    }
+
+    override val appLaunchCount: Flow<Int> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "app_launch_count") {
+                trySend(p.getInt(key, 0))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.onStart {
+        emit(prefs.getInt("app_launch_count", 0))
+    }
+
+    override suspend fun incrementAppLaunchCount(): Int {
+        val current = prefs.getInt("app_launch_count", 0) + 1
+        prefs.edit().putInt("app_launch_count", current).apply()
+        return current
+    }
+
+    override suspend fun setSupportDialogNeverAsk(neverAsk: Boolean) {
+        prefs.edit().putBoolean("support_dialog_never_ask", neverAsk).apply()
+    }
+
+    override fun getSupportDialogLastShownLaunch(): Int {
+        return prefs.getInt("support_dialog_last_shown_launch", 0)
+    }
+
+    override suspend fun setSupportDialogLastShownLaunch(launchCount: Int) {
+        prefs.edit().putInt("support_dialog_last_shown_launch", launchCount).apply()
+    }
 }

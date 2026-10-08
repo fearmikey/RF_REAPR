@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.4] - 2026-08-31
+
+### Added
+- **Compliance & FOSS**:
+    - Replaced Google Play Services Location dependency with native Android `LocationManager` for 100% FOSS compliance.
+    - Added Fastlane and F-Droid deployment metadata definitions.
+- **UI/UX & Community**:
+    - Added support prompt dialog and links to community support (Buy Me a Coffee) in Settings.
+    - Integrated MIT License viewer and GitHub issue reporting actions in Settings.
+
+### Fixed
+- **Network Auditing & Vulnerability Discovery**:
+    - Hardened NVD vulnerability repository parsing to handle null CPE entries and improve software keyword search matching heuristics.
+
+### Changed
+- **Maintenance**: Version bump to 1.5.4.
+
 ## [1.5.3] - 2026-08-31
 
 ### Added

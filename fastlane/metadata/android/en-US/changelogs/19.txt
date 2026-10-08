@@ -1,0 +1,4 @@
+- Migrated location provider to native LocationManager for 100% FOSS compliance.
+- Added Fastlane and F-Droid metadata configurations.
+- Added optional support & community links.
+- Vulnerability repository parsing and search stability improvements.

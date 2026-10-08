@@ -15,8 +15,8 @@ android {
         applicationId = "com.fearmikey.rf_reapr"
         minSdk = 26
         targetSdk = 35
-        versionCode = 18
-        versionName = "1.5.3"
+        versionCode = 19
+        versionName = "1.5.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -37,6 +37,10 @@ android {
             versionNameSuffix = "-DEBUG"
         }
         release {
+            vcsInfo {
+                include = false
+            }
+
             val keystoreProperties = Properties()
             val keystorePropertiesFile = rootProject.file("local.properties")
             if (keystorePropertiesFile.exists()) {
@@ -141,9 +145,6 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.extensions)
-
-    // Location
-    implementation(libs.play.services.location)
 
     // UI Utilities
     implementation(libs.coil.compose)
