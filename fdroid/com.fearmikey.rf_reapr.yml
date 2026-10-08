@@ -1,0 +1,22 @@
+Categories:
+  - Security
+License: MIT
+AuthorName: fearmikey
+SourceCode: https://github.com/fearmikey/RF_REAPR
+IssueTracker: https://github.com/fearmikey/RF_REAPR/issues
+Changelog: https://github.com/fearmikey/RF_REAPR/releases
+
+RepoType: git
+Repo: https://github.com/fearmikey/RF_REAPR.git
+
+Builds:
+  - versionName: '1.5.4'
+    versionCode: 19
+    commit: 2277f41e5eb23d5b88ac67651836b643e8641f49
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+UpdateCheckData: v.*
