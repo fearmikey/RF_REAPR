@@ -10,9 +10,9 @@ RepoType: git
 Repo: https://github.com/fearmikey/RF_REAPR.git
 
 Builds:
-  - versionName: '1.5.5'
-    versionCode: 20
-    commit: b5aaef643e8749260ef0bc25f11c9c61efccbad3
+  - versionName: '1.5.6'
+    versionCode: 21
+    commit: 3bee29509add5f301ccd2c8a3a1bb7d9676b3124
     subdir: app
     gradle:
       - yes
