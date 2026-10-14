@@ -38,13 +38,16 @@ fun ApiKeysScreen(
     val apiKey by viewModel.vulnerabilityApiKey.collectAsStateWithLifecycle()
     val hibpApiKey by viewModel.hibpApiKey.collectAsStateWithLifecycle()
     val shodanApiKey by viewModel.shodanApiKey.collectAsStateWithLifecycle()
+    val abuseIpDbApiKey by viewModel.abuseIpDbApiKey.collectAsStateWithLifecycle()
     
     var editedApiKey by remember(apiKey) { mutableStateOf(apiKey) }
     var editedHibpApiKey by remember(hibpApiKey) { mutableStateOf(hibpApiKey) }
     var editedShodanApiKey by remember(shodanApiKey) { mutableStateOf(shodanApiKey) }
+    var editedAbuseIpDbApiKey by remember(abuseIpDbApiKey) { mutableStateOf(abuseIpDbApiKey) }
     var showApiKey by remember { mutableStateOf(false) }
     var showHibpApiKey by remember { mutableStateOf(false) }
     var showShodanApiKey by remember { mutableStateOf(false) }
+    var showAbuseIpDbApiKey by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
 
@@ -65,6 +68,7 @@ fun ApiKeysScreen(
             val scrollTarget = when(highlightKey) {
                 "hibp" -> 150
                 "shodan" -> 350
+                "abuseipdb" -> 550
                 else -> 0
             }
             if (scrollTarget > 0) {
@@ -292,6 +296,74 @@ fun ApiKeysScreen(
             ) {
                 Text(
                     text = "Get an API Key from Shodan",
+                    textDecoration = TextDecoration.Underline
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Threat Intelligence (AbuseIPDB)",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val abuseIpDbFontSize = when {
+                editedAbuseIpDbApiKey.length > 35 -> 11.sp
+                editedAbuseIpDbApiKey.length > 25 -> 13.sp
+                else -> 16.sp
+            }
+
+            val abuseHighlightColor = if (highlightKey == "abuseipdb") MaterialTheme.colorScheme.primaryContainer.copy(alpha = highlightAlpha) else Color.Transparent
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+                    .background(abuseHighlightColor, shape = MaterialTheme.shapes.small)
+                    .padding(if (highlightKey == "abuseipdb") 8.dp else 0.dp)
+            ) {
+                OutlinedTextField(
+                    value = editedAbuseIpDbApiKey,
+                    onValueChange = { editedAbuseIpDbApiKey = it },
+                    label = { Text("AbuseIPDB API Key") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontSize = abuseIpDbFontSize),
+                    visualTransformation = if (showAbuseIpDbApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showAbuseIpDbApiKey = !showAbuseIpDbApiKey }) {
+                            Icon(
+                                imageVector = if (showAbuseIpDbApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (showAbuseIpDbApiKey) "Hide AbuseIPDB API Key" else "Show AbuseIPDB API Key"
+                            )
+                        }
+                    },
+                    supportingText = {
+                        Text("Required for checking IP reputation and malicious abuse reports.")
+                    }
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Button(
+                    onClick = { viewModel.setAbuseIpDbApiKey(editedAbuseIpDbApiKey) },
+                    enabled = editedAbuseIpDbApiKey != abuseIpDbApiKey,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Text("Apply")
+                }
+            }
+
+            TextButton(
+                onClick = { uriHandler.openUri("https://www.abuseipdb.com/pricing") },
+                modifier = Modifier.align(Alignment.End),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = if (darkTheme) WebGold else Color(0xFF8B6B00)
+                )
+            ) {
+                Text(
+                    text = "Get a free API Key from AbuseIPDB",
                     textDecoration = TextDecoration.Underline
                 )
             }

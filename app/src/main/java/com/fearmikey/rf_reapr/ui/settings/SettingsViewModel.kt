@@ -48,6 +48,13 @@ class SettingsViewModel(
             initialValue = ""
         )
 
+    val abuseIpDbApiKey: StateFlow<String> = repository.abuseIpDbApiKey
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ""
+        )
+
     val isCameraShortcutEnabled: StateFlow<Boolean> = repository.isCameraShortcutEnabled
         .stateIn(
             scope = viewModelScope,
@@ -131,6 +138,12 @@ class SettingsViewModel(
     fun setShodanApiKey(key: String) {
         viewModelScope.launch {
             repository.setShodanApiKey(key)
+        }
+    }
+
+    fun setAbuseIpDbApiKey(key: String) {
+        viewModelScope.launch {
+            repository.setAbuseIpDbApiKey(key)
         }
     }
 }

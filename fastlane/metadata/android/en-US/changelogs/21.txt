@@ -1,0 +1,4 @@
+- Added EXIF Metadata Inspector and Google Dorks Generator.
+- Added Payload Encoder/Decoder and Reverse Shell Cheatsheet.
+- Added Username & Phone Number OSINT tools and Threat Intel Aggregator.
+- AlienVault OTX API key support and expanded unit test coverage.

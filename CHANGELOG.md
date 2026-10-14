@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.6] - 2026-10-14
+
+### Added
+- **OSINT & Reconnaissance Suite**:
+    - **Username OSINT**: Search for social accounts and digital footprints across 30+ platforms (GitHub, Reddit, Twitter, HackerNews, Instagram, etc.).
+    - **Phone Number OSINT**: Analyze E.164 phone numbers for country code, carrier format, and international formatting.
+    - **Google Dorks Generator**: Generate targeted search engine queries for exposed files, admin portals, open directories, and vulnerable endpoints.
+    - **Threat Intelligence Aggregator**: Query AlienVault OTX and IP/Domain threat feeds for threat indicators and pulse counts.
+- **Web & Analysis Tools**:
+    - **EXIF Metadata Inspector**: Inspect image metadata, camera details, GPS coordinates, and stripped image generation.
+    - **Payload Encoder / Decoder**: Multi-format converter supporting URL Encoding, Base64, Hex, HTML Entities, UTF-8, and Rot13.
+- **Settings & API Management**:
+    - Added AlienVault OTX API key management in Settings for Threat Intel queries.
+- **Testing & Quality Assurance**:
+    - Added comprehensive ViewModel unit test suite covering EXIF, Google Dorks, Payload Encoder, Phone OSINT, Threat Intel, and Username OSINT.
+
+### Changed
+- **Maintenance**: Version bump to 1.5.6 (versionCode 21).
+
 ## [1.5.5] - 2026-10-07
 
 ### Added

@@ -88,6 +88,18 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         emit(prefs.getString("shodan_api_key", "") ?: "")
     }
 
+    override val abuseIpDbApiKey: Flow<String> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "abuseipdb_api_key") {
+                trySend(p.getString(key, "") ?: "")
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.onStart {
+        emit(prefs.getString("abuseipdb_api_key", "") ?: "")
+    }
+
     override val sdrIp: Flow<String> = callbackFlow {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
             if (key == "sdr_ip") {
@@ -148,6 +160,10 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
 
     override suspend fun setShodanApiKey(key: String) {
         prefs.edit().putString("shodan_api_key", key).apply()
+    }
+
+    override suspend fun setAbuseIpDbApiKey(key: String) {
+        prefs.edit().putString("abuseipdb_api_key", key).apply()
     }
 
     override suspend fun setSdrIp(ip: String) {

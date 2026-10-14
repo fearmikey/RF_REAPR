@@ -342,6 +342,31 @@ fun MainMenuScreen(
                 requiresApiKey = false
             ),
             ToolkitTool(
+                "Threat Intel (AbuseIPDB)",
+                "Audit IP abuse confidence score and malicious threat reports.",
+                Icons.Default.Security,
+                Screen.ThreatIntel.createRoute(),
+                ToolCategory.WEB,
+                isAggressive = false,
+                requiresApiKey = true
+            ),
+            ToolkitTool(
+                "Google Dorks Recon",
+                "Curated search engine queries for exposed assets and leaks.",
+                Icons.Default.Search,
+                Screen.GoogleDorks.route,
+                ToolCategory.WEB,
+                isAggressive = false
+            ),
+            ToolkitTool(
+                "Username OSINT",
+                "Concurrent social & developer profile enumeration.",
+                Icons.Default.Person,
+                Screen.UsernameOsint.route,
+                ToolCategory.WEB,
+                isAggressive = false
+            ),
+            ToolkitTool(
                 "Hash Calculator",
                 "Generate and verify MD5, SHA-1, and SHA-256 hashes.",
                 Icons.Default.EnhancedEncryption,
@@ -362,6 +387,27 @@ fun MainMenuScreen(
                 Screen.ReverseShellCheatsheet.route,
                 ToolCategory.WEB,
                 isAggressive = true
+            ),
+            ToolkitTool(
+                "EXIF Metadata Inspector",
+                "Inspect image GPS, camera specs, and strip EXIF tags.",
+                Icons.Default.Image,
+                Screen.ExifInspector.route,
+                ToolCategory.WEB
+            ),
+            ToolkitTool(
+                "Payload Encoder / JWT",
+                "Base64, Hex, URL, ROT13, and JWT token claims inspector.",
+                Icons.Default.Code,
+                Screen.PayloadEncoder.route,
+                ToolCategory.WEB
+            ),
+            ToolkitTool(
+                "Phone Number OSINT",
+                "E.164 phone parser, region lookup, and OSINT intent shortcuts.",
+                Icons.Default.Phone,
+                Screen.PhoneOsint.route,
+                ToolCategory.WEB
             ),
             // Compliance Tools
             ToolkitTool(

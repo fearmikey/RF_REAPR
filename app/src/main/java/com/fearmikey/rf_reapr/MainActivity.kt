@@ -148,6 +148,8 @@ class MainActivity : ComponentActivity() {
         val tlsCipherScannerRepository = TlsCipherScannerRepositoryImpl()
         val cloudAssetScannerRepository = CloudAssetScannerRepositoryImpl(okHttpClient)
         val hibpRepository = HibpRepositoryImpl(okHttpClient, settingsRepository)
+        val usernameOsintRepository = UsernameOsintRepositoryImpl(okHttpClient)
+        val threatIntelRepository = ThreatIntelRepositoryImpl(okHttpClient)
         val pingRepository = PingRepositoryImpl()
         val logRepository = LogRepositoryImpl(database.eventLogDao())
         val complianceRepository = ComplianceRepositoryImpl(database.complianceDao())
@@ -176,6 +178,7 @@ class MainActivity : ComponentActivity() {
         val hidRepository = LocalHidRepository(database.hidScriptDao())
         val hidAssetRepository = LocalHidAssetRepository(this, database.hidAssetDao())
         val usbDriveRepository = UsbDriveRepositoryImpl(this, database.usbDriveDao())
+        val exifRepository = ExifRepositoryImpl(this)
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
 
@@ -430,6 +433,36 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                        composable(Screen.GoogleDorks.route) {
+                            val dorksViewModel: GoogleDorksViewModel = viewModel {
+                                GoogleDorksViewModel()
+                            }
+                            GoogleDorksScreen(
+                                viewModel = dorksViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.UsernameOsint.route) {
+                            val usernameViewModel: UsernameOsintViewModel = viewModel {
+                                UsernameOsintViewModel(usernameOsintRepository)
+                            }
+                            UsernameOsintScreen(
+                                viewModel = usernameViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.ThreatIntel.route) {
+                            val threatIntelViewModel: ThreatIntelViewModel = viewModel {
+                                ThreatIntelViewModel(threatIntelRepository, settingsRepository)
+                            }
+                            ThreatIntelScreen(
+                                viewModel = threatIntelViewModel,
+                                onNavigateToApiKeys = {
+                                    navController.navigate(Screen.ApiKeys.createRoute("abuseipdb"))
+                                },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                         composable(Screen.PingTool.route) {
                             val pingViewModel: PingViewModel = viewModel {
                                                     PingViewModel(pingRepository, logRepository, settingsRepository)
@@ -632,6 +665,33 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.ReverseShellCheatsheet.route) {
                             ReverseShellCheatsheetScreen { navController.popBackStack() }
+                        }
+                        composable(Screen.ExifInspector.route) {
+                            val exifViewModel: ExifInspectorViewModel = viewModel {
+                                ExifInspectorViewModel(exifRepository)
+                            }
+                            ExifInspectorScreen(
+                                viewModel = exifViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.PayloadEncoder.route) {
+                            val payloadViewModel: PayloadEncoderViewModel = viewModel {
+                                PayloadEncoderViewModel()
+                            }
+                            PayloadEncoderScreen(
+                                viewModel = payloadViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.PhoneOsint.route) {
+                            val phoneViewModel: PhoneOsintViewModel = viewModel {
+                                PhoneOsintViewModel()
+                            }
+                            PhoneOsintScreen(
+                                viewModel = phoneViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                         composable(Screen.UsbOtgAuditor.route) {
                             UsbOtgAuditorScreen { navController.popBackStack() }

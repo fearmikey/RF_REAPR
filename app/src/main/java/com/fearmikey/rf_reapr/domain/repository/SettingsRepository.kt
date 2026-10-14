@@ -17,6 +17,8 @@ interface SettingsRepository {
         get() = flowOf(false)
     val shodanApiKey: Flow<String>
         get() = flowOf("")
+    val abuseIpDbApiKey: Flow<String>
+        get() = flowOf("")
     val sdrIp: Flow<String>
         get() = flowOf("127.0.0.1")
     val sdrPort: Flow<Int>
@@ -32,6 +34,7 @@ interface SettingsRepository {
     suspend fun setCameraShortcutEnabled(enabled: Boolean) {}
     suspend fun setPassiveMode(enabled: Boolean) {}
     suspend fun setShodanApiKey(key: String) {}
+    suspend fun setAbuseIpDbApiKey(key: String) {}
     suspend fun setSdrIp(ip: String) {}
     suspend fun setSdrPort(port: Int) {}
     suspend fun incrementAppLaunchCount(): Int = 1

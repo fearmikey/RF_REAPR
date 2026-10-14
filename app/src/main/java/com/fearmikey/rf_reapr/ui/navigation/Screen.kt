@@ -23,6 +23,11 @@ sealed class Screen(val route: String) {
     }
     data object HibpChecker : Screen("hibp_checker")
     data object ShodanScanner : Screen("shodan_scanner")
+    data object GoogleDorks : Screen("google_dorks")
+    data object UsernameOsint : Screen("username_osint")
+    data object ThreatIntel : Screen("threat_intel?ip={ip}") {
+        fun createRoute(ip: String? = null) = if (ip != null) "threat_intel?ip=$ip" else "threat_intel"
+    }
     data object PingTool : Screen("ping_tool")
     
     // New Physical Access & Wireless Tools
@@ -42,6 +47,9 @@ sealed class Screen(val route: String) {
     data object HashCalculator : Screen("hash_calculator")
     data object CertDecoder : Screen("cert_decoder")
     data object ReverseShellCheatsheet : Screen("reverse_shell_cheatsheet")
+    data object ExifInspector : Screen("exif_inspector")
+    data object PayloadEncoder : Screen("payload_encoder")
+    data object PhoneOsint : Screen("phone_osint")
     data object UsbOtgAuditor : Screen("usb_otg_auditor")
     data object CellularRecon : Screen("cellular_recon")
     data object WpsPinCalculator : Screen("wps_pin_calculator")

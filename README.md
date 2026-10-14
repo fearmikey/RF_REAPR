@@ -41,7 +41,13 @@ RF-REAPR integrates a wide range of security modules:
 *   **SDR Controller**: Real-time spectrum analysis and waterfall display via RTL-SDR (rtl_tcp).
 *   **NFC Scanner**: Read and analyze NFC tag data and technology types.
 
-### Web & Infrastructure Security
+### Web, OSINT & Infrastructure Security
+*   **Username OSINT Recon**: Search for accounts and digital footprints across 30+ platforms.
+*   **Phone Number OSINT**: E.164 phone number analysis, carrier validation, and country formatting.
+*   **Google Dorks Generator**: Generate targeted search dorks for exposed files, admin portals, and open directories.
+*   **Threat Intelligence Aggregator**: Query AlienVault OTX threat indicators and pulse counts.
+*   **EXIF Metadata Inspector**: Analyze image EXIF tags, GPS coordinates, and generate scrubbed images.
+*   **Payload Encoder / Decoder**: Convert payloads between URL, Base64, Hex, HTML Entities, UTF-8, and Rot13.
 *   **Cert Decoder**: Decode and inspect SSL/TLS X.509 certificate chains.
 *   **Hash Calculator**: Compute MD5, SHA-1, SHA-256, and SHA-512 cryptographic hashes.
 *   **Reverse Shell Cheatsheet**: Reference payload generator for authorized penetration testing.
@@ -75,7 +81,7 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.5.5.apk` from the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page of this repository.
+1.  Download the latest `RF_REAPR_v1.5.6.apk` from the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)
