@@ -1,22 +1,36 @@
+AntiFeatures:
+  NonFreeNet:
+    en-US: Optional modules can query non-free network services (Shodan, Have I
+      Been Pwned, AbuseIPDB, AlienVault OTX).
 Categories:
+  - Connectivity
   - Security
 License: MIT
 AuthorName: fearmikey
 SourceCode: https://github.com/fearmikey/RF_REAPR
 IssueTracker: https://github.com/fearmikey/RF_REAPR/issues
-Changelog: https://github.com/fearmikey/RF_REAPR/releases
+Changelog: https://github.com/fearmikey/RF_REAPR/blob/HEAD/CHANGELOG.md
+Donate: https://buymeacoffee.com/ximw7nxi1j
+
+AutoName: RF-REAPR
 
 RepoType: git
 Repo: https://github.com/fearmikey/RF_REAPR.git
+Binaries: https://github.com/fearmikey/RF_REAPR/releases/download/v%v/app-release.apk
 
 Builds:
-  - versionName: '1.5.6'
-    versionCode: 21
-    commit: 3bee29509add5f301ccd2c8a3a1bb7d9676b3124
+  - versionName: 1.5.7
+    versionCode: 22
+    commit: 43d431b762da0a36eca71221a79724c0cf071eff
     subdir: app
+    submodules: true
     gradle:
       - yes
+    ndk: 27.0.12077973
+
+AllowedAPKSigningKeys: 9caaad2cf535abd6f64159aaa7c63e3471e3f38fbbd88ff536fc894afde23ab2
 
 AutoUpdateMode: Version
-UpdateCheckMode: Tags
-UpdateCheckData: v.*
+UpdateCheckMode: Tags ^v[0-9.]+$
+CurrentVersion: 1.5.7
+CurrentVersionCode: 22

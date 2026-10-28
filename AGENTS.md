@@ -57,7 +57,8 @@ The app is published on F-Droid with Reproducible Builds enabled and auto-update
    * Commit the recipe change separately (it must not alter the release commit).
 7. **Tag & Push:** Create a git tag strictly following the `vX.Y.Z` format (e.g., `v1.5.7`) **on the release commit from step 5** (`git tag vX.Y.Z <hash>`), then push both the commits and the tag to GitHub (`git push origin master --tags`).
 8. **Reproducible Build Binary:** F-Droid requires the compiled APK to verify reproducible builds. Instruct the user to:
-   * Check out the tagged commit with submodules (`git submodule update --init --recursive`) and build the signed release APK (`app-release.apk`) using their secure `rf_reapr.jks` keystore (kept outside the repository).
+   * Check out the tagged commit with submodules (`git submodule update --init --recursive`) and build the signed release APK (`app-release.apk`) via **Build → Generate Signed App Bundle / APK** using their `RF_REAPR-Release.jks` keystore (alias `key0`, stored outside the repository; passwords entered in the dialog, never saved to `local.properties`).
+   * **NEVER** sign with the old `rf_reapr.jks` (alias `rf_reapr_alias`, SHA-256 `c802d4a6…081d`). It was publicly exposed in git history and is considered compromised.
    * Go to GitHub Releases, draft a new release for the newly pushed `vX.Y.Z` tag.
    * Upload the `app-release.apk` file. (F-Droid is hardcoded to look for this exact filename at `https://github.com/fearmikey/RF_REAPR/releases/download/v%v/app-release.apk`.)
-   * The APK must be signed with the key whose SHA-256 certificate digest matches `AllowedAPKSigningKeys` in the recipe.
+   * The APK must be signed with the key whose SHA-256 certificate digest matches `AllowedAPKSigningKeys` in the recipe (`9caaad2cf535abd6f64159aaa7c63e3471e3f38fbbd88ff536fc894afde23ab2`). Verify with `apksigner verify --print-certs app-release.apk` before uploading.
