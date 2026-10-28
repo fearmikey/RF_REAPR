@@ -1,1 +1,1 @@
-Android security auditing, network reconnaissance, and penetration reporting toolkit.
+Android security auditing, network recon, and penetration reporting toolkit

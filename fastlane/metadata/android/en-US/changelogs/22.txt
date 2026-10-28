@@ -1,0 +1,3 @@
+- F-Droid readiness: reproducible native iperf3 build from a clean checkout.
+- Pinned NDK version and removed embedded dependency metadata from the APK.
+- Fixed the License link in Settings.

@@ -5,8 +5,11 @@ Features include:
 - Network Discovery, Port Scanner, & Interactive Topology Map
 - Integrated Traffic Capture (PCAP) & Throughput Testing (iPerf3)
 - Wireless Auditing (Bluetooth RSSI Finder, Wi-Fi Fingerprinting, RTL-SDR Spectrum Analysis)
+- OSINT & Web Tools (Username/Phone OSINT, DNS, Certificates, EXIF Inspector)
 - Physical & Hardware Tools (Magnetometer & HID Injector Payload Planner)
 - Evidence Capture System with Local Retention & Export capabilities
-- 100% Offline-First & Privacy Preserving
+- 100% FOSS, Offline-First & Privacy Preserving
+
+Optional online integrations: some modules can query third-party, non-free network services (e.g. Shodan, Have I Been Pwned, AbuseIPDB, AlienVault OTX, NVD). These are only contacted when you use the corresponding tool, and several require your own API key. All core functionality works without them.
 
 RF-REAPR is intended for educational and authorized security auditing purposes only.

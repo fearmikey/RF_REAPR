@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.7] - 2026-10-28
+
+### Fixed
+- **F-Droid Build Compatibility**:
+    - Registered the native `iperf3` source as a proper Git submodule (`.gitmodules`) so it is fetched on clean clones and by the F-Droid build server.
+    - Added checked-in, Android-specific `iperf_config.h` and `version.h` (`app/src/main/cpp/iperf_android/`) that were previously generated locally by `./configure` and missing from clean checkouts.
+    - Pinned the submodule to upstream iperf3 commit `c9b7422`. The previously pinned commit existed only locally and could not be fetched. RF-REAPR's JNI patches (`longjmp` instead of `exit()`, idempotent signal handler, cJSON cast fixes) now live in the main repo under `iperf_android/`.
+- **Settings**: Fixed the broken License link (now points to the repository `LICENSE` file).
+
+### Changed
+- **Reproducible Builds**:
+    - Pinned `ndkVersion` to `27.0.12077973` so native libraries are built with an identical toolchain.
+    - Native library is now built with `-ffile-prefix-map` and `--build-id=none` to strip machine-specific paths and IDs.
+    - Disabled the Google-encrypted dependency metadata block (`dependenciesInfo`) in the APK/AAB.
+- **Repository Hygiene**: Release keystores (`*.jks`, `*.keystore`) are no longer tracked and are now git-ignored.
+- **F-Droid Metadata**: Updated build recipe (submodules, NDK, reproducible binary verification, `NonFreeNet` anti-feature) and fastlane short description (now within the 80-character limit).
+- **Maintenance**: Version bump to 1.5.7 (versionCode 22).
+
 ## [1.5.6] - 2026-10-14
 
 ### Added

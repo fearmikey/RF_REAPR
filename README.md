@@ -1,5 +1,9 @@
 # RF-REAPR (Reconnaissance, Evaluation, Analysis, and Penetration Reporting)
 
+[![Version](https://img.shields.io/badge/version-1.5.7-blue.svg)](https://github.com/fearmikey/RF_REAPR/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![F-Droid](https://img.shields.io/f-droid/v/com.fearmikey.rf_reapr.svg)](https://f-droid.org/packages/com.fearmikey.rf_reapr/)
+
 RF-REAPR is a comprehensive Android-based security auditing and network reconnaissance tool. Designed for security professionals and enthusiasts, it provides a suite of tools to analyze, map, and evaluate the security posture of various network and radio frequency environments.
 
 ## Features
@@ -81,14 +85,15 @@ RF-REAPR integrates a wide range of security modules:
 ### Installation
 
 #### Option 1: Download APK (Recommended for users)
-1.  Download the latest `RF_REAPR_v1.5.6.apk` from the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page of this repository.
+1.  Download the latest `app-release.apk` from the [Releases](https://github.com/fearmikey/RF_REAPR/releases) page of this repository.
 2.  Transfer the APK to your Android device and install it (you may need to "Allow installation from unknown sources").
 
 #### Option 2: Build from Source (Recommended for developers)
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/fearmikey/RF_REAPR.git
+    git clone --recurse-submodules https://github.com/fearmikey/RF_REAPR.git
     ```
+    (If you already cloned without submodules, run `git submodule update --init --recursive`; the native iperf3 library is built from the `app/src/main/cpp/iperf3` submodule.)
 2.  Open the project in **Android Studio**.
 3.  Build and run the app on your physical device.
 

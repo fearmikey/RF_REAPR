@@ -10,13 +10,15 @@ plugins {
 android {
     namespace = "com.fearmikey.rf_reapr"
     compileSdk = 35
+    // Pinned so F-Droid builds the native iperf3 library with the exact same NDK (reproducible builds).
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.fearmikey.rf_reapr"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.5.6"
+        versionCode = 22
+        versionName = "1.5.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -65,6 +67,11 @@ android {
                 "proguard-rules.pro"
             )
         }
+    }
+    dependenciesInfo {
+        // F-Droid: don't embed the Google-encrypted dependency metadata blob in the APK/AAB signing block.
+        includeInApk = false
+        includeInBundle = false
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

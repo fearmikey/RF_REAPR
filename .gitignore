@@ -9,3 +9,8 @@
 .cxx
 local.properties
 .artifacts/
+
+# Signing keys must NEVER be committed
+*.jks
+*.keystore
+keystore.properties

@@ -95,7 +95,7 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(
                     onClick = {
-                        uriHandler.openUri("https://github.com/fearmikey/RF_REAPR/License")
+                        uriHandler.openUri("https://github.com/fearmikey/RF_REAPR/blob/master/LICENSE")
                     }
                 ) {
                     Text("View on GitHub")

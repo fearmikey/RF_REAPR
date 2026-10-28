@@ -1,0 +1,3 @@
+[submodule "app/src/main/cpp/iperf3"]
+	path = app/src/main/cpp/iperf3
+	url = https://github.com/esnet/iperf.git
