@@ -1,0 +1,362 @@
+{
+  "manifest_version": "1.0",
+  "project_name": "RF-REAPR",
+  "app_id": "com.fearmikey.rf_reapr",
+  "instruction": "Before attempting any code modification, you must consult .agent_manifest.json to identify the architectural pattern and the specific files responsible for data flow. Do not guess file paths.",
+  "maintenance_rule": "At the end of each development session, agents MUST update .agent_manifest.json if any new features, files, repositories, database models, or architectural components were added, modified, or removed.",
+  "architectural_overview": {
+    "pattern": "Unidirectional Data Flow (UDF) + MVVM (Model-View-ViewModel) + Repository Pattern + Clean Architecture",
+    "dependency_injection": "Manual Dependency Injection in MainActivity.kt (Repositories instantiated on launch and injected into ViewModels via ViewModelProvider.Factory)",
+    "ui_framework": "Jetpack Compose with Material 3",
+    "async_concurrency": "Kotlin Coroutines & Flow / StateFlow",
+    "persistence": "Room Database (AppDatabase v16, SQLite) + EncryptedSharedPreferences (SettingsRepositoryImpl)",
+    "network": "Retrofit 2 + Gson + OkHttpClient for external APIs (Shodan, HIBP, NVD, etc.)",
+    "background_processing": "WorkManager (VulnerabilityUpdateWorker, RecycleBinWorker) + ScanForegroundService (promotes scans to Android Foreground Service via ActiveTaskMonitor)",
+    "native_code": "C++ / JNI iperf3 wrapper compiled via CMake with custom Android longjmp patch in app/src/main/cpp/iperf_android/",
+    "foss_compliance": "Strict 100% FOSS. Zero proprietary SDKs (No Google Play Services/GMS, Ads, Billing, ML Kit, Firebase, or Analytics)."
+  },
+  "entry_points": {
+    "application_class": "app/src/main/java/com/fearmikey/rf_reapr/RfReaprApplication.kt",
+    "main_activity": "app/src/main/java/com/fearmikey/rf_reapr/MainActivity.kt",
+    "navigation_routes": "app/src/main/java/com/fearmikey/rf_reapr/ui/navigation/Screen.kt",
+    "database": "app/src/main/java/com/fearmikey/rf_reapr/data/db/AppDatabase.kt",
+    "theme": "app/src/main/java/com/fearmikey/rf_reapr/ui/theme/Theme.kt"
+  },
+  "package_map": {
+    "ui": "app/src/main/java/com/fearmikey/rf_reapr/ui/ (Jetpack Compose screens, ViewModels, Theme, Navigation)",
+    "domain_models": "app/src/main/java/com/fearmikey/rf_reapr/domain/model/ (Core data structures & domain entities)",
+    "domain_repositories": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/ (Interface definitions for data access)",
+    "domain_services": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ (ActiveTaskMonitor, DeviceIdentificationService)",
+    "data_repositories": "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ (Repository implementations)",
+    "data_db": "app/src/main/java/com/fearmikey/rf_reapr/data/db/ (Room Database, Entities, DAOs, Converters)",
+    "data_remote": "app/src/main/java/com/fearmikey/rf_reapr/data/remote/ (Retrofit API services & DTOs)",
+    "data_local": "app/src/main/java/com/fearmikey/rf_reapr/data/local/ (SettingsRepositoryImpl & SharedPrefs)",
+    "data_worker": "app/src/main/java/com/fearmikey/rf_reapr/data/worker/ (WorkManager Workers)",
+    "system": "app/src/main/java/com/fearmikey/rf_reapr/system/ (Android Services, PCAP VPN, Root capture, Notifications)",
+    "iperf": "app/src/main/java/com/fearmikey/rf_reapr/iperf/ (JNI wrapper & native iperf3 repository)",
+    "util": "app/src/main/java/com/fearmikey/rf_reapr/util/ (AuditExporter, StegoEngine, ReportGraphRenderer)",
+    "cpp_native": "app/src/main/cpp/ (iperf3 C++ submodule, iperf_android patches, CMakeLists.txt)"
+  },
+  "database_map": {
+    "class": "app/src/main/java/com/fearmikey/rf_reapr/data/db/AppDatabase.kt",
+    "version": 16,
+    "daos": {
+      "networkDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/NetworkDao.kt",
+      "scanSessionDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/ScanSessionDao.kt",
+      "eventLogDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/EventLogDao.kt",
+      "complianceDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/ComplianceDao.kt",
+      "evidenceDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/EvidenceDao.kt",
+      "vulnerabilityDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/VulnerabilityDao.kt",
+      "hidScriptDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/HidScriptDao.kt",
+      "hidAssetDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/HidAssetDao.kt",
+      "usbDriveDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/UsbDriveDao.kt"
+    },
+    "entities": [
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/ScanSessionEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/NetworkNodeEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/SessionNodeCrossRef.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/EventLogEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/ComplianceFindingEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/EvidenceEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/EvidenceFolderEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/EvidenceProjectEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/VulnerabilityEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/HidScriptEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/HidAssetEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/UsbDriveEntity.kt"
+    ]
+  },
+  "feature_map": {
+    "network_discovery_and_topology": {
+      "route": "Screen.TopologyMap ('network_discovery')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/TopologyScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/TopologyViewModel.kt",
+      "ui_components": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/NetworkMapView.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/components/DeviceDetailBottomSheet.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/components/NetworkNodeList.kt"
+      ],
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/NetworkNode.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/MappedGraph.kt"
+      ],
+      "domain_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/NetworkDiscoveryRepository.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/ScanSessionRepository.kt"
+      ],
+      "data_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/NetworkDiscoveryRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ScanSessionRepositoryImpl.kt"
+      ],
+      "daos": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/NetworkDao.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/ScanSessionDao.kt"
+      ],
+      "services": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/DeviceIdentificationService.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/layout/TopologyLayoutEngine.kt"
+      ]
+    },
+    "port_scanner": {
+      "route": "Screen.PortScanner ('port_scanner?ip={ip}')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/scanner/PortScannerScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/scanner/PortScannerViewModel.kt",
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/OpenPort.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/Vulnerability.kt"
+      ],
+      "domain_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/PortScannerRepository.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/VulnerabilityRepository.kt"
+      ],
+      "data_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/PortScannerRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/VulnerabilityRepositoryImpl.kt"
+      ],
+      "remote_api": "app/src/main/java/com/fearmikey/rf_reapr/data/remote/VulnerabilityApiService.kt",
+      "worker": "app/src/main/java/com/fearmikey/rf_reapr/data/worker/VulnerabilityUpdateWorker.kt"
+    },
+    "bluetooth_proximity": {
+      "route": "Screen.BluetoothProximityFinder ('bluetooth_proximity_finder')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/wireless/BluetoothProximityFinderScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/wireless/BluetoothProximityFinderViewModel.kt",
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/BleDevice.kt"
+      ],
+      "domain_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/BleProximityRepository.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/BleScannerRepository.kt"
+      ],
+      "data_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/BleProximityRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/BleScannerRepositoryImpl.kt"
+      ]
+    },
+    "wifi_fingerprinter": {
+      "route": "Screen.WifiFingerprinter ('wifi_fingerprinter')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/wifi/WifiFingerprintScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/wifi/WifiFingerprintViewModel.kt",
+      "ui_components": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/wifi/WifiChannelGraph.kt"
+      ],
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/WifiAccessPoint.kt"
+      ],
+      "domain_repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/WifiFingerprintRepository.kt",
+      "data_repository": "app/src/main/java/com/fearmikey/rf_reapr/data/repository/WifiFingerprintRepositoryImpl.kt"
+    },
+    "sdr_controller": {
+      "route": "Screen.SdrController ('sdr_controller')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/sdr/SdrScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/sdr/SdrViewModel.kt",
+      "ui_components": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/sdr/components/WaterfallView.kt"
+      ],
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/SdrConfig.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/FftData.kt"
+      ],
+      "domain_repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/SdrRepository.kt",
+      "data_repository": "app/src/main/java/com/fearmikey/rf_reapr/data/repository/RtlTcpRepositoryImpl.kt"
+    },
+    "iperf_tester": {
+      "route": "Screen.IperfTester ('iperf_tester')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/iperf/IperfScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/iperf/IperfViewModel.kt",
+      "jni_bridge": "app/src/main/java/com/fearmikey/rf_reapr/iperf/IperfNative.kt",
+      "data_repository": "app/src/main/java/com/fearmikey/rf_reapr/iperf/IperfRepository.kt",
+      "native_cpp_files": [
+        "app/src/main/cpp/CMakeLists.txt",
+        "app/src/main/cpp/iperf_android/cjson.c",
+        "app/src/main/cpp/iperf_android/iperf_error.c",
+        "app/src/main/cpp/iperf_android/iperf_config.h"
+      ]
+    },
+    "hid_injector_and_assets": {
+      "route": "Screen.HidInjector ('hid_injector'), Screen.HidAssets ('hid_assets')",
+      "ui_screens": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/physical/HidInjectorScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/physical/HidAssetsScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/physical/DuckyScriptBuilderSheet.kt"
+      ],
+      "ui_viewmodels": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/physical/HidInjectorViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/physical/HidAssetsViewModel.kt"
+      ],
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/DuckyCommand.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/HidPayload.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/HidAsset.kt"
+      ],
+      "domain_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/HidRepository.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/HidAssetRepository.kt"
+      ],
+      "data_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/LocalHidRepository.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/LocalHidAssetRepository.kt"
+      ],
+      "daos": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/HidScriptDao.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/HidAssetDao.kt"
+      ]
+    },
+    "evidence_and_compliance": {
+      "routes": [
+        "Screen.EvidenceCapture ('evidence_capture')",
+        "Screen.EvidenceGallery ('evidence_gallery')",
+        "Screen.RecycleBin ('recycle_bin')",
+        "Screen.ComplianceChecklists ('compliance_checklists')",
+        "Screen.AuditChecklist ('audit_checklist/{frameworkId}')"
+      ],
+      "ui_screens": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/EvidenceCaptureScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/EvidenceGalleryScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/EvidenceProjectSelectionScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/RecycleBinScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/ComplianceChecklistsScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/AuditChecklistScreen.kt"
+      ],
+      "ui_viewmodels": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/EvidenceCaptureViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/RecycleBinViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/ComplianceViewModel.kt"
+      ],
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/Evidence.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/EvidenceFolder.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/EvidenceProject.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/ComplianceFramework.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/ComplianceControl.kt"
+      ],
+      "domain_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/EvidenceRepository.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/ComplianceRepository.kt"
+      ],
+      "data_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/EvidenceRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ComplianceRepositoryImpl.kt"
+      ],
+      "daos": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/EvidenceDao.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/ComplianceDao.kt"
+      ],
+      "utilities": [
+        "app/src/main/java/com/fearmikey/rf_reapr/util/StegoEngine.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/util/AuditExporter.kt"
+      ],
+      "worker": "app/src/main/java/com/fearmikey/rf_reapr/data/worker/RecycleBinWorker.kt"
+    },
+    "web_osint_and_threat_intel": {
+      "routes": [
+        "Screen.ShodanScanner ('shodan_scanner')",
+        "Screen.HibpChecker ('hibp_checker')",
+        "Screen.ThreatIntel ('threat_intel?ip={ip}')",
+        "Screen.SubdomainFinder ('subdomain_finder')",
+        "Screen.WebsiteInspector ('website_inspector')",
+        "Screen.CloudAssetScanner ('cloud_asset_scanner')",
+        "Screen.TlsCipherScanner ('tls_cipher_scanner')",
+        "Screen.ExifInspector ('exif_inspector')",
+        "Screen.GoogleDorks ('google_dorks')",
+        "Screen.PhoneOsint ('phone_osint')",
+        "Screen.UsernameOsint ('username_osint')",
+        "Screen.PayloadEncoder ('payload_encoder')"
+      ],
+      "ui_screens": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/ShodanScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/HibpScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/ThreatIntelScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/SubdomainFinderScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/WebsiteInspectorScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/CloudAssetScannerScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/TlsCipherScannerScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/ExifInspectorScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/GoogleDorksScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/PhoneOsintScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/UsernameOsintScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/PayloadEncoderScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/HashCalculatorScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/CertDecoderScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/ReverseShellCheatsheetScreen.kt"
+      ],
+      "ui_viewmodels": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/ShodanViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/HibpViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/ThreatIntelViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/SubdomainFinderViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/WebsiteInspectorViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/CloudAssetScannerViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/TlsCipherScannerViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/ExifInspectorViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/GoogleDorksViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/PhoneOsintViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/UsernameOsintViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/web/PayloadEncoderViewModel.kt"
+      ],
+      "data_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ShodanRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/HibpRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ThreatIntelRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/SubdomainFinderRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/WebsiteInspectorRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/CloudAssetScannerRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/TlsCipherScannerRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ExifRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/UsernameOsintRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/InternetDbRepositoryImpl.kt"
+      ]
+    },
+    "packet_capture_and_system": {
+      "route": "Screen.PacketCapture ('packet_capture')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/network/PacketCaptureScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/network/PacketCaptureViewModel.kt",
+      "system_services": [
+        "app/src/main/java/com/fearmikey/rf_reapr/system/PcapVpnService.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/system/RootPcapCapture.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/system/ScanForegroundService.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/system/ScanNotificationManager.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/system/StopAllReceiver.kt"
+      ],
+      "active_task_monitor": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ActiveTaskMonitor.kt"
+    },
+    "report_builder": {
+      "route": "Screen.ReportBuilder ('report_builder')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/report/ReportBuilderScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/report/ReportBuilderViewModel.kt",
+      "domain_model": "app/src/main/java/com/fearmikey/rf_reapr/domain/model/ReportData.kt",
+      "domain_repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/ReportRepository.kt",
+      "data_repository": "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ReportRepositoryImpl.kt",
+      "graph_renderer": "app/src/main/java/com/fearmikey/rf_reapr/util/ReportGraphRenderer.kt"
+    },
+    "settings_and_logs": {
+      "routes": [
+        "Screen.Settings ('settings')",
+        "Screen.ApiKeys ('api_keys')",
+        "Screen.*Logs ('logs/*')"
+      ],
+      "ui_screens": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/settings/SettingsScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/settings/ApiKeysScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/logs/LogListScreen.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/logs/PcapLogListScreen.kt"
+      ],
+      "ui_viewmodels": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/settings/SettingsViewModel.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/logs/LogViewModel.kt"
+      ],
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/ThemePreference.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/EventLog.kt"
+      ],
+      "domain_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/SettingsRepository.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/LogRepository.kt"
+      ],
+      "data_repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/local/SettingsRepositoryImpl.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/data/repository/LogRepositoryImpl.kt"
+      ],
+      "dao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/EventLogDao.kt"
+    }
+  }
+}

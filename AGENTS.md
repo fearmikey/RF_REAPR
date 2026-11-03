@@ -1,5 +1,13 @@
 # RF-REAPR - Guidelines for AI Agents & Developers
 
+## AGENT NAVIGATION & MANIFEST RULES
+
+### Mandatory Manifest Consultation
+> **Before attempting any code modification, you must consult `.agent_manifest.json` to identify the architectural pattern and the specific files responsible for data flow. Do not guess file paths.**
+
+### End-of-Session Manifest Updates
+At the end of each development session, if any new features, files, repositories, database models/DAOs/entities, or architectural components were added, modified, or removed, AI agents **MUST** update `.agent_manifest.json` with the new/updated paths so the code map remains accurate for future sessions.
+
 ## CRITICAL ARCHITECTURAL CONSTRAINTS
 
 ### 1. STRICT 100% FOSS POLICY (F-DROID COMPLIANCE)

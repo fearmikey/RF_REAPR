@@ -1,0 +1,39 @@
+# RF-REAPR - Cursor & AI Agent Execution Rules
+
+## MANDATORY CODE NAVIGATION RULE
+Before attempting any code modification, you must consult `.agent_manifest.json` to identify the architectural pattern and the specific files responsible for data flow. Do not guess file paths.
+
+## END-OF-SESSION MANIFEST MAINTENANCE RULE
+At the end of each development session, if any new features, files, repositories, database models/DAOs/entities, or architectural components were added, modified, or removed, you MUST update `.agent_manifest.json` so the code map remains accurate for future sessions.
+
+## CRITICAL ARCHITECTURAL CONSTRAINTS
+
+### 1. STRICT 100% FOSS POLICY (F-DROID COMPLIANCE)
+- **Zero Proprietary SDKs:** RF-REAPR is strictly Free and Open Source Software (FOSS), targeted for distribution on F-Droid and open-source Android repositories.
+- **FORBIDDEN DEPENDENCIES:**
+  - NO Google Play Services (`com.google.android.gms:*`, including `play-services-location`)
+  - NO Google Mobile Ads / AdMob (`com.google.android.gms:play-services-ads`)
+  - NO Google Play Billing (`com.android.billingclient:*`)
+  - NO ML Kit or closed-source vision/speech SDKs (`com.google.mlkit:*`)
+  - NO Firebase SDKs that pull in non-free binaries or Play Services requirements
+  - NO Analytics, crash reporting, tracking, or proprietary telemetry libraries
+  - NO prebuilt binaries (`.so`, `.jar`, `.aar`, `.apk`) committed to the repository (except official `gradle-wrapper.jar`).
+- **ALLOWED DEPENDENCIES:**
+  - Android Jetpack libraries (`androidx.*`)
+  - Kotlin standard/coroutines/serialization libraries
+  - Open-source third-party dependencies with permissive/copyleft FOSS licenses (Apache 2.0, MIT, BSD, GPL, MPL), resolved only from `google()` or `mavenCentral()`.
+  - Standard Android framework APIs (`LocationManager` via `android.location.*`).
+
+### 2. PRIVACY & OFFLINE FIRST
+- The application must remain fully functional offline.
+- All user data (security project records, evidence photos, PCAP network captures, audit checklists, scan logs) must stay local on device or be exportable via user-initiated standard formats.
+- Third-party online services (Shodan, HIBP, AlienVault OTX, etc.) must only be contacted on explicit user action.
+
+### 3. NATIVE CODE & REPRODUCIBLE BUILDS
+- The native `iperf3` library is built from the Git submodule at `app/src/main/cpp/iperf3`. Never commit prebuilt `.so` files.
+- RF-REAPR's JNI patches to iperf3 live in the main repo under `app/src/main/cpp/iperf_android/` (`cjson.c`, `iperf_error.c`, `iperf_config.h`).
+- Do NOT run `./configure` inside the submodule.
+- Keep `ndkVersion` in `app/build.gradle.kts` aligned with the F-Droid recipe (`27.0.12077973`).
+
+### 4. SECRETS & SECURITY
+- Never commit keystores (`*.jks`, `*.keystore`), `local.properties`, API keys, or tokens.
