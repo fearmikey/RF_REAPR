@@ -9,5 +9,7 @@ data class ScanSessionEntity(
     val id: Long = 0,
     val timestamp: Long = System.currentTimeMillis(),
     val networkName: String? = null,
-    val gatewayIp: String? = null
+    val gatewayIp: String? = null,
+    /** Added in DB v17: project that was active when the scan ran (null = none). */
+    val projectId: String? = null
 )

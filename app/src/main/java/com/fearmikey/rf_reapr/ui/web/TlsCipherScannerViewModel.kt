@@ -2,11 +2,13 @@ package com.fearmikey.rf_reapr.ui.web
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.repository.TlsCipherScannerRepository
 import com.fearmikey.rf_reapr.domain.repository.TlsCipherScannerRepository.TlsScanResult
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.fearmikey.rf_reapr.domain.service.FindingAdapters
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,7 +20,8 @@ import kotlinx.coroutines.launch
 class TlsCipherScannerViewModel(
     private val repository: TlsCipherScannerRepository,
     private val logRepository: LogRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val findingRepository: FindingRepository? = null
 ) : ViewModel() {
 
     private val gson = Gson()
@@ -50,6 +53,7 @@ class TlsCipherScannerViewModel(
                     _uiState.value = result
                     
                     if (result.isFinished) {
+                        findingRepository?.record(FindingAdapters.tls(result))
                         val weak = result.supportedCiphers.count { it.riskLevel >= com.fearmikey.rf_reapr.domain.model.RiskLevel.HIGH }
                         logRepository.saveLog(
                             type = "WEB",

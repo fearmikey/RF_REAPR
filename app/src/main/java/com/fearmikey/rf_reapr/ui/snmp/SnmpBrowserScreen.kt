@@ -36,9 +36,13 @@ private enum class SnmpTab(val label: String) { OVERVIEW("Overview"), INTERFACES
 @Composable
 fun SnmpBrowserScreen(
     viewModel: SnmpViewModel,
+    initialTarget: String? = null,
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(initialTarget) {
+        if (!initialTarget.isNullOrBlank() && viewModel.uiState.value.target.isBlank()) viewModel.updateTarget(initialTarget)
+    }
     val clipboard = LocalClipboardManager.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -84,6 +88,7 @@ fun SnmpBrowserScreen(
                             enabled = !uiState.isBusy,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
                         )
+                        com.fearmikey.rf_reapr.ui.components.ScopeWarning(uiState.target)
                         OutlinedTextField(
                             value = uiState.community,
                             onValueChange = viewModel::updateCommunity,

@@ -100,6 +100,17 @@ android {
             useLegacyPackaging = false
         }
     }
+    sourceSets {
+        // Exported Room schemas are packaged into instrumented tests so MigrationTestHelper
+        // can build each historical database version.
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+}
+
+ksp {
+    // Every database version's schema is checked into app/schemas/ so migrations can be
+    // written against (and tested from) the exact shape users have on their devices.
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 kotlin {
@@ -164,6 +175,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)

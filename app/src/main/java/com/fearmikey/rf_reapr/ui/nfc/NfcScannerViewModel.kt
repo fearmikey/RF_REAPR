@@ -3,8 +3,10 @@ package com.fearmikey.rf_reapr.ui.nfc
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.NfcTagData
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.NfcScannerRepository
+import com.fearmikey.rf_reapr.domain.service.FindingAdapters
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.drop
@@ -13,7 +15,8 @@ import kotlinx.coroutines.launch
 
 class NfcScannerViewModel(
     private val repository: NfcScannerRepository,
-    private val logRepository: LogRepository? = null
+    private val logRepository: LogRepository? = null,
+    private val findingRepository: FindingRepository? = null
 ) : ViewModel() {
 
     val tagData: StateFlow<NfcTagData?> = repository.tagData
@@ -29,6 +32,7 @@ class NfcScannerViewModel(
                     summary = "NFC: ${tag.chipType} ${tag.id}" + (tag.vulnerabilityDescription?.let { " · $it" } ?: ""),
                     detailJson = gson.toJson(tag)
                 )
+                findingRepository?.record(FindingAdapters.nfc(tag.id, tag.chipType, tag.findings))
             }
         }
     }

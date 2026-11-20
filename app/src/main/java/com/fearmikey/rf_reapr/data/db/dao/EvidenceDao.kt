@@ -26,6 +26,15 @@ interface EvidenceDao {
     @Query("SELECT * FROM evidence_projects WHERE isDeleted = 1 ORDER BY deletedAt DESC")
     fun getDeletedProjects(): Flow<List<EvidenceProjectEntity>>
 
+    @Query("SELECT * FROM evidence_projects WHERE id = :projectId")
+    fun observeProject(projectId: String): Flow<EvidenceProjectEntity?>
+
+    @Query("UPDATE evidence_projects SET scope = :scope WHERE id = :projectId")
+    suspend fun updateProjectScope(projectId: String, scope: String)
+
+    @Query("SELECT COUNT(*) FROM evidence WHERE isDeleted = 0 AND projectId = :projectId")
+    fun countEvidenceForProject(projectId: String): Flow<Int>
+
     @Query("SELECT * FROM evidence_folders WHERE isDeleted = 0 AND projectId = :projectId AND (parentFolderId = :parentFolderId OR (parentFolderId IS NULL AND :parentFolderId IS NULL)) ORDER BY createdAt DESC")
     fun getFolders(projectId: String, parentFolderId: String?): Flow<List<EvidenceFolderEntity>>
 

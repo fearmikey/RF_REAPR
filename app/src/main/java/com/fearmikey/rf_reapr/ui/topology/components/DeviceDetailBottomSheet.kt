@@ -13,8 +13,14 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NetworkCheck
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SettingsRemote
+import com.fearmikey.rf_reapr.domain.service.PortCatalog
+import com.fearmikey.rf_reapr.ui.navigation.Screen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,6 +70,8 @@ fun DeviceDetailBottomSheet(
     lastResult: String? = null,
     onOpenPortScanner: ((String) -> Unit)? = null,
     onOpenThreatIntel: ((String) -> Unit)? = null,
+    /** Opens another tool's route (Ping, Traceroute, TLS, SNMP) prefilled with this host. */
+    onOpenRoute: ((String) -> Unit)? = null,
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -204,6 +212,34 @@ fun DeviceDetailBottomSheet(
                                 onClick = { onOpenThreatIntel(node.ipAddress) },
                                 label = { Text("Threat Intel") },
                                 leadingIcon = { Icon(Icons.Default.Security, null, Modifier.size(AssistChipDefaults.IconSize)) }
+                            )
+                        }
+                        if (onOpenRoute != null) {
+                            val ip = node.ipAddress
+                            val tlsPort = node.openPorts.firstOrNull { PortCatalog.isTls(it.port, it.serviceName) }?.port
+                            AssistChip(
+                                onClick = { onOpenRoute(Screen.PingTool.createRoute(ip)) },
+                                label = { Text("Ping") },
+                                leadingIcon = { Icon(Icons.Default.NetworkCheck, null, Modifier.size(AssistChipDefaults.IconSize)) }
+                            )
+                            AssistChip(
+                                onClick = { onOpenRoute(Screen.Traceroute.createRoute(ip)) },
+                                label = { Text("Traceroute") },
+                                leadingIcon = { Icon(Icons.Default.Route, null, Modifier.size(AssistChipDefaults.IconSize)) },
+                                enabled = !isPassiveMode
+                            )
+                            if (tlsPort != null) {
+                                AssistChip(
+                                    onClick = { onOpenRoute(Screen.TlsCipherScanner.createRoute(if (tlsPort == 443) ip else "$ip:$tlsPort")) },
+                                    label = { Text("TLS Audit") },
+                                    leadingIcon = { Icon(Icons.Default.Lock, null, Modifier.size(AssistChipDefaults.IconSize)) },
+                                    enabled = !isPassiveMode
+                                )
+                            }
+                            AssistChip(
+                                onClick = { onOpenRoute(Screen.SnmpBrowser.createRoute(ip)) },
+                                label = { Text("SNMP Browser") },
+                                leadingIcon = { Icon(Icons.Default.Router, null, Modifier.size(AssistChipDefaults.IconSize)) }
                             )
                         }
                         AssistChip(

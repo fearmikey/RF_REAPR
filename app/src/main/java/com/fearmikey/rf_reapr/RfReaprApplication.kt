@@ -24,8 +24,15 @@ class RfReaprApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    /** Process-wide dependency container (see [AppContainer]). */
+    val container: AppContainer by lazy { AppContainer(this) }
+
     override fun onCreate() {
         super.onCreate()
+
+        // Load the active engagement eagerly so logs/findings written right after launch are
+        // tagged and the out-of-scope warnings have the scope available.
+        container.activeProjectStore
 
         applicationScope.launch {
             ActiveTaskMonitor.activeTasks

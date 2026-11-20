@@ -10,5 +10,7 @@ data class EventLogEntity(
     val type: String, // WIFI, BLE, PORT, WEB, PING, TOPOLOGY
     val timestamp: Long = System.currentTimeMillis(),
     val summary: String,
-    val detailJson: String
+    val detailJson: String,
+    /** Added in DB v17: project that was active when the log was written (null = none). */
+    val projectId: String? = null
 )

@@ -6,7 +6,9 @@ import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import kotlinx.coroutines.flow.Flow
 
 class LogRepositoryImpl(
-    private val eventLogDao: EventLogDao
+    private val eventLogDao: EventLogDao,
+    /** Active project id at write time (logs are tagged so reports can filter by engagement). */
+    private val activeProjectId: () -> String? = { null }
 ) : LogRepository {
 
     override fun getLogs(type: String): Flow<List<EventLogEntity>> {
@@ -22,7 +24,8 @@ class LogRepositoryImpl(
             EventLogEntity(
                 type = type,
                 summary = summary,
-                detailJson = detailJson
+                detailJson = detailJson,
+                projectId = activeProjectId()
             )
         )
     }

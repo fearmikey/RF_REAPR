@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.DnsAuditResult
 import com.fearmikey.rf_reapr.domain.repository.DnsAuditorRepository
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.service.CheckStatus
+import com.fearmikey.rf_reapr.domain.service.FindingAdapters
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +21,8 @@ import kotlinx.coroutines.launch
 class DnsAuditorViewModel(
     private val repository: DnsAuditorRepository,
     private val logRepository: LogRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val findingRepository: FindingRepository? = null
 ) : ViewModel() {
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
@@ -45,6 +48,7 @@ class DnsAuditorViewModel(
             try {
                 val result = repository.auditDns()
                 _auditResult.value = result
+                findingRepository?.record(FindingAdapters.dnsAudit(result.checks))
                 val problems = result.checks.filter { it.status == CheckStatus.FAIL || it.status == CheckStatus.WARN }
                 logRepository.saveLog(
                     type = "DNS",

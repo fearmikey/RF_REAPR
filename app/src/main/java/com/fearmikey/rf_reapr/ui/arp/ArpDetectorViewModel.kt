@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.repository.AlertSeverity
 import com.fearmikey.rf_reapr.domain.repository.ArpDetectorRepository
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.fearmikey.rf_reapr.domain.service.FindingAdapters
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.drop
@@ -14,7 +16,8 @@ import kotlinx.coroutines.launch
 
 class ArpDetectorViewModel(
     private val repository: ArpDetectorRepository,
-    private val logRepository: LogRepository? = null
+    private val logRepository: LogRepository? = null,
+    private val findingRepository: FindingRepository? = null
 ) : ViewModel() {
 
     val gatewayInfo = repository.gatewayInfo
@@ -34,8 +37,10 @@ class ArpDetectorViewModel(
         // Persist warnings/critical alerts so they show up in reports even after the screen closes.
         viewModelScope.launch {
             repository.alerts.drop(1).collect { list ->
+                val newAlerts = list.filter { it.severity != AlertSeverity.INFO && loggedAlerts.add("${it.timestamp}|${it.message}") }
+                findingRepository?.record(newAlerts.mapNotNull { FindingAdapters.arp(gatewayInfo.value?.ipAddress, it) })
                 val logger = logRepository ?: return@collect
-                list.filter { it.severity != AlertSeverity.INFO && loggedAlerts.add("${it.timestamp}|${it.message}") }.forEach { alert ->
+                newAlerts.forEach { alert ->
                     logger.saveLog(
                         type = "TOPOLOGY",
                         summary = "ARP monitor: ${alert.message}",

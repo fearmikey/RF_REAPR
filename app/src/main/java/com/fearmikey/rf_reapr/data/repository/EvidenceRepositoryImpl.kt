@@ -360,7 +360,8 @@ class EvidenceRepositoryImpl(
             showDate = showDate,
             showTimestamp = showTimestamp,
             isDeleted = isDeleted,
-            deletedAt = deletedAt?.let { Date(it) }
+            deletedAt = deletedAt?.let { Date(it) },
+            scope = scope
         )
     }
 
@@ -374,7 +375,8 @@ class EvidenceRepositoryImpl(
             showDate = showDate,
             showTimestamp = showTimestamp,
             isDeleted = isDeleted,
-            deletedAt = deletedAt?.time
+            deletedAt = deletedAt?.time,
+            scope = scope
         )
     }
 

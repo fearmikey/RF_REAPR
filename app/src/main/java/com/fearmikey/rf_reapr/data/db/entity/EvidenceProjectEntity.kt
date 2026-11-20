@@ -1,5 +1,6 @@
 package com.fearmikey.rf_reapr.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -14,5 +15,8 @@ data class EvidenceProjectEntity(
     val showDate: Boolean = true,
     val showTimestamp: Boolean = true,
     val isDeleted: Boolean = false,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    /** Added in DB v17: authorized engagement scope, newline separated. */
+    @ColumnInfo(defaultValue = "")
+    val scope: String = ""
 )

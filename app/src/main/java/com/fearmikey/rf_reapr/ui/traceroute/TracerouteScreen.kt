@@ -52,10 +52,11 @@ private val FairLatency = Color(0xFFFFA000)
 @Composable
 fun TracerouteScreen(
     viewModel: TracerouteViewModel,
+    initialTarget: String? = null,
     onPingHost: (String) -> Unit = {},
     onBackClick: () -> Unit
 ) {
-    var hostInput by rememberSaveable { mutableStateOf("8.8.8.8") }
+    var hostInput by rememberSaveable { mutableStateOf(initialTarget?.takeIf { it.isNotBlank() } ?: "8.8.8.8") }
     val result by viewModel.result.collectAsStateWithLifecycle()
     val hops by viewModel.hops.collectAsStateWithLifecycle()
     val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
@@ -144,6 +145,7 @@ fun TracerouteScreen(
                     }
                 }
             )
+            com.fearmikey.rf_reapr.ui.components.ScopeWarning(hostInput)
 
             Row(
                 modifier = Modifier

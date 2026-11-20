@@ -118,6 +118,7 @@ fun PingScreen(
                             }
                         }
                     )
+                    com.fearmikey.rf_reapr.ui.components.ScopeWarning(host)
                     // Quick targets
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),

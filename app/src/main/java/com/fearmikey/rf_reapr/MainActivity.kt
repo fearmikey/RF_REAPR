@@ -96,9 +96,13 @@ import com.fearmikey.rf_reapr.ui.sdr.SdrViewModel
 import com.fearmikey.rf_reapr.ui.iperf.IperfScreen
 import com.fearmikey.rf_reapr.ui.iperf.IperfViewModel
 import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
-import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
+import com.fearmikey.rf_reapr.ui.backup.BackupScreen
+import com.fearmikey.rf_reapr.ui.backup.BackupViewModel
+import com.fearmikey.rf_reapr.ui.engagement.EngagementScreen
+import com.fearmikey.rf_reapr.ui.engagement.EngagementViewModel
+import com.fearmikey.rf_reapr.ui.findings.FindingsScreen
+import com.fearmikey.rf_reapr.ui.findings.FindingsViewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -124,72 +128,56 @@ class MainActivity : ComponentActivity() {
         // Activity's lifecycle.
         handleCameraShortcuts(intent)
 
-        // Manual DI
-        val retrofit = Retrofit.Builder()
-            .baseUrl("https://services.nvd.nist.gov/rest/json/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            
-        val apiService = retrofit.create(VulnerabilityApiService::class.java)
-        val okHttpClient = OkHttpClient()
-        val database = AppDatabase.getDatabase(this)
-        
-        val scanSessionRepository = ScanSessionRepositoryImpl(
-            database.networkDao(),
-            database.scanSessionDao(),
-        )
-        
-        val settingsRepository = SettingsRepositoryImpl(this)
+        // Dependencies come from the process-wide AppContainer. Local delegates keep the
+        // names used throughout the NavHost below and stay lazy (resolved on first use).
+        val container = (application as RfReaprApplication).container
+        val okHttpClient by container::okHttpClient
+        val settingsRepository by container::settingsRepository
         lifecycleScope.launch {
             settingsRepository.incrementAppLaunchCount()
         }
-        val portRepository = PortScannerRepositoryImpl()
-        val vulnerabilityRepository = VulnerabilityRepositoryImpl(apiService, database.vulnerabilityDao(), settingsRepository)
-        val discoveryRepository = NetworkDiscoveryRepositoryImpl(this)
-        val wifiRepository = WifiFingerprintRepositoryImpl(this)
-        val bleRepository = BleScannerRepositoryImpl(this)
-        nfcRepository = NfcScannerRepositoryImpl()
-        val dhcpRepository = DhcpMonitorRepositoryImpl(discoveryRepository)
-        val ouiRepository = OuiRepositoryImpl(this)
-        val dnsQueryRepository = DnsQueryRepositoryImpl(okHttpClient)
-        val wolRepository = WolRepositoryImpl(this)
-        val networkAlertNotifier = NetworkAlertNotificationManager(this)
-        val websiteInspectorRepository = WebsiteInspectorRepositoryImpl(okHttpClient)
-        val subdomainFinderRepository = SubdomainFinderRepositoryImpl(okHttpClient)
-        val tlsCipherScannerRepository = TlsCipherScannerRepositoryImpl()
-        val cloudAssetScannerRepository = CloudAssetScannerRepositoryImpl(okHttpClient)
-        val hibpRepository = HibpRepositoryImpl(okHttpClient, settingsRepository)
-        val usernameOsintRepository = UsernameOsintRepositoryImpl(okHttpClient)
-        val threatIntelRepository = ThreatIntelRepositoryImpl(okHttpClient)
-        val pingRepository = PingRepositoryImpl()
-        val logRepository = LogRepositoryImpl(database.eventLogDao())
-        val complianceRepository = ComplianceRepositoryImpl(database.complianceDao())
-        val proximityRepository = BleProximityRepositoryImpl(this)
-        val evidenceRepository = EvidenceRepositoryImpl(database.evidenceDao(), this)
-        val magnetometerRepository = MagnetometerRepositoryImpl(this)
-        val reportRepository = ReportRepositoryImpl(
-            this,
-            database.scanSessionDao(),
-            database.evidenceDao(),
-            database.complianceDao(),
-            database.eventLogDao()
-        )
-        
-        val sdrRepository = RtlTcpRepositoryImpl()
-        val snmpRepository = SnmpRepositoryImpl()
-        
-        // New Repositories
-        val serviceDiscoveryRepository = ServiceDiscoveryRepositoryImpl(this)
-        val dnsAuditorRepository = DnsAuditorRepositoryImpl(this, okHttpClient)
-        val tracerouteRepository = TracerouteRepositoryImpl()
-        val arpDetectorRepository = ArpDetectorRepositoryImpl(this, networkAlertNotifier)
-        val upnpScannerRepository = UpnpScannerRepositoryImpl(okHttpClient, discoveryRepository)
-        val shodanRepository = ShodanRepositoryImpl(okHttpClient, settingsRepository)
-        val internetDbRepository = InternetDbRepositoryImpl(okHttpClient)
-        val hidRepository = LocalHidRepository(database.hidScriptDao())
-        val hidAssetRepository = LocalHidAssetRepository(this, database.hidAssetDao())
-        val usbDriveRepository = UsbDriveRepositoryImpl(this, database.usbDriveDao())
-        val exifRepository = ExifRepositoryImpl(this)
+        val scanSessionRepository by container::scanSessionRepository
+        val portRepository by container::portRepository
+        val vulnerabilityRepository by container::vulnerabilityRepository
+        val discoveryRepository by container::discoveryRepository
+        val wifiRepository by container::wifiRepository
+        val bleRepository by container::bleRepository
+        nfcRepository = container.nfcRepository
+        val dhcpRepository by container::dhcpRepository
+        val ouiRepository by container::ouiRepository
+        val dnsQueryRepository by container::dnsQueryRepository
+        val wolRepository by container::wolRepository
+        val networkAlertNotifier by container::networkAlertNotifier
+        val websiteInspectorRepository by container::websiteInspectorRepository
+        val subdomainFinderRepository by container::subdomainFinderRepository
+        val tlsCipherScannerRepository by container::tlsCipherScannerRepository
+        val cloudAssetScannerRepository by container::cloudAssetScannerRepository
+        val hibpRepository by container::hibpRepository
+        val usernameOsintRepository by container::usernameOsintRepository
+        val threatIntelRepository by container::threatIntelRepository
+        val pingRepository by container::pingRepository
+        val logRepository by container::logRepository
+        val complianceRepository by container::complianceRepository
+        val proximityRepository by container::proximityRepository
+        val evidenceRepository by container::evidenceRepository
+        val magnetometerRepository by container::magnetometerRepository
+        val reportRepository by container::reportRepository
+        val sdrRepository by container::sdrRepository
+        val snmpRepository by container::snmpRepository
+        val serviceDiscoveryRepository by container::serviceDiscoveryRepository
+        val dnsAuditorRepository by container::dnsAuditorRepository
+        val tracerouteRepository by container::tracerouteRepository
+        val arpDetectorRepository by container::arpDetectorRepository
+        val upnpScannerRepository by container::upnpScannerRepository
+        val shodanRepository by container::shodanRepository
+        val internetDbRepository by container::internetDbRepository
+        val hidRepository by container::hidRepository
+        val hidAssetRepository by container::hidAssetRepository
+        val usbDriveRepository by container::usbDriveRepository
+        val exifRepository by container::exifRepository
+        val findingRepository by container::findingRepository
+        val engagementRepository by container::engagementRepository
+        val backupManager by container::backupManager
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         lifecycleScope.launch {
@@ -319,7 +307,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.PortScanner.route) { backStackEntry ->
                             val portScannerViewModel: PortScannerViewModel = viewModel {
-                                                    PortScannerViewModel(portRepository, vulnerabilityRepository, scanSessionRepository, logRepository, settingsRepository)
+                                                    PortScannerViewModel(portRepository, vulnerabilityRepository, scanSessionRepository, logRepository, settingsRepository, findingRepository)
                                                 }
                             val ip = backStackEntry.arguments?.getString("ip")
                             PortScannerScreen(
@@ -338,7 +326,8 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() },
                                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                                 onNavigateToPortScanner = { ip -> navController.navigate(Screen.PortScanner.createRoute(ip)) },
-                                onNavigateToThreatIntel = { ip -> navController.navigate(Screen.ThreatIntel.createRoute(ip)) }
+                                onNavigateToThreatIntel = { ip -> navController.navigate(Screen.ThreatIntel.createRoute(ip)) },
+                                onNavigate = { route -> navController.navigate(route) }
                             )
                         }
                         composable(Screen.WifiFingerprinter.route) {
@@ -359,7 +348,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.NfcScanner.route) {
                             val nfcViewModel: NfcScannerViewModel = viewModel {
-                                                    NfcScannerViewModel(nfcRepository, logRepository)
+                                                    NfcScannerViewModel(nfcRepository, logRepository, findingRepository)
                                                 }
                             NfcScannerScreen(
                                 viewModel = nfcViewModel,
@@ -392,15 +381,16 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                        composable(Screen.WebsiteInspector.route) {
+                        composable(Screen.WebsiteInspector.route) { backStackEntry ->
                             val websiteInspectorViewModel: WebsiteInspectorViewModel = viewModel {
                                                     WebsiteInspectorViewModel(websiteInspectorRepository, logRepository, settingsRepository)
                                                 }
                             WebsiteInspectorScreen(
                                 viewModel = websiteInspectorViewModel,
+                                initialTarget = backStackEntry.targetArg(),
                             ) { navController.popBackStack() }
                         }
-                        composable(Screen.SubdomainFinder.route) {
+                        composable(Screen.SubdomainFinder.route) { backStackEntry ->
                             val subdomainFinderViewModel: SubdomainFinderViewModel = viewModel {
                                                     SubdomainFinderViewModel(subdomainFinderRepository, logRepository, settingsRepository)
                                                 }
@@ -409,15 +399,17 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() },
                                 onNavigateToCloudScanner = { domain ->
                                     navController.navigate(Screen.CloudAssetScanner.createRoute(domain))
-                                }
+                                },
+                                initialTarget = backStackEntry.targetArg()
                             )
                         }
-                        composable(Screen.TlsCipherScanner.route) {
+                        composable(Screen.TlsCipherScanner.route) { backStackEntry ->
                             val tlsCipherScannerViewModel: TlsCipherScannerViewModel = viewModel {
-                                                    TlsCipherScannerViewModel(tlsCipherScannerRepository, logRepository, settingsRepository)
+                                                    TlsCipherScannerViewModel(tlsCipherScannerRepository, logRepository, settingsRepository, findingRepository)
                                                 }
                             TlsCipherScannerScreen(
                                 viewModel = tlsCipherScannerViewModel,
+                                initialTarget = backStackEntry.targetArg(),
                             ) { navController.popBackStack() }
                         }
                         composable(Screen.CloudAssetScanner.route) { backStackEntry ->
@@ -604,24 +596,25 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.DnsAuditor.route) {
                             val dnsAuditorViewModel: DnsAuditorViewModel = viewModel {
-                                                    DnsAuditorViewModel(dnsAuditorRepository, logRepository, settingsRepository)
+                                                    DnsAuditorViewModel(dnsAuditorRepository, logRepository, settingsRepository, findingRepository)
                                                 }
                             DnsAuditorScreen(
                                 viewModel = dnsAuditorViewModel,
                             ) { navController.popBackStack() }
                         }
-                        composable(Screen.Traceroute.route) {
+                        composable(Screen.Traceroute.route) { backStackEntry ->
                             val tracerouteViewModel: TracerouteViewModel = viewModel {
                                                     TracerouteViewModel(tracerouteRepository, logRepository, settingsRepository)
                                                 }
                             TracerouteScreen(
                                 viewModel = tracerouteViewModel,
+                                initialTarget = backStackEntry.targetArg(),
                                 onPingHost = { ip -> navController.navigate(Screen.PingTool.createRoute(ip)) }
                             ) { navController.popBackStack() }
                         }
                         composable(Screen.ArpDetector.route) {
                             val arpDetectorViewModel: ArpDetectorViewModel = viewModel {
-                                                    ArpDetectorViewModel(arpDetectorRepository, logRepository)
+                                                    ArpDetectorViewModel(arpDetectorRepository, logRepository, findingRepository)
                                                 }
                             ArpDetectorScreen(
                                 viewModel = arpDetectorViewModel,
@@ -629,7 +622,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.UpnpAuditor.route) {
                             val upnpScannerViewModel: UpnpScannerViewModel = viewModel {
-                                                    UpnpScannerViewModel(upnpScannerRepository, settingsRepository, logRepository)
+                                                    UpnpScannerViewModel(upnpScannerRepository, settingsRepository, logRepository, findingRepository)
                                                 }
                             UpnpAuditorScreen(
                                 viewModel = upnpScannerViewModel,
@@ -661,12 +654,13 @@ class MainActivity : ComponentActivity() {
                                 onOpenCaptures = { navController.navigate(Screen.PacketCaptureLogs.route) }
                             )
                         }
-                        composable(Screen.SnmpBrowser.route) {
+                        composable(Screen.SnmpBrowser.route) { backStackEntry ->
                             val snmpViewModel: SnmpViewModel = viewModel {
-                                                    SnmpViewModel(snmpRepository, logRepository)
+                                                    SnmpViewModel(snmpRepository, logRepository, findingRepository)
                                                 }
                             SnmpBrowserScreen(
                                 viewModel = snmpViewModel,
+                                initialTarget = backStackEntry.targetArg(),
                                 onBack = { navController.popBackStack() }
                             )
                         }
@@ -733,10 +727,39 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(Screen.UsbOtgAuditor.route) {
-                            UsbOtgAuditorScreen { navController.popBackStack() }
+                            UsbOtgAuditorScreen(
+                                onFindings = { drafts -> container.applicationScope.launch { findingRepository.record(drafts) } }
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.CellularRecon.route) {
-                            CellularReconScreen { navController.popBackStack() }
+                            CellularReconScreen(
+                                onFindings = { drafts -> container.applicationScope.launch { findingRepository.record(drafts) } }
+                            ) { navController.popBackStack() }
+                        }
+
+                        // Engagement, findings and backup
+                        composable(Screen.Engagement.route) {
+                            val engagementViewModel: EngagementViewModel = viewModel {
+                                EngagementViewModel(engagementRepository, BuildConfig.VERSION_NAME)
+                            }
+                            EngagementScreen(
+                                viewModel = engagementViewModel,
+                                onOpenFindings = { navController.navigate(Screen.Findings.route) },
+                                onOpenBackup = { navController.navigate(Screen.Backup.route) },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.Findings.route) {
+                            val findingsViewModel: FindingsViewModel = viewModel {
+                                FindingsViewModel(findingRepository, engagementRepository, BuildConfig.VERSION_NAME)
+                            }
+                            FindingsScreen(viewModel = findingsViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.Backup.route) {
+                            val backupViewModel: BackupViewModel = viewModel {
+                                BackupViewModel(backupManager, BuildConfig.VERSION_NAME)
+                            }
+                            BackupScreen(viewModel = backupViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.WpsPinCalculator.route) {
                             WpsPinCalculatorScreen { navController.popBackStack() }
@@ -824,6 +847,10 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    /** Optional `target` query argument (null when absent or still the `{target}` placeholder). */
+    private fun NavBackStackEntry.targetArg(): String? =
+        arguments?.getString("target")?.takeUnless { it.isBlank() || it == "{target}" }
 
     private fun scheduleRecycleBinCleanup() {
         val constraints = Constraints.Builder()

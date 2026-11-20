@@ -38,9 +38,10 @@ import java.util.Date
 @Composable
 fun TlsCipherScannerScreen(
     viewModel: TlsCipherScannerViewModel,
+    initialTarget: String? = null,
     onBack: () -> Unit
 ) {
-    var url by remember { mutableStateOf("google.com") }
+    var url by remember { mutableStateOf(initialTarget?.takeIf { it.isNotBlank() } ?: "google.com") }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -78,6 +79,7 @@ fun TlsCipherScannerScreen(
                         if (url.isNotBlank() && !isPassiveMode) { viewModel.startScan(url); keyboardController?.hide() }
                     })
                 )
+                com.fearmikey.rf_reapr.ui.components.ScopeWarning(url)
             }
             if (isPassiveMode) {
                 item { Text("Passive (stealth) mode is on, so TLS scanning is disabled.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }

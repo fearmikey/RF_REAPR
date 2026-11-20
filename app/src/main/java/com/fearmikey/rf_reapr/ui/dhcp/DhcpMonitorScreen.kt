@@ -192,6 +192,10 @@ fun DhcpMonitorScreen(
                 )
             }
 
+            item(key = "background_watch") {
+                BackgroundWatchCard(isPassiveMode = isPassiveMode)
+            }
+
             item(key = "tabs") {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     SegmentedButton(

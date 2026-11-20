@@ -410,6 +410,28 @@ fun MainMenuScreen(
                 Screen.PhoneOsint.route,
                 ToolCategory.WEB
             ),
+            // Engagement & findings
+            ToolkitTool(
+                "Engagement & Scope",
+                "Choose the active project, define the authorized scope, compare scans and export.",
+                Icons.Default.Workspaces,
+                Screen.Engagement.route,
+                ToolCategory.COMPLIANCE
+            ),
+            ToolkitTool(
+                "Findings",
+                "Triage de-duplicated findings from every tool; export CSV, JSON or Markdown.",
+                Icons.Default.BugReport,
+                Screen.Findings.route,
+                ToolCategory.COMPLIANCE
+            ),
+            ToolkitTool(
+                "Encrypted Backup",
+                "Back up or restore all local data to a password-protected file.",
+                Icons.Default.Backup,
+                Screen.Backup.route,
+                ToolCategory.COMPLIANCE
+            ),
             // Compliance Tools
             ToolkitTool(
                 "Audit Checklists",
@@ -598,6 +620,9 @@ fun MainMenuScreen(
             }
 
             if (trimmedQuery.isBlank()) {
+                item(key = "engagement") {
+                    ActiveEngagementCard(onClick = { onNavigate(Screen.Engagement.route) })
+                }
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),

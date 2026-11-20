@@ -15,6 +15,9 @@ interface EventLogDao {
     @Query("SELECT * FROM event_logs ORDER BY timestamp DESC")
     fun getAllLogs(): Flow<List<EventLogEntity>>
 
+    @Query("SELECT * FROM event_logs WHERE projectId = :projectId ORDER BY timestamp DESC")
+    fun getLogsForProject(projectId: String): Flow<List<EventLogEntity>>
+
     @Query("DELETE FROM event_logs WHERE id = :id")
     suspend fun deleteLog(id: Long)
 

@@ -2,11 +2,13 @@ package com.fearmikey.rf_reapr.ui.mdns
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.repository.UpnpAuditResult
 import com.fearmikey.rf_reapr.domain.repository.UpnpScannerRepository
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.fearmikey.rf_reapr.domain.service.FindingAdapters
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +21,8 @@ import kotlinx.coroutines.launch
 class UpnpScannerViewModel(
     private val repository: UpnpScannerRepository,
     private val settingsRepository: SettingsRepository,
-    private val logRepository: LogRepository? = null
+    private val logRepository: LogRepository? = null,
+    private val findingRepository: FindingRepository? = null
 ) : ViewModel() {
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
@@ -58,6 +61,7 @@ class UpnpScannerViewModel(
     }
 
     private suspend fun log(result: UpnpAuditResult) {
+        findingRepository?.record(FindingAdapters.upnp(result.gatewayIp, result.findings))
         val logger = logRepository ?: return
         val mappings = result.devices.sumOf { it.portMappings.size }
         logger.saveLog(

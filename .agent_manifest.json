@@ -6,10 +6,11 @@
   "maintenance_rule": "At the end of each development session, agents MUST update .agent_manifest.json if any new features, files, repositories, database models, or architectural components were added, modified, or removed.",
   "architectural_overview": {
     "pattern": "Unidirectional Data Flow (UDF) + MVVM (Model-View-ViewModel) + Repository Pattern + Clean Architecture",
-    "dependency_injection": "Manual Dependency Injection in MainActivity.kt (Repositories instantiated on launch and injected into ViewModels via ViewModelProvider.Factory)",
+    "dependency_injection": "Manual DI via AppContainer.kt (owned by RfReaprApplication.container; lazy, process-lifetime repositories with the Application context). MainActivity pulls them with local delegates (`val x by container::x`) and passes them into ViewModels via viewModel { } factories. Workers reach the container via (applicationContext as RfReaprApplication).container.",
     "ui_framework": "Jetpack Compose with Material 3",
     "async_concurrency": "Kotlin Coroutines & Flow / StateFlow",
-    "persistence": "Room Database (AppDatabase v16, SQLite) + EncryptedSharedPreferences (SettingsRepositoryImpl)",
+    "persistence": "Room Database (AppDatabase v17, SQLite; schemas exported to app/schemas/, AutoMigration 16->17, destructive fallback ONLY from legacy v1-15) + EncryptedSharedPreferences (SettingsRepositoryImpl) + plain prefs: engagement_prefs (active project id), network_watch, wol_targets",
+    "migration_rules": "Every schema change MUST bump AppDatabase.VERSION and add an AutoMigration/Migration; rebuild so app/schemas/<version>.json is exported and commit it; extend app/src/androidTest/.../data/db/AppDatabaseMigrationTest.kt. KSP2 is enabled in gradle.properties (ksp.useKSP2=true) because Room's schema reader fails under KSP1.",
     "network": "Retrofit 2 + Gson + OkHttpClient for external APIs (Shodan, HIBP, NVD, etc.)",
     "background_processing": "WorkManager (VulnerabilityUpdateWorker, RecycleBinWorker) + ScanForegroundService (promotes scans to Android Foreground Service via ActiveTaskMonitor)",
     "native_code": "C++ / JNI iperf3 wrapper compiled via CMake with custom Android longjmp patch in app/src/main/cpp/iperf_android/",
@@ -17,6 +18,7 @@
   },
   "entry_points": {
     "application_class": "app/src/main/java/com/fearmikey/rf_reapr/RfReaprApplication.kt",
+    "di_container": "app/src/main/java/com/fearmikey/rf_reapr/AppContainer.kt",
     "main_activity": "app/src/main/java/com/fearmikey/rf_reapr/MainActivity.kt",
     "navigation_routes": "app/src/main/java/com/fearmikey/rf_reapr/ui/navigation/Screen.kt",
     "database": "app/src/main/java/com/fearmikey/rf_reapr/data/db/AppDatabase.kt",
@@ -39,8 +41,11 @@
   },
   "database_map": {
     "class": "app/src/main/java/com/fearmikey/rf_reapr/data/db/AppDatabase.kt",
-    "version": 16,
+    "version": 17,
+    "schemas": "app/schemas/com.fearmikey.rf_reapr.data.db.AppDatabase/{16,17}.json",
+    "migration_test": "app/src/androidTest/java/com/fearmikey/rf_reapr/data/db/AppDatabaseMigrationTest.kt",
     "daos": {
+      "findingDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/FindingDao.kt",
       "networkDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/NetworkDao.kt",
       "scanSessionDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/ScanSessionDao.kt",
       "eventLogDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/EventLogDao.kt",
@@ -63,10 +68,57 @@
       "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/VulnerabilityEntity.kt",
       "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/HidScriptEntity.kt",
       "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/HidAssetEntity.kt",
-      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/UsbDriveEntity.kt"
-    ]
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/UsbDriveEntity.kt",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/FindingEntity.kt (v17; unique (projectId, fingerprint); projectId '' = no project)"
+    ],
+    "v17_columns": "event_logs.projectId, scan_sessions.projectId (nullable, stamped by LogRepositoryImpl/ScanSessionRepositoryImpl from ActiveProjectStore); evidence_projects.scope (newline-separated, see ScopeMatcher)"
   },
   "feature_map": {
+    "engagement_findings_scope": {
+      "summary": "Evidence projects double as engagements. The active project (ActiveProjectStore -> ActiveEngagement singleton) tags logs, scan sessions and findings; its scope drives ScopeWarning under target inputs.",
+      "routes": ["Screen.Engagement ('engagement')", "Screen.Findings ('findings')", "Screen.Backup ('backup')"],
+      "ui": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/engagement/EngagementScreen.kt + EngagementViewModel.kt (project picker, scope editor, stats, exports, scan comparison)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/findings/FindingsScreen.kt + FindingsViewModel.kt (filter, triage status/notes, manual findings, export)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/menu/ActiveEngagementCard.kt (main menu banner)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/components/ScopeWarning.kt (used by Port Scanner, Ping, Traceroute, SNMP, TLS, Website Inspector, Subdomain Finder)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/components/ExportUtils.kt (ExportFormat, SAF text writer)"
+      ],
+      "state": [
+        "app/src/main/java/com/fearmikey/rf_reapr/data/local/ActiveProjectStore.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ActiveEngagement.kt"
+      ],
+      "repositories": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/FindingRepository.kt -> data/repository/FindingRepositoryImpl.kt (mutex-serialized merge)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/EngagementRepository.kt -> data/repository/EngagementRepositoryImpl.kt (stats, sessions, EngagementReport)"
+      ],
+      "domain": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/Finding.kt (Finding, FindingDraft, FindingStatus, FindingTools)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/FindingMerger.kt (fingerprint, dedupe, FIXED->OPEN regression)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/FindingAdapters.kt (tool results -> FindingDraft: ports, TLS, DNS audit, UPnP, SNMP, ARP, NFC, USB, cellular)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ScopeMatcher.kt (CIDR/range/domain/wildcard/!exclusion, no DNS)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/FindingsExporter.kt (CSV w/ formula-injection guard, JSON, Markdown)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ScanDiff.kt"
+      ],
+      "tool_wiring": "ViewModels take an optional findingRepository (PortScanner, UPnP, SNMP, TLS, DnsAuditor, NFC, ARP). UsbOtgAuditorScreen/CellularReconScreen take onFindings callbacks (recorded only when the finding set changes). New finding-producing tools: add an adapter in FindingAdapters with STABLE titles (titles are part of the fingerprint).",
+      "tests": [
+        "app/src/test/java/com/fearmikey/rf_reapr/domain/service/EngagementServicesTest.kt",
+        "app/src/test/java/com/fearmikey/rf_reapr/domain/service/FindingAdaptersTest.kt"
+      ]
+    },
+    "encrypted_backup": {
+      "route": "Screen.Backup ('backup')",
+      "ui": "app/src/main/java/com/fearmikey/rf_reapr/ui/backup/BackupScreen.kt + BackupViewModel.kt (restart after restore)",
+      "manager": "app/src/main/java/com/fearmikey/rf_reapr/data/backup/BackupManager.kt (WAL checkpoint snapshot, zip of db + filesDir + wol/engagement prefs, path rewrite on restore, zip-slip guard, newer-db-version rejection; excludes settings/API keys)",
+      "crypto": "app/src/main/java/com/fearmikey/rf_reapr/data/backup/BackupCrypto.kt (PBKDF2-SHA256 310k + chunked AES-256-GCM with index/final-flag AAD)",
+      "tests": "app/src/test/java/com/fearmikey/rf_reapr/data/backup/BackupCryptoTest.kt"
+    },
+    "background_network_watch": {
+      "worker": "app/src/main/java/com/fearmikey/rf_reapr/data/worker/NetworkWatchWorker.kt (opt-in 15-min periodic, UNMETERED + battery-not-low, skips in passive mode)",
+      "store": "app/src/main/java/com/fearmikey/rf_reapr/data/local/NetworkWatchStore.kt (per-network baselines)",
+      "evaluator": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/NetworkWatchEvaluator.kt",
+      "ui": "app/src/main/java/com/fearmikey/rf_reapr/ui/dhcp/BackgroundWatchCard.kt (shown in DhcpMonitorScreen)"
+    },
     "network_discovery_and_topology": {
       "route": "Screen.TopologyMap ('network_discovery')",
       "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/TopologyScreen.kt",
@@ -78,7 +130,7 @@
       ],
       "ui_helpers": "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/TopologyUi.kt (shared risk colors, DeviceType icons/names, TopologyFilter search+sort logic, NodeSortOrder, node summary text)",
       "ui_state_notes": "TopologyViewModel exposes activeNodeScans (per-node scan kinds), auditProgress, deepScanCompleted, nodeResults (last per-node result shown in the sheet), and a messages Flow for snackbars. The port scanner repository is single-target, so port scans are serialized via isPortScannerBusy.",
-      "navigation_out": "TopologyScreen -> Screen.PortScanner.createRoute(ip), Screen.ThreatIntel.createRoute(ip) (wired in MainActivity; ThreatIntel prefills the IP only)",
+      "navigation_out": "TopologyScreen -> Screen.PortScanner.createRoute(ip), Screen.ThreatIntel.createRoute(ip), and via onNavigate(route) from DeviceDetailBottomSheet: Ping, Traceroute, TLS (if a TLS port is open), SNMP. Tools accepting a prefilled target use `?target=` (Screen.withTarget; MainActivity NavBackStackEntry.targetArg()): WebsiteInspector, SubdomainFinder, TlsCipherScanner, SnmpBrowser, Traceroute.",
       "tests": [
         "app/src/test/java/com/fearmikey/rf_reapr/ui/topology/TopologyFilterTest.kt",
         "app/src/test/java/com/fearmikey/rf_reapr/domain/mapper/TopologyMapperTest.kt"

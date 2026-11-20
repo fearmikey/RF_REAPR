@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.OpenPort
 import com.fearmikey.rf_reapr.domain.model.RiskLevel
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.PortScanOptions
 import com.fearmikey.rf_reapr.domain.repository.PortScannerRepository
@@ -12,6 +13,7 @@ import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import com.fearmikey.rf_reapr.domain.repository.VulnerabilityRepository
 import com.fearmikey.rf_reapr.domain.scanner.NetworkScanner
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.fearmikey.rf_reapr.domain.service.FindingAdapters
 import com.fearmikey.rf_reapr.domain.service.HostValidator
 import com.fearmikey.rf_reapr.domain.service.PortCatalog
 import com.google.gson.Gson
@@ -62,7 +64,8 @@ class PortScannerViewModel(
     private val vulnerabilityRepository: VulnerabilityRepository,
     private val scanSessionRepository: ScanSessionRepository,
     private val logRepository: LogRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val findingRepository: FindingRepository? = null
 ) : ViewModel() {
 
     val isApiKeySet: StateFlow<Boolean> = settingsRepository.vulnerabilityApiKey
@@ -209,6 +212,8 @@ class PortScannerViewModel(
                 )
             )
         )
+
+        findingRepository?.record(FindingAdapters.openPorts(host, auditedPorts))
 
         scanSessionRepository.getNodeByIp(host)?.let { existingNode ->
             scanSessionRepository.updateNodeDetails(

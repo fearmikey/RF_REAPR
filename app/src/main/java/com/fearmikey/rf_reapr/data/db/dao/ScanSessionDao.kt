@@ -30,6 +30,10 @@ interface ScanSessionDao {
         }
     }
 
+    @Transaction
+    @Query("SELECT * FROM scan_sessions WHERE projectId = :projectId ORDER BY timestamp DESC")
+    fun getSessionsWithNodesForProject(projectId: String): Flow<List<ScanSessionWithNodes>>
+
     @Query("SELECT gatewayIp FROM scan_sessions ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLastSessionGatewayIp(): String?
 

@@ -44,7 +44,8 @@ fun TopologyScreen(
     onBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToPortScanner: (ip: String) -> Unit = {},
-    onNavigateToThreatIntel: (ip: String) -> Unit = {}
+    onNavigateToThreatIntel: (ip: String) -> Unit = {},
+    onNavigate: (route: String) -> Unit = {}
 ) {
     val mappedGraph by viewModel.mappedGraph.collectAsStateWithLifecycle()
     val discoveryState by viewModel.discoveryState.collectAsStateWithLifecycle()
@@ -622,6 +623,10 @@ fun TopologyScreen(
                 onOpenThreatIntel = { ip ->
                     selectedNodeId = null
                     onNavigateToThreatIntel(ip)
+                },
+                onOpenRoute = { route ->
+                    selectedNodeId = null
+                    onNavigate(route)
                 }
             )
         }

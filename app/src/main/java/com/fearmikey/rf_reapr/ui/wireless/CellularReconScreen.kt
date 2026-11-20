@@ -140,7 +140,10 @@ private suspend fun TelephonyManager.freshCellInfo(context: Context): List<CellI
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CellularReconScreen(onBack: () -> Unit) {
+fun CellularReconScreen(
+    onFindings: (List<com.fearmikey.rf_reapr.domain.model.FindingDraft>) -> Unit = {},
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     var cells by remember { mutableStateOf<List<CellSummary>>(emptyList()) }
     var hasPermission by remember { mutableStateOf(false) }
@@ -177,6 +180,11 @@ fun CellularReconScreen(onBack: () -> Unit) {
     }
 
     val findings = remember(cells) { CellAnalyzer.findings(cells, servingHistory.toList()) }
+
+    // Record only when the set of findings changes (cells refresh every 5 s).
+    LaunchedEffect(findings.map { it.title }.toSet()) {
+        if (findings.isNotEmpty()) onFindings(com.fearmikey.rf_reapr.domain.service.FindingAdapters.cellular(findings))
+    }
 
     Scaffold(
         topBar = {

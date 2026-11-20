@@ -41,9 +41,20 @@ private fun UsbDevice.toInfo() = UsbDeviceInfo(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UsbOtgAuditorScreen(onBack: () -> Unit) {
+fun UsbOtgAuditorScreen(
+    onFindings: (List<com.fearmikey.rf_reapr.domain.model.FindingDraft>) -> Unit = {},
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     var devices by remember { mutableStateOf<List<UsbDeviceInfo>>(emptyList()) }
+
+    // Record findings once per distinct device set (the list is re-polled every 1.5 s).
+    LaunchedEffect(devices.map { it.name }.toSet()) {
+        val drafts = devices.flatMap { d ->
+            com.fearmikey.rf_reapr.domain.service.FindingAdapters.usb(d, UsbAuditAnalyzer.findings(d))
+        }
+        if (drafts.isNotEmpty()) onFindings(drafts)
+    }
 
     // Poll while visible: ATTACHED broadcasts only reach manifest-declared activities.
     LaunchedEffect(Unit) {

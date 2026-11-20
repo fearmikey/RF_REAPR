@@ -41,9 +41,10 @@ import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository.Discov
 fun SubdomainFinderScreen(
     viewModel: SubdomainFinderViewModel,
     onBack: () -> Unit,
-    onNavigateToCloudScanner: (String) -> Unit
+    onNavigateToCloudScanner: (String) -> Unit,
+    initialTarget: String? = null
 ) {
-    var domain by remember { mutableStateOf("google.com") }
+    var domain by remember { mutableStateOf(initialTarget?.takeIf { it.isNotBlank() } ?: "google.com") }
     val subdomains by viewModel.subdomains.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
@@ -100,6 +101,7 @@ fun SubdomainFinderScreen(
                     }
                 )
             )
+            com.fearmikey.rf_reapr.ui.components.ScopeWarning(domain, Modifier.padding(top = 4.dp))
 
             if (isPassiveMode) {
                 Text(

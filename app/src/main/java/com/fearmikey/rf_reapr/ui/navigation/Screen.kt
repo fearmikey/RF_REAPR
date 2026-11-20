@@ -15,9 +15,15 @@ sealed class Screen(val route: String) {
         fun createRoute(highlight: String? = null) = if (highlight != null) "api_keys?highlight=$highlight" else "api_keys"
     }
     data object DhcpMonitor : Screen("dhcp_monitor")
-    data object WebsiteInspector : Screen("website_inspector")
-    data object SubdomainFinder : Screen("subdomain_finder")
-    data object TlsCipherScanner : Screen("tls_cipher_scanner")
+    data object WebsiteInspector : Screen("website_inspector?target={target}") {
+        fun createRoute(target: String? = null) = withTarget("website_inspector", target)
+    }
+    data object SubdomainFinder : Screen("subdomain_finder?target={target}") {
+        fun createRoute(target: String? = null) = withTarget("subdomain_finder", target)
+    }
+    data object TlsCipherScanner : Screen("tls_cipher_scanner?target={target}") {
+        fun createRoute(target: String? = null) = withTarget("tls_cipher_scanner", target)
+    }
     data object CloudAssetScanner : Screen("cloud_asset_scanner?domain={domain}") {
         fun createRoute(domain: String? = null) = if (domain != null) "cloud_asset_scanner?domain=$domain" else "cloud_asset_scanner"
     }
@@ -56,10 +62,14 @@ sealed class Screen(val route: String) {
     data object CellularRecon : Screen("cellular_recon")
     data object WpsPinCalculator : Screen("wps_pin_calculator")
 
-    data object SnmpBrowser : Screen("snmp_browser")
+    data object SnmpBrowser : Screen("snmp_browser?target={target}") {
+        fun createRoute(target: String? = null) = withTarget("snmp_browser", target)
+    }
     data object ServiceDiscovery : Screen("service_discovery")
     data object DnsAuditor : Screen("dns_auditor")
-    data object Traceroute : Screen("traceroute")
+    data object Traceroute : Screen("traceroute?target={target}") {
+        fun createRoute(target: String? = null) = withTarget("traceroute", target)
+    }
     data object ArpDetector : Screen("arp_detector")
     data object UpnpAuditor : Screen("upnp_auditor")
     data object SdrController : Screen("sdr_controller")
@@ -76,6 +86,11 @@ sealed class Screen(val route: String) {
     }
     data object PermissionExplanation : Screen("permission_explanation")
 
+    // Engagement / findings / data safety
+    data object Engagement : Screen("engagement")
+    data object Findings : Screen("findings")
+    data object Backup : Screen("backup")
+
     // Log Screens
     data object WifiLogs : Screen("logs/wifi")
     data object BleLogs : Screen("logs/ble")
@@ -86,4 +101,10 @@ sealed class Screen(val route: String) {
     data object TopologyLogs : Screen("logs/network_discovery")
     data object SnmpLogs : Screen("logs/snmp")
     data object PacketCaptureLogs : Screen("logs/pcap")
+
+    companion object {
+        /** Builds `base?target=<encoded>` (or just `base`) for tools that accept a prefilled target. */
+        fun withTarget(base: String, target: String?): String =
+            if (target.isNullOrBlank()) base else "$base?target=${android.net.Uri.encode(target)}"
+    }
 }

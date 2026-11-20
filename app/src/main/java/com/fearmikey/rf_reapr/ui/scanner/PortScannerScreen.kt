@@ -181,6 +181,7 @@ fun PortScannerScreen(
                         }
                     }
                 )
+                com.fearmikey.rf_reapr.ui.components.ScopeWarning(state.target)
             }
 
             item {

@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.SnmpResult
 import com.fearmikey.rf_reapr.domain.model.SnmpVarBind
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.SnmpRepository
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
+import com.fearmikey.rf_reapr.domain.service.FindingAdapters
 import com.fearmikey.rf_reapr.domain.service.HostValidator
 import com.fearmikey.rf_reapr.domain.service.SnmpFinding
 import com.fearmikey.rf_reapr.domain.service.SnmpTools
@@ -20,7 +22,8 @@ import kotlinx.coroutines.launch
 
 class SnmpViewModel(
     private val snmpRepository: SnmpRepository,
-    private val logRepository: LogRepository
+    private val logRepository: LogRepository,
+    private val findingRepository: FindingRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SnmpUiState())
@@ -60,6 +63,7 @@ class SnmpViewModel(
                         val findings = SnmpTools.findings(result, _uiState.value.workingCommunities)
                         _uiState.update { it.copy(result = result, findings = findings) }
                         saveToLogs(result, findings)
+                        findingRepository?.record(FindingAdapters.snmp(host, findings))
                     }
                     .onFailure { error ->
                         _uiState.update { it.copy(error = error.message ?: "Unknown error") }
@@ -92,6 +96,7 @@ class SnmpViewModel(
                         findings = s.result?.let { SnmpTools.findings(it, working) } ?: s.findings
                     )
                 }
+                findingRepository?.record(FindingAdapters.snmp(host, _uiState.value.findings))
                 if (working.isNotEmpty()) {
                     logRepository.saveLog("SNMP", "Default SNMP communities accepted by $host: ${working.joinToString()}", gson.toJson(mapOf("host" to host, "communities" to working)))
                 }

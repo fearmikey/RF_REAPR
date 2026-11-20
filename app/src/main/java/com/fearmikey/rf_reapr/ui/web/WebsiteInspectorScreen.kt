@@ -39,9 +39,10 @@ import java.util.*
 @Composable
 fun WebsiteInspectorScreen(
     viewModel: WebsiteInspectorViewModel,
+    initialTarget: String? = null,
     onBack: () -> Unit
 ) {
-    var url by remember { mutableStateOf("https://google.com") }
+    var url by remember { mutableStateOf(initialTarget?.takeIf { it.isNotBlank() } ?: "https://google.com") }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -85,6 +86,7 @@ fun WebsiteInspectorScreen(
                     }
                 )
             )
+            com.fearmikey.rf_reapr.ui.components.ScopeWarning(url, Modifier.padding(top = 4.dp))
 
             if (isPassiveMode) {
                 Text(

@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.map
 
 class ScanSessionRepositoryImpl(
     private val networkDao: NetworkDao,
-    private val scanSessionDao: ScanSessionDao
+    private val scanSessionDao: ScanSessionDao,
+    /** Active project id at scan time (sessions are tagged per engagement). */
+    private val activeProjectId: () -> String? = { null }
 ) : ScanSessionRepository {
 
     override fun getAllPersistedNodes(): Flow<List<NetworkNode>> {
@@ -38,7 +40,8 @@ class ScanSessionRepositoryImpl(
         
         val session = ScanSessionEntity(
             networkName = networkName,
-            gatewayIp = gatewayIp
+            gatewayIp = gatewayIp,
+            projectId = activeProjectId()
         )
         scanSessionDao.saveSessionWithNodes(session, nodes.map { it.ipAddress })
     }
