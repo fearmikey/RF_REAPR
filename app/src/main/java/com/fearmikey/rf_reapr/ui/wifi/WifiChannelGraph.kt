@@ -76,8 +76,8 @@ fun WifiChannelGraph(
 
     val (minFreq, maxFreq) = when (range) {
         FrequencyRange.FREQ_2_4GHZ -> 2400f to 2484f
-        FrequencyRange.FREQ_5GHZ -> 5145f to 5840f
-        FrequencyRange.FREQ_6GHZ -> 5900f to 7150f
+        FrequencyRange.FREQ_5GHZ -> 5150f to 5895f
+        FrequencyRange.FREQ_6GHZ -> 5925f to 7125f
     }
 
     val visibleAps = remember(accessPoints, hiddenBssids) {
@@ -207,7 +207,7 @@ fun WifiChannelGraph(
                     }
                 }
                 FrequencyRange.FREQ_5GHZ -> {
-                    listOf(36, 48, 64, 100, 128, 144, 149, 161).forEach { ch ->
+                    listOf(36, 52, 64, 100, 116, 132, 149, 165, 177).forEach { ch ->
                         val f = 5000f + ch * 5f
                         val x = freqToX(f)
                         if (x in 0f..width) {
@@ -217,7 +217,7 @@ fun WifiChannelGraph(
                 }
                 FrequencyRange.FREQ_6GHZ -> {
                     listOf(1, 33, 65, 97, 129, 161, 193, 233).forEach { ch ->
-                        val f = 5945f + (ch - 1) * 5f
+                        val f = 5950f + ch * 5f
                         val x = freqToX(f)
                         if (x in 0f..width) {
                             drawContext.canvas.nativeCanvas.drawText("$ch", x, height - 5f, channelPaint)

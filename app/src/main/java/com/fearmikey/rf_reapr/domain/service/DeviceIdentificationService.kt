@@ -102,10 +102,16 @@ object DeviceIdentificationService {
     fun getManufacturer(macAddress: String?): String? {
         val normalizedMac = macAddress?.uppercase()?.replace(":", "")?.replace("-", "") ?: return null
         if (normalizedMac.length < 6) return null
-        
-        val oui = normalizedMac.substring(0, 6)
-        
-        val ouiMap = mapOf(
+        return ouiMap[normalizedMac.substring(0, 6)]
+    }
+
+    /** The built-in OUI (6 uppercase hex digits) -> vendor table. */
+    val builtInOuiTable: Map<String, String> get() = ouiMap
+
+    // Built once on first use rather than re-allocated on every lookup (discovery calls
+    // getManufacturer() for every host found).
+    private val ouiMap: Map<String, String> by lazy {
+        mapOf(
             "000142" to "Cisco",
             "000164" to "Cisco",
             "000393" to "Apple",
@@ -1050,7 +1056,5 @@ object DeviceIdentificationService {
             "FCE992" to "Apple",
             "FCFC48" to "Apple"
         )
-        
-        return ouiMap[oui]
     }
 }

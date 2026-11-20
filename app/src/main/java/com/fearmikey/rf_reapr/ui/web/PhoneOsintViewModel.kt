@@ -199,7 +199,8 @@ class PhoneOsintViewModel : ViewModel() {
                 }
             }
             else -> {
-                if (national.length in 9..11 && national.startsWith("9") || national.startsWith("7") || national.startsWith("6")) {
+                if (national.length in 9..11 &&
+                    (national.startsWith("9") || national.startsWith("7") || national.startsWith("6"))) {
                     "Likely Mobile"
                 } else {
                     "Fixed Line / Mobile"

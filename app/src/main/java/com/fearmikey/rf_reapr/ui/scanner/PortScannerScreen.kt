@@ -3,42 +3,53 @@ package com.fearmikey.rf_reapr.ui.scanner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fearmikey.rf_reapr.domain.model.OpenPort
 import com.fearmikey.rf_reapr.domain.model.RiskLevel
+import com.fearmikey.rf_reapr.domain.service.PortCatalog
 import com.fearmikey.rf_reapr.ui.theme.WebGold
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PortScannerScreen(
     viewModel: PortScannerViewModel,
@@ -48,53 +59,35 @@ fun PortScannerScreen(
     onUpdateTopology: (Map<String, List<OpenPort>>, String?) -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    var ipAddress by remember { 
-        mutableStateOf(TextFieldValue(initialIp ?: "127.0.0.1", TextRange((initialIp ?: "127.0.0.1").length))) 
-    }
-    var startPort by remember { mutableStateOf("1") }
-    var endPort by remember { mutableStateOf("65535") }
-    
+    val clipboard = LocalClipboardManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val foundPorts by viewModel.foundPorts.collectAsStateWithLifecycle()
-    val progress by viewModel.progress.collectAsStateWithLifecycle()
-    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
-    val eta by viewModel.eta.collectAsStateWithLifecycle()
     val isApiKeySet by viewModel.isApiKeySet.collectAsStateWithLifecycle()
 
     var showWarningDialog by remember { mutableStateOf(false) }
-    var showManualPortDialog by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
-    var showApiKeyRecommendation by remember { mutableStateOf(false) }
+    var apiKeyHintDismissed by rememberSaveable { mutableStateOf(false) }
     var selectedPortDetails by remember { mutableStateOf<OpenPort?>(null) }
-    var pendingScanType by remember { mutableStateOf<ScanType?>(null) }
 
-    val onPortClick = remember { { port: OpenPort -> selectedPortDetails = port } }
+    LaunchedEffect(initialIp) { viewModel.setInitialTarget(initialIp) }
 
-    LaunchedEffect(Unit) {
-        if (!isApiKeySet) {
-            showApiKeyRecommendation = true
+    LaunchedEffect(state.phase) {
+        if (state.phase == ScanPhase.DONE && foundPorts.isNotEmpty()) {
+            onUpdateTopology(mapOf(state.scannedTarget to foundPorts), null)
         }
     }
 
-    LaunchedEffect(initialIp) {
-        if (initialIp != null) {
-            ipAddress = TextFieldValue(initialIp, TextRange(initialIp.length))
-        }
+    val validationError = remember(state.target, state.preset, state.customSpec) {
+        if (state.target.isBlank()) null else viewModel.validate()
     }
-
-    DisposableEffect(viewModel) {
-        onDispose {
-            viewModel.clearResults()
-        }
-    }
-
-    LaunchedEffect(isScanning, foundPorts) {
-        if (!isScanning && foundPorts.isNotEmpty()) {
-            onUpdateTopology(mapOf(ipAddress.text to foundPorts), null)
-        }
-    }
+    val canStart = !state.isBusy && !isPassiveMode && state.target.isNotBlank() && validationError == null
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("TCP Port Scanner") },
@@ -104,6 +97,14 @@ fun PortScannerScreen(
                     }
                 },
                 actions = {
+                    if (foundPorts.isNotEmpty() && !state.isBusy) {
+                        IconButton(onClick = {
+                            clipboard.setText(AnnotatedString(viewModel.reportText()))
+                            scope.launch { snackbarHostState.showSnackbar("Report copied") }
+                        }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy report")
+                        }
+                    }
                     IconButton(onClick = { showInfoDialog = true }) {
                         Icon(Icons.Default.Info, contentDescription = "Information")
                     }
@@ -111,313 +112,275 @@ fun PortScannerScreen(
             )
         }
     ) { padding ->
-        Column(
+        val listState = rememberLazyListState()
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .verticalScrollbar(listState),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
-                value = ipAddress,
-                onValueChange = { newValue ->
-                    // 1. If deleting, just update and exit to avoid IME stutter
-                    if (newValue.text.length < ipAddress.text.length) {
-                        ipAddress = newValue
-                        return@OutlinedTextField
-                    }
-
-                    // 2. Filter input to only allowed characters
-                    val text = newValue.text.filter { (it.isDigit() || it == '.') }
-                    
-                    // 3. Apply auto-formatting (dots) and limits
-                    val parts = text.split('.')
-                    if (parts.size <= 4) {
-                        var formatted = ""
-                        var cursorOffset = newValue.selection.start
-                        
-                        parts.forEachIndexed { index, s ->
-                            val sanitized = s.take(3)
-                            formatted += sanitized
-                            
-                            // Auto-add dot if 3 digits entered in an octet (and it's not the 4th octet)
-                            if (sanitized.length == 3 && index < 3) {
-                                // Only add if we're at the very end of the current input
-                                if (index == parts.size - 1) {
-                                    formatted += "."
-                                    // Adjust cursor to be after the new dot
-                                    if (cursorOffset == formatted.length - 1) {
-                                        cursorOffset++
-                                    }
-                                }
-                            }
-                            
-                            // Ensure dots between existing parts are preserved
-                            if (index < parts.size - 1 && !formatted.endsWith(".")) {
-                                formatted += "."
-                            }
-                        }
-                        
-                        ipAddress = newValue.copy(
-                            text = formatted,
-                            selection = TextRange(cursorOffset.coerceIn(0, formatted.length))
-                        )
-                    }
-                },
-                label = { Text("IP Address") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                trailingIcon = {
-                    if (ipAddress.text.isNotEmpty()) {
-                        IconButton(onClick = { ipAddress = TextFieldValue("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear IP Address"
-                            )
-                        }
-                    }
-                }
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { 
-                        keyboardController?.hide()
-                        pendingScanType = ScanType.Common
-                        showWarningDialog = true
-                    },
-                    enabled = !isScanning && !isPassiveMode,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Common Ports")
-                }
-
-                Button(
-                    onClick = { 
-                        keyboardController?.hide()
-                        showManualPortDialog = true
-                    },
-                    enabled = !isScanning && !isPassiveMode,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Manual Selection")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = { viewModel.stopScan() },
-                enabled = isScanning,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Stop Scan")
-            }
-            
-            if (isScanning) {
-                Spacer(modifier = Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Scanning... ${(progress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
-                    if (eta != null) {
-                        Text("ETA: $eta", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-            
-            // ... (Alert dialogs omitted for brevity in replace_file_content but I will keep them)
-            // Wait, I should include the rest of the logic.
-
-            if (showManualPortDialog) {
-                AlertDialog(
-                    onDismissRequest = { showManualPortDialog = false },
-                    title = { Text("Manual Port Range") },
-                    text = {
-                        Column {
-                            OutlinedTextField(
-                                value = startPort,
-                                onValueChange = { startPort = it },
-                                label = { Text("Start Port") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = endPort,
-                                onValueChange = { endPort = it },
-                                label = { Text("End Port") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                pendingScanType = ScanType.Full(
-                                    startPort.toIntOrNull() ?: 1,
-                                    endPort.toIntOrNull() ?: 65535
-                                )
-                                showManualPortDialog = false
-                                showWarningDialog = true
-                            }
-                        ) {
-                            Text("Set Range & Audit")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showManualPortDialog = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                )
-            }
-
-            if (showWarningDialog) {
-                AlertDialog(
-                    onDismissRequest = { showWarningDialog = false },
-                    icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                    title = { Text("Network Audit Warning") },
-                    text = {
-                        Text(
-                            "Port scanning is easily detectable by network security systems (IDS/IPS). " +
-                            "Aggressive scanning can cause malfunctions or crashes in fragile Operational Technology (OT) and Industrial Control Systems (ICS), " +
-                            "such as PLCs, HMIs, medical equipment, and building automation controllers. " +
-                            "\n\nProceed with caution on production networks."
-                        )
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                when (val type = pendingScanType) {
-                                    is ScanType.Full -> viewModel.startScan(ipAddress.text, type.start, type.end)
-                                    is ScanType.Common -> viewModel.startCommonPortsScan(ipAddress.text)
-                                    else -> {}
-                                }
-                                showWarningDialog = false
-                            }
-                        ) {
-                            Text("Start Scan", maxLines = 1)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showWarningDialog = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                )
-            }
-
-            if (showInfoDialog) {
-                AlertDialog(
-                    onDismissRequest = { showInfoDialog = false },
-                    title = { Text("Port Scanning Information") },
-                    text = {
-                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                            Text(
-                                text = "Common Ports Scan",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Scans ~150 high-priority ports frequently used by common services (SSH, HTTP, Database, Remote Desktop, etc.). This is faster and less intrusive than a full 65k port scan while identifying most common exposure points.",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            
-                            Text(
-                                text = "Benefits",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "• Identifies active services and versions.\n" +
-                                       "• Discovers potential entry points for security auditing.\n" +
-                                       "• Helps verify firewall and access control rules.",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            
-                            Text(
-                                text = "Dangers & Risks",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                text = "• Detection: Scans are easily flagged by IDS/IPS.\n" +
-                                       "• Stability: Aggressive scanning can crash fragile Operational Technology (OT) like PLCs or medical equipment.\n" +
-                                       "• Policy: Unauthorized scans may violate network policies or local regulations.",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { showInfoDialog = false }) {
-                            Text("Close")
-                        }
-                    }
-                )
-            }
-
-            if (showApiKeyRecommendation) {
-                AlertDialog(
-                    onDismissRequest = { showApiKeyRecommendation = false },
-                    title = { Text("Boost Your Scan Results") },
-                    text = {
-                        Text(
-                            "Adding a free NIST NVD API key allows RF_REAPR to fetch vulnerability data more reliably and with higher rate limits.\n\n" +
-                            "Without a key, the NIST API may throttle requests, leading to missing CVE data during audits."
-                        )
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                showApiKeyRecommendation = false
-                                onNavigateToSettings()
-                            }
-                        ) {
-                            Text("Go to Settings")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showApiKeyRecommendation = false }) {
-                            Text("Maybe Later")
-                        }
-                    }
-                )
-            }
-            
-            PortResultsList(
-                foundPorts = foundPorts,
-                ipAddress = ipAddress.text,
-                isPassiveMode = isPassiveMode,
-                onPortClick = onPortClick
-            )
-        }
-
-        selectedPortDetails?.let { port ->
-            PortDetailsDialog(
-                ipAddress = ipAddress.text,
-                port = port
-            ) { selectedPortDetails = null }
             if (isPassiveMode) {
+                item {
+                    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
+                        Text(
+                            "Passive (stealth) mode is on, so scanning is disabled. Turn it off in Settings to scan.",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+
+            if (!isApiKeySet && !apiKeyHintDismissed) {
+                item {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(
+                                "Optional: add a free NIST NVD API key for more reliable CVE lookups (higher rate limits).",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { apiKeyHintDismissed = true }) { Text("Dismiss") }
+                                TextButton(onClick = onNavigateToSettings) { Text("Settings") }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                OutlinedTextField(
+                    value = state.target,
+                    onValueChange = viewModel::updateTarget,
+                    label = { Text("Target IP or hostname") },
+                    placeholder = { Text("192.168.1.1") },
+                    singleLine = true,
+                    enabled = !state.isBusy,
+                    isError = state.target.isNotBlank() && validationError != null,
+                    supportingText = {
+                        val msg = if (state.target.isNotBlank()) validationError else null
+                        Text(msg ?: viewModel.estimateLabel())
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                    keyboardActions = KeyboardActions(onGo = {
+                        if (canStart) {
+                            keyboardController?.hide()
+                            showWarningDialog = true
+                        }
+                    }),
+                    trailingIcon = {
+                        if (state.target.isNotEmpty() && !state.isBusy) {
+                            IconButton(onClick = { viewModel.updateTarget("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear target")
+                            }
+                        }
+                    }
+                )
+            }
+
+            item {
+                Text("Ports", style = MaterialTheme.typography.labelLarge)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PortPreset.entries.forEach { preset ->
+                        FilterChip(
+                            selected = state.preset == preset,
+                            onClick = { viewModel.updatePreset(preset) },
+                            enabled = !state.isBusy,
+                            label = { Text(preset.label) }
+                        )
+                    }
+                }
+                if (state.preset == PortPreset.CUSTOM) {
+                    OutlinedTextField(
+                        value = state.customSpec,
+                        onValueChange = viewModel::updateCustomSpec,
+                        label = { Text("Ports and ranges") },
+                        placeholder = { Text("22,80,443,8000-8100") },
+                        singleLine = true,
+                        enabled = !state.isBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text("Speed", style = MaterialTheme.typography.labelLarge)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    ScanSpeed.entries.forEachIndexed { index, speed ->
+                        SegmentedButton(
+                            selected = state.speed == speed,
+                            onClick = { viewModel.updateSpeed(speed) },
+                            enabled = !state.isBusy,
+                            shape = SegmentedButtonDefaults.itemShape(index, ScanSpeed.entries.size)
+                        ) { Text(speed.label) }
+                    }
+                }
                 Text(
-                    "Passive Mode (Stealth). Scanning is inhibited.",
+                    when (state.speed) {
+                        ScanSpeed.GENTLE -> "Few parallel connections and long timeouts. Use on fragile devices, slow links or OT/ICS networks."
+                        ScanSpeed.NORMAL -> "Balanced for typical home and office LANs."
+                        ScanSpeed.FAST -> "Many parallel connections and short timeouts. May miss slow hosts and is noisy for IDS."
+                    },
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            item {
+                if (state.isBusy) {
+                    OutlinedButton(onClick = viewModel::stopScan, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Stop, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Stop scan")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            keyboardController?.hide()
+                            showWarningDialog = true
+                        },
+                        enabled = canStart,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Start scan")
+                    }
+                }
+            }
+
+            if (state.phase != ScanPhase.IDLE) {
+                item { ScanStatusCard(state, foundPorts) }
+            }
+
+            if (foundPorts.isEmpty() && state.phase == ScanPhase.DONE) {
+                item {
+                    Text(
+                        "No open TCP ports found. The host may be offline, firewalled, or only running services on other ports.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 16.dp)
+                    )
+                }
+            }
+
+            items(items = foundPorts, key = { it.port }, contentType = { "port" }) { port ->
+                AuditResultCard(
+                    ipAddress = state.scannedTarget.ifBlank { state.target },
+                    port = port,
+                    isPassiveMode = isPassiveMode,
+                    onClick = { selectedPortDetails = port }
+                )
+            }
+        }
+    }
+
+    if (showWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showWarningDialog = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Network audit warning") },
+            text = {
+                Text(
+                    "Port scanning is easily detected by IDS/IPS. Aggressive scanning can crash fragile " +
+                        "OT/ICS equipment such as PLCs, HMIs, medical devices and building controllers.\n\n" +
+                        "Only scan hosts you're authorized to test. ${viewModel.estimateLabel()}."
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showWarningDialog = false
+                    viewModel.startScan()
+                }) { Text("Start scan", maxLines = 1) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWarningDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showInfoDialog = false },
+            title = { Text("About port scanning") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("How it works", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "A TCP connect scan: RF-REAPR opens a normal connection to each port. If it connects, the port is open and the app reads the service greeting (or sends an HTTP HEAD request) to identify the software. Versions found in banners are checked against the local CVE database and the NIST NVD.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Port sets", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "• Common: ~170 ports used by remote access, databases, file sharing, IoT and industrial services.\n" +
+                            "• 1–1024: the well-known port range.\n" +
+                            "• All: every TCP port; slow.\n" +
+                            "• Custom: lists and ranges, e.g. 22,80,8000-8100.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Risks", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        "• Detection: scans are easily flagged by IDS/IPS.\n" +
+                            "• Stability: aggressive scanning can crash fragile OT equipment. Use Gentle speed.\n" +
+                            "• Policy: unauthorized scans may violate network policies or local law.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { showInfoDialog = false }) { Text("Close") } }
+        )
+    }
+
+    selectedPortDetails?.let { port ->
+        PortDetailsDialog(ipAddress = state.scannedTarget.ifBlank { state.target }, port = port) { selectedPortDetails = null }
+    }
+}
+
+@Composable
+private fun ScanStatusCard(state: PortScanUiState, ports: List<OpenPort>) {
+    val exposed = ports.count { PortCatalog.info(it.port)?.exposureRisk?.let { r -> r >= RiskLevel.HIGH } == true }
+    val vulnCount = ports.sumOf { it.vulnerabilities.size }
+    Card {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val title = when (state.phase) {
+                ScanPhase.SCANNING -> "Scanning ${state.scannedTarget}…"
+                ScanPhase.AUDITING -> "Checking banners for known CVEs…"
+                ScanPhase.DONE -> "Scan complete: ${state.scannedTarget}"
+                ScanPhase.STOPPED -> "Scan stopped: ${state.scannedTarget}"
+                ScanPhase.ERROR -> "Scan failed"
+                ScanPhase.IDLE -> ""
+            }
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            when (state.phase) {
+                ScanPhase.SCANNING -> LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+                ScanPhase.AUDITING -> LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                else -> Unit
+            }
+            state.error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Stat("Open", ports.size.toString())
+                Stat("Scanned", "${(state.progress * state.portsTotal).toInt()}/${state.portsTotal}")
+                Stat("Elapsed", formatDuration(state.elapsedMs))
+                Stat("ETA", state.eta ?: "–")
+            }
+            if (exposed > 0 || vulnCount > 0) {
+                Text(
+                    buildString {
+                        if (exposed > 0) append("$exposed high-risk service${if (exposed == 1) "" else "s"} exposed")
+                        if (exposed > 0 && vulnCount > 0) append(" · ")
+                        if (vulnCount > 0) append("$vulnCount CVE match${if (vulnCount == 1) "" else "es"}")
+                    },
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp)
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -425,40 +388,10 @@ fun PortScannerScreen(
 }
 
 @Composable
-fun PortResultsList(
-    foundPorts: List<OpenPort>,
-    ipAddress: String,
-    isPassiveMode: Boolean,
-    onPortClick: (OpenPort) -> Unit
-) {
-    val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
-
-    LazyColumn(
-        state = scrollState,
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScrollbar(scrollState)
-    ) {
-        items(
-            items = foundPorts,
-            key = { it.port },
-            contentType = { "port" }
-        ) { port ->
-            AuditResultCard(
-                ipAddress = ipAddress,
-                port = port,
-                isPassiveMode = isPassiveMode,
-                onClick = { onPortClick(port) }
-            )
-            if (isPassiveMode) {
-                Text(
-                    "Passive Mode (Stealth). Scanning is inhibited.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-        }
+private fun Stat(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -469,51 +402,51 @@ fun Modifier.verticalScrollbar(
     Modifier.drawWithContent {
         drawContent()
 
-    val layoutInfo = state.layoutInfo
-    val visibleItemsInfo = layoutInfo.visibleItemsInfo
-    if (visibleItemsInfo.isEmpty()) return@drawWithContent
+        val layoutInfo = state.layoutInfo
+        val visibleItemsInfo = layoutInfo.visibleItemsInfo
+        if (visibleItemsInfo.isEmpty()) return@drawWithContent
 
-    val totalItemsCount = layoutInfo.totalItemsCount
-    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-    if (viewportHeight <= 0) return@drawWithContent
+        val totalItemsCount = layoutInfo.totalItemsCount
+        val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+        if (viewportHeight <= 0 || visibleItemsInfo.size >= totalItemsCount) return@drawWithContent
 
-    val firstVisibleItem = visibleItemsInfo.first()
+        val firstVisibleItem = visibleItemsInfo.first()
+        val totalHeight = (viewportHeight.toFloat() / visibleItemsInfo.size) * totalItemsCount
+        val scrollbarHeight = (viewportHeight.toFloat() / totalHeight) * viewportHeight
+        val scrollOffset = (firstVisibleItem.index.toFloat() / totalItemsCount) * viewportHeight
 
-    val totalHeight = (viewportHeight.toFloat() / visibleItemsInfo.size) * totalItemsCount
-    val scrollbarHeight = (viewportHeight.toFloat() / totalHeight) * viewportHeight
-    val scrollOffset = (firstVisibleItem.index.toFloat() / totalItemsCount) * viewportHeight
-
-    drawRect(
-        color = Color.Gray.copy(alpha = 0.5f),
-        topLeft = Offset(size.width - width.toPx(), scrollOffset),
-        size = Size(width.toPx(), scrollbarHeight),
-    )
-})
-
-
+        drawRect(
+            color = Color.Gray.copy(alpha = 0.5f),
+            topLeft = Offset(size.width - width.toPx(), scrollOffset),
+            size = Size(width.toPx(), scrollbarHeight),
+        )
+    }
+)
 
 @Composable
 fun AuditResultCard(
     ipAddress: String,
     port: OpenPort,
-    isPassiveMode: Boolean,
+    @Suppress("UNUSED_PARAMETER") isPassiveMode: Boolean = false,
     onClick: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
-    val isWeb = isWebService(port.port, port.serviceName, port.banner)
+    val url = PortCatalog.webUrl(ipAddress, port.port, port.serviceName, port.banner)
+    val info = PortCatalog.info(port.port)
     val vulns = port.vulnerabilities
     val hasVulns = vulns.isNotEmpty()
     val allUnconfirmed = hasVulns && vulns.all { !it.isConfirmed }
+    val worstVuln = vulns.maxByOrNull { it.severity.ordinal }?.severity
+    val exposure = info?.exposureRisk
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
         color = when {
-            allUnconfirmed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-            hasVulns -> MaterialTheme.colorScheme.errorContainer
+            hasVulns && !allUnconfirmed -> MaterialTheme.colorScheme.errorContainer
+            hasVulns -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
             else -> MaterialTheme.colorScheme.surfaceVariant
         },
         tonalElevation = if (hasVulns) 0.dp else 1.dp
@@ -521,72 +454,58 @@ fun AuditResultCard(
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Port: ${port.port}", 
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Service: ${port.serviceName}", 
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-                
-                if (isWeb) {
-                    IconButton(
-                        onClick = { 
-                            val protocol = getProtocol(port.port, port.serviceName, port.banner)
-                            uriHandler.openUri("$protocol://$ipAddress:${port.port}")
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Language,
-                            contentDescription = "Open in Browser",
-                            tint = WebGold,
-                            modifier = Modifier.size(24.dp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "${port.port}/tcp",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
                         )
+                        Spacer(Modifier.width(8.dp))
+                        Text(port.serviceName, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (worstVuln != null) SeverityBadge(worstVuln)
+                        else if (exposure != null && exposure >= RiskLevel.MEDIUM) SeverityBadge(exposure)
+                    }
+                }
+                if (url != null) {
+                    IconButton(onClick = { uriHandler.openUri(url) }) {
+                        Icon(Icons.Default.Language, contentDescription = "Open in browser", tint = WebGold)
                     }
                 }
             }
 
-            if (port.banner != null) {
+            port.banner?.let { banner ->
                 Spacer(modifier = Modifier.height(6.dp))
-                Box(
+                Text(
+                    text = banner,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
-                            shape = MaterialTheme.shapes.extraSmall
-                        )
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f), MaterialTheme.shapes.extraSmall)
                         .padding(8.dp)
-                ) {
-                    Text(
-                        text = "Banner: ${port.banner}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                    )
-                }
-            }
-            
-            if (hasVulns) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = if (allUnconfirmed) "Potential vulnerabilities detected" else "Vulnerabilities detected", 
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold, 
-                    color = if (allUnconfirmed) MaterialTheme.colorScheme.error.copy(alpha = 0.7f) else MaterialTheme.colorScheme.error
                 )
             }
-            if (isPassiveMode) {
+
+            info?.exposureNote?.let { note ->
+                Spacer(Modifier.height(4.dp))
+                Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            if (hasVulns) {
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    "Passive Mode (Stealth). Scanning is inhibited.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp)
+                    text = "${vulns.size} ${if (allUnconfirmed) "potential " else ""}CVE match${if (vulns.size == 1) "" else "es"}. Tap for details.",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
                 )
             }
         }
@@ -600,75 +519,74 @@ fun PortDetailsDialog(
     onDismiss: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
-    val isWeb = isWebService(port.port, port.serviceName, port.banner)
-    val description = getServiceDescription(port.port, port.serviceName)
+    val clipboard = LocalClipboardManager.current
+    val url = PortCatalog.webUrl(ipAddress, port.port, port.serviceName, port.banner)
+    val info = PortCatalog.info(port.port)
+    val description = info?.description ?: getServiceDescription(port.port, port.serviceName)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Port ${port.port} Details") },
+        title = { Text("Port ${port.port} · ${port.serviceName}") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text(text = "Service: ${port.serviceName}", fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "Description",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Text("Description", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 Text(text = description, style = MaterialTheme.typography.bodyMedium)
-                
-                if (port.banner != null) {
+
+                info?.exposureNote?.let { note ->
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Banner (Raw Output)",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    Text(
-                        text = port.banner,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                    )
+                    Text("Why it matters", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
+                    Text(note, style = MaterialTheme.typography.bodyMedium)
+                    info.exposureRisk?.let { SeverityBadge(it) }
+                }
+
+                port.banner?.let { banner ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Banner",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { clipboard.setText(AnnotatedString(banner)) }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy banner", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    Text(text = banner, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                 }
 
                 if (port.vulnerabilities.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Vulnerabilities",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    port.vulnerabilities.forEach { vuln ->
+                    Text("Vulnerabilities", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
+                    port.vulnerabilities.sortedByDescending { it.severity.ordinal }.forEach { vuln ->
                         val annotatedLink = buildAnnotatedString {
-                            append("• ")
-                            withStyle(style = SpanStyle(
-                                color = MaterialTheme.colorScheme.primary,
-                                textDecoration = TextDecoration.Underline,
-                                fontWeight = FontWeight.Bold
-                            )) {
-                                append(vuln.cveId)
-                            }
-                            if (!vuln.isConfirmed) {
-                                append(" (Potential)")
-                            }
+                            withStyle(
+                                SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            ) { append(vuln.cveId) }
+                            if (!vuln.isConfirmed) append(" (potential)")
                             append(": ${vuln.description}")
                         }
+                        Spacer(Modifier.height(6.dp))
+                        SeverityBadge(vuln.severity)
                         Text(
                             text = annotatedLink,
                             style = MaterialTheme.typography.bodySmall,
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.clickable {
-                                uriHandler.openUri("https://cve.mitre.org/cgi-bin/cvename.cgi?name=${vuln.cveId}")
+                                uriHandler.openUri("https://nvd.nist.gov/vuln/detail/${vuln.cveId}")
                             }
                         )
-                        SeverityBadge(vuln.severity)
-                        Spacer(modifier = Modifier.height(4.dp))
                     }
 
                     if (port.vulnerabilities.any { !it.isConfirmed }) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "* Potential vulnerabilities are matched by service name only because no version banner was detected.",
+                            text = "* Potential matches are based on the product name without a confirmed version. Verify manually.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -677,80 +595,28 @@ fun PortDetailsDialog(
             }
         },
         confirmButton = {
-            if (isWeb) {
-                Button(
-                    onClick = {
-                        val protocol = getProtocol(port.port, port.serviceName, port.banner)
-                        uriHandler.openUri("$protocol://$ipAddress:${port.port}")
-                    }
-                ) {
-                    Text("Open in Browser")
-                }
+            if (url != null) {
+                Button(onClick = { uriHandler.openUri(url) }) { Text("Open in browser") }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
-            }
+            TextButton(onClick = onDismiss) { Text("Close") }
         }
     )
 }
 
-private fun isWebService(port: Int, serviceName: String, banner: String?): Boolean {
-    val webPorts = listOf(
-        80, 443, 444, 8000, 8008, 8080, 8081, 8443, 8880, 8888, 9000, 9090, 9443,
-        3000, 3001, 5000, 5001
-    )
-    val isWebPort = port in webPorts
-    val isWebServiceName = serviceName.contains("http", ignoreCase = true) || 
-                          serviceName.contains("www", ignoreCase = true)
-    
-    val isWebBanner = banner?.let {
-        it.contains("HTTP/", ignoreCase = true) ||
-        it.contains("Server:", ignoreCase = true) ||
-        it.contains("<html>", ignoreCase = true) ||
-        it.contains("Content-Type:", ignoreCase = true)
-    } ?: false
-
-    return isWebPort || isWebServiceName || isWebBanner
-}
-
-private fun getProtocol(port: Int, serviceName: String, banner: String?): String {
-    val httpsPorts = listOf(443, 444, 8443, 9443)
-    val isHttpsPort = port in httpsPorts
-    val isHttpsServiceName = serviceName.contains("https", ignoreCase = true)
-    val isHttpsBanner = banner?.let {
-        it.contains("SSL", ignoreCase = true) ||
-        it.contains("TLS", ignoreCase = true) ||
-        it.contains("HTTPS", ignoreCase = true)
-    } ?: false
-
-    return if (isHttpsPort || isHttpsServiceName || isHttpsBanner) "https" else "http"
-}
-
-private fun getServiceDescription(port: Int, serviceName: String): String {
-    return when {
-        port == 21 || serviceName.contains("ftp", ignoreCase = true) -> "File Transfer Protocol (FTP). Used for transferring files between a client and server. Often used for website maintenance."
-        port == 22 || serviceName.contains("ssh", ignoreCase = true) -> "Secure Shell (SSH). Provides a secure encrypted connection for remote command-line access and file transfers."
-        port == 23 || serviceName.contains("telnet", ignoreCase = true) -> "Telnet. An older, unencrypted protocol for remote command-line access. HIGHLY INSECURE."
-        port == 25 || port == 587 || serviceName.contains("smtp", ignoreCase = true) -> "Simple Mail Transfer Protocol (SMTP). Used for sending emails between servers."
-        port == 53 || serviceName.contains("dns", ignoreCase = true) -> "Domain Name System (DNS). Translates human-readable domain names (like google.com) into IP addresses."
-        port == 80 || port == 8080 || serviceName.contains("http", ignoreCase = true) -> "Hypertext Transfer Protocol (HTTP). The foundation of the World Wide Web, used for loading unencrypted web pages."
-        port == 443 || port == 8443 || serviceName.contains("https", ignoreCase = true) -> "Hypertext Transfer Protocol Secure (HTTPS). The secure, encrypted version of HTTP used for safe web browsing."
-        port == 445 || serviceName.contains("microsoft-ds", ignoreCase = true) -> "Server Message Block (SMB). Used for file sharing and printer sharing in Windows environments. Common target for exploits like EternalBlue."
-        port == 3306 || serviceName.contains("mysql", ignoreCase = true) -> "MySQL Database Service. A popular open-source relational database management system."
-        port == 3389 || serviceName.contains("rdp", ignoreCase = true) -> "Remote Desktop Protocol (RDP). Allows users to remotely connect to and control a Windows computer."
-        else -> "Standard network service. The exact function depends on the software listening on this port."
-    }
+private fun getServiceDescription(port: Int, serviceName: String): String = when {
+    serviceName.contains("http", ignoreCase = true) -> "Web server. Open it in a browser to see what's being served."
+    else -> "Port $port accepted a TCP connection. The exact service depends on the software listening here; check the banner if one was captured."
 }
 
 @Composable
 fun SeverityBadge(severity: RiskLevel) {
     val color = when (severity) {
-        RiskLevel.LOW -> Color.Green
-        RiskLevel.MEDIUM -> Color.Yellow
-        RiskLevel.HIGH -> Color(0xFFFFA500) // Orange
-        RiskLevel.CRITICAL -> Color.Red
+        RiskLevel.LOW -> Color(0xFF4CAF50)
+        RiskLevel.MEDIUM -> Color(0xFFFFC107)
+        RiskLevel.HIGH -> Color(0xFFFF9800)
+        RiskLevel.CRITICAL -> Color(0xFFF44336)
     }
     Box(
         modifier = Modifier
@@ -765,9 +631,4 @@ fun SeverityBadge(severity: RiskLevel) {
             fontWeight = FontWeight.Bold
         )
     }
-}
-
-sealed class ScanType {
-    data class Full(val start: Int, val end: Int) : ScanType()
-    object Common : ScanType()
 }

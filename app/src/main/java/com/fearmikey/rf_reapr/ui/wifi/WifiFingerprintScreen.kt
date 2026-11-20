@@ -22,6 +22,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.WifiAccessPoint
+import com.fearmikey.rf_reapr.domain.service.ChannelAdvice
+import com.fearmikey.rf_reapr.domain.service.WifiSecurityAnalyzer
+import com.fearmikey.rf_reapr.domain.service.WifiSecurityFamily
 import com.fearmikey.rf_reapr.ui.theme.WifiOrange
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,6 +38,10 @@ fun WifiFingerprintScreen(
     val selectedRange by viewModel.selectedRange.collectAsStateWithLifecycle()
     val hiddenBssids by viewModel.hiddenBssids.collectAsStateWithLifecycle()
     val simplifyGraph by viewModel.simplifyGraph.collectAsStateWithLifecycle()
+    val scanStatus by viewModel.scanStatus.collectAsStateWithLifecycle()
+    val channelAdvice by viewModel.channelAdvice.collectAsStateWithLifecycle()
+    val allAccessPoints by viewModel.accessPoints.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(
@@ -134,7 +141,16 @@ fun WifiFingerprintScreen(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                Text("Scanning for nearby Access Points...")
+                Text(
+                    when {
+                        !scanStatus.wifiEnabled -> "Wi-Fi is off. Turn it on (or enable Wi-Fi scanning in location settings)."
+                        !scanStatus.lastRequestAccepted -> "Android is throttling scans (4 per 2 min); showing cached results. Refreshes every 30 s."
+                        scanStatus.lastResultsAt > 0 -> "Live: ${scanStatus.resultCount} APs · refreshes every 30 s"
+                        else -> "Scanning for nearby access points…"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (!scanStatus.wifiEnabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -168,6 +184,10 @@ fun WifiFingerprintScreen(
                     }
                 }
 
+                if (allAccessPoints.isNotEmpty()) {
+                    item { WifiSecuritySummary(allAccessPoints, channelAdvice) }
+                }
+
                 item {
                     WifiChannelGraph(
                         accessPoints = filteredAccessPoints,
@@ -183,10 +203,17 @@ fun WifiFingerprintScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = viewModel::setQuery,
+                        placeholder = { Text("Filter by SSID, BSSID or vendor") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                    )
                 }
 
                 items(
-                    items = filteredAccessPoints.sortedByDescending { it.signalLevel },
+                    items = filteredAccessPoints.sortedWith(compareByDescending<WifiAccessPoint> { it.isRogueSuspect }.thenByDescending { it.signalLevel }),
                     key = { it.bssid } // Performance: Stable keys for lazy list
                 ) { ap ->
                     WifiAccessPointItem(
@@ -199,6 +226,49 @@ fun WifiFingerprintScreen(
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WifiSecuritySummary(aps: List<WifiAccessPoint>, advice: ChannelAdvice?) {
+    val securities = remember(aps) { aps.map { WifiSecurityAnalyzer.analyze(it.capabilities) } }
+    val open = securities.count { it.family == WifiSecurityFamily.OPEN }
+    val wep = securities.count { it.family == WifiSecurityFamily.WEP }
+    val wpa1 = securities.count { it.family == WifiSecurityFamily.WPA }
+    val wps = securities.count { it.wps }
+    val wpa3 = securities.count { it.family == WifiSecurityFamily.WPA3 }
+    val rogues = aps.count { it.isRogueSuspect }
+    val networks = aps.map { it.ssid }.filter { it.isNotBlank() }.distinct().size
+    val hidden = aps.count { it.ssid.isBlank() }
+
+    Card(colors = CardDefaults.cardColors(containerColor = if (rogues > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Security overview", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("${aps.size} radios · $networks networks" + if (hidden > 0) " · $hidden hidden" else "", style = MaterialTheme.typography.bodySmall)
+            if (rogues > 0) {
+                Text("$rogues possible evil-twin AP${if (rogues == 1) "" else "s"}", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+            }
+            val weak = listOfNotNull(
+                open.takeIf { it > 0 }?.let { "$it open" },
+                wep.takeIf { it > 0 }?.let { "$it WEP" },
+                wpa1.takeIf { it > 0 }?.let { "$it WPA1" },
+                wps.takeIf { it > 0 }?.let { "$it with WPS" }
+            )
+            Text(
+                if (weak.isEmpty()) "No open, WEP or WPS networks nearby" else "Weak: ${weak.joinToString()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (weak.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
+            )
+            if (wpa3 > 0) Text("$wpa3 support WPA3", style = MaterialTheme.typography.bodySmall)
+            advice?.let {
+                Text(
+                    "Best ${it.band.label} channel: ${it.bestChannel} (${it.reason})",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -256,14 +326,36 @@ fun WifiAccessPointItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isHidden) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = "Capabilities: ${ap.capabilities}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isHidden) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface
+                val security = remember(ap.capabilities) { WifiSecurityAnalyzer.analyze(ap.capabilities) }
+                val extras = listOfNotNull(
+                    "${ap.bandwidth} MHz",
+                    ap.standard,
+                    ap.vendor,
+                    if (ap.isConnected) "Connected" else null
                 )
+                Text(
+                    text = extras.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isHidden) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                    Text(
+                        text = security.label + if (security.wps) " · WPS" else "",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = when (security.risk) {
+                            com.fearmikey.rf_reapr.domain.model.RiskLevel.HIGH, com.fearmikey.rf_reapr.domain.model.RiskLevel.CRITICAL -> MaterialTheme.colorScheme.error
+                            com.fearmikey.rf_reapr.domain.model.RiskLevel.MEDIUM -> Color(0xFFFF9800)
+                            else -> Color(0xFF4CAF50)
+                        }
+                    )
+                }
+                security.issues.forEach { issue ->
+                    Text("• $issue", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (isRogue) {
                     Text(
-                        text = "POTENTIAL ROGUE AP / EVIL TWIN",
+                        text = "POSSIBLE EVIL TWIN" + (ap.rogueReason?.let { ": $it" } ?: ""),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Bold

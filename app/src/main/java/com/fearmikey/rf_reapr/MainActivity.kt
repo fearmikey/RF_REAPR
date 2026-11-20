@@ -20,9 +20,15 @@ import com.fearmikey.rf_reapr.ui.wireless.CellularReconScreen
 import com.fearmikey.rf_reapr.ui.wireless.WpsPinCalculatorScreen
 import com.fearmikey.rf_reapr.ui.network.SubnetCalculatorScreen
 import com.fearmikey.rf_reapr.ui.network.MacLookupScreen
+import com.fearmikey.rf_reapr.ui.network.MacLookupViewModel
+import com.fearmikey.rf_reapr.ui.network.SubnetCalculatorViewModel
+import com.fearmikey.rf_reapr.ui.network.DnsQueryViewModel
+import com.fearmikey.rf_reapr.ui.network.WolViewModel
+import com.fearmikey.rf_reapr.system.NetworkAlertNotificationManager
 import com.fearmikey.rf_reapr.ui.network.DnsQueryScreen
 import com.fearmikey.rf_reapr.ui.network.WolInjectorScreen
 import com.fearmikey.rf_reapr.ui.network.CaptivePortalDetectorScreen
+import com.fearmikey.rf_reapr.ui.network.CaptivePortalViewModel
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import androidx.navigation.compose.NavHost
@@ -143,6 +150,10 @@ class MainActivity : ComponentActivity() {
         val bleRepository = BleScannerRepositoryImpl(this)
         nfcRepository = NfcScannerRepositoryImpl()
         val dhcpRepository = DhcpMonitorRepositoryImpl(discoveryRepository)
+        val ouiRepository = OuiRepositoryImpl(this)
+        val dnsQueryRepository = DnsQueryRepositoryImpl(okHttpClient)
+        val wolRepository = WolRepositoryImpl(this)
+        val networkAlertNotifier = NetworkAlertNotificationManager(this)
         val websiteInspectorRepository = WebsiteInspectorRepositoryImpl(okHttpClient)
         val subdomainFinderRepository = SubdomainFinderRepositoryImpl(okHttpClient)
         val tlsCipherScannerRepository = TlsCipherScannerRepositoryImpl()
@@ -171,8 +182,8 @@ class MainActivity : ComponentActivity() {
         val serviceDiscoveryRepository = ServiceDiscoveryRepositoryImpl(this)
         val dnsAuditorRepository = DnsAuditorRepositoryImpl(this, okHttpClient)
         val tracerouteRepository = TracerouteRepositoryImpl()
-        val arpDetectorRepository = ArpDetectorRepositoryImpl(this)
-        val upnpScannerRepository = UpnpScannerRepositoryImpl()
+        val arpDetectorRepository = ArpDetectorRepositoryImpl(this, networkAlertNotifier)
+        val upnpScannerRepository = UpnpScannerRepositoryImpl(okHttpClient, discoveryRepository)
         val shodanRepository = ShodanRepositoryImpl(okHttpClient, settingsRepository)
         val internetDbRepository = InternetDbRepositoryImpl(okHttpClient)
         val hidRepository = LocalHidRepository(database.hidScriptDao())
@@ -181,6 +192,11 @@ class MainActivity : ComponentActivity() {
         val exifRepository = ExifRepositoryImpl(this)
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                nfcRepository.readerRequested.collect { updateNfcReaderMode(it) }
+            }
+        }
 
         // Schedule Workers
         scheduleRecycleBinCleanup()
@@ -320,7 +336,9 @@ class MainActivity : ComponentActivity() {
                             TopologyScreen(
                                 viewModel = topologyViewModel,
                                 onBack = { navController.popBackStack() },
-                                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                                onNavigateToPortScanner = { ip -> navController.navigate(Screen.PortScanner.createRoute(ip)) },
+                                onNavigateToThreatIntel = { ip -> navController.navigate(Screen.ThreatIntel.createRoute(ip)) }
                             )
                         }
                         composable(Screen.WifiFingerprinter.route) {
@@ -333,7 +351,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.BluetoothProximityFinder.route) {
                             val proximityViewModel: BluetoothProximityFinderViewModel = viewModel {
-                                                    BluetoothProximityFinderViewModel(proximityRepository, bleRepository)
+                                                    BluetoothProximityFinderViewModel(proximityRepository, bleRepository, logRepository, networkAlertNotifier)
                                                 }
                             BluetoothProximityFinderScreen(
                                 viewModel = proximityViewModel,
@@ -341,7 +359,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.NfcScanner.route) {
                             val nfcViewModel: NfcScannerViewModel = viewModel {
-                                                    NfcScannerViewModel(nfcRepository)
+                                                    NfcScannerViewModel(nfcRepository, logRepository)
                                                 }
                             NfcScannerScreen(
                                 viewModel = nfcViewModel,
@@ -364,13 +382,13 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.DhcpMonitor.route) {
                             val dhcpViewModel: DhcpMonitorViewModel = viewModel {
-                                                    DhcpMonitorViewModel(dhcpRepository, settingsRepository)
+                                                    DhcpMonitorViewModel(dhcpRepository, settingsRepository, networkAlertNotifier)
                                                 }
                             DhcpMonitorScreen(
                                 viewModel = dhcpViewModel,
                                 onBack = { navController.popBackStack() },
-                                onDeviceClick = { device ->
-                                    navController.navigate(Screen.PortScanner.createRoute(device.ipAddress))
+                                onPortScan = { ip ->
+                                    navController.navigate(Screen.PortScanner.createRoute(ip))
                                 }
                             )
                         }
@@ -451,9 +469,17 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
-                        composable(Screen.ThreatIntel.route) {
+                        composable(Screen.ThreatIntel.route) { backStackEntry ->
                             val threatIntelViewModel: ThreatIntelViewModel = viewModel {
                                 ThreatIntelViewModel(threatIntelRepository, settingsRepository)
+                            }
+                            // Prefill the IP when opened from another tool (e.g. the network map).
+                            // The lookup itself still requires an explicit tap (online service).
+                            val initialIp = backStackEntry.arguments?.getString("ip")
+                            LaunchedEffect(initialIp) {
+                                if (!initialIp.isNullOrBlank() && threatIntelViewModel.ipAddress.value.isBlank()) {
+                                    threatIntelViewModel.onIpAddressChanged(initialIp)
+                                }
                             }
                             ThreatIntelScreen(
                                 viewModel = threatIntelViewModel,
@@ -463,12 +489,13 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
-                        composable(Screen.PingTool.route) {
+                        composable(Screen.PingTool.route) { backStackEntry ->
                             val pingViewModel: PingViewModel = viewModel {
-                                                    PingViewModel(pingRepository, logRepository, settingsRepository)
-                                                }
+                                PingViewModel(pingRepository, logRepository, settingsRepository, discoveryRepository)
+                            }
                             PingScreen(
                                 viewModel = pingViewModel,
+                                initialHost = backStackEntry.arguments?.getString("host"),
                             ) { navController.popBackStack() }
                         }
                         composable(Screen.HidInjector.route) {
@@ -572,6 +599,7 @@ class MainActivity : ComponentActivity() {
                                                 }
                             ServiceDiscoveryScreen(
                                 viewModel = serviceDiscoveryViewModel,
+                                onPortScan = { ip -> navController.navigate(Screen.PortScanner.createRoute(ip)) }
                             ) { navController.popBackStack() }
                         }
                         composable(Screen.DnsAuditor.route) {
@@ -588,11 +616,12 @@ class MainActivity : ComponentActivity() {
                                                 }
                             TracerouteScreen(
                                 viewModel = tracerouteViewModel,
+                                onPingHost = { ip -> navController.navigate(Screen.PingTool.createRoute(ip)) }
                             ) { navController.popBackStack() }
                         }
                         composable(Screen.ArpDetector.route) {
                             val arpDetectorViewModel: ArpDetectorViewModel = viewModel {
-                                                    ArpDetectorViewModel(arpDetectorRepository)
+                                                    ArpDetectorViewModel(arpDetectorRepository, logRepository)
                                                 }
                             ArpDetectorScreen(
                                 viewModel = arpDetectorViewModel,
@@ -600,7 +629,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.UpnpAuditor.route) {
                             val upnpScannerViewModel: UpnpScannerViewModel = viewModel {
-                                                    UpnpScannerViewModel(upnpScannerRepository, settingsRepository)
+                                                    UpnpScannerViewModel(upnpScannerRepository, settingsRepository, logRepository)
                                                 }
                             UpnpAuditorScreen(
                                 viewModel = upnpScannerViewModel,
@@ -628,7 +657,8 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.PacketCapture.route) {
                             PacketCaptureScreen(
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                onOpenCaptures = { navController.navigate(Screen.PacketCaptureLogs.route) }
                             )
                         }
                         composable(Screen.SnmpBrowser.route) {
@@ -643,19 +673,28 @@ class MainActivity : ComponentActivity() {
 
                         // --- NEW TOOLS ---
                         composable(Screen.SubnetCalculator.route) {
-                            SubnetCalculatorScreen { navController.popBackStack() }
+                            val subnetViewModel: SubnetCalculatorViewModel = viewModel { SubnetCalculatorViewModel(discoveryRepository) }
+                            SubnetCalculatorScreen(viewModel = subnetViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.MacLookup.route) {
-                            MacLookupScreen { navController.popBackStack() }
+                            val macLookupViewModel: MacLookupViewModel = viewModel { MacLookupViewModel(ouiRepository) }
+                            MacLookupScreen(viewModel = macLookupViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.DnsQuery.route) {
-                            DnsQueryScreen { navController.popBackStack() }
+                            val dnsQueryViewModel: DnsQueryViewModel = viewModel { DnsQueryViewModel(dnsQueryRepository) }
+                            DnsQueryScreen(viewModel = dnsQueryViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.WolInjector.route) {
-                            WolInjectorScreen { navController.popBackStack() }
+                            val wolViewModel: WolViewModel = viewModel {
+                                WolViewModel(wolRepository, discoveryRepository, scanSessionRepository)
+                            }
+                            WolInjectorScreen(viewModel = wolViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.CaptivePortalDetector.route) {
-                            CaptivePortalDetectorScreen { navController.popBackStack() }
+                            val captiveViewModel: CaptivePortalViewModel = viewModel {
+                                CaptivePortalViewModel(applicationContext, okHttpClient, logRepository)
+                            }
+                            CaptivePortalDetectorScreen(viewModel = captiveViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.HashCalculator.route) {
                             HashCalculatorScreen { navController.popBackStack() }
@@ -868,20 +907,28 @@ class MainActivity : ComponentActivity() {
                intent?.action == MediaStore.ACTION_IMAGE_CAPTURE
     }
 
-    override fun onResume() {
-        super.onResume()
-        nfcAdapter?.enableReaderMode(
-            this,
-            { tag ->
-                vibratePhone()
-                nfcRepository.processTag(tag)
-            },
-            NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or
+    /**
+     * Reader mode only while the NFC Scanner screen asks for it. It used to be on for the
+     * whole app, intercepting taps (and NFC payments) on every screen.
+     */
+    private fun updateNfcReaderMode(enabled: Boolean) {
+        val adapter = nfcAdapter ?: return
+        if (enabled) {
+            adapter.enableReaderMode(
+                this,
+                { tag ->
+                    vibratePhone()
+                    nfcRepository.processTag(tag)
+                },
+                NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or
                     NfcAdapter.FLAG_READER_NFC_F or NfcAdapter.FLAG_READER_NFC_V or
                     NfcAdapter.FLAG_READER_NFC_BARCODE or
                     NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK,
-            null,
-        )
+                null,
+            )
+        } else {
+            runCatching { adapter.disableReaderMode(this) }
+        }
     }
 
     private fun vibratePhone() {
@@ -899,7 +946,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
-        nfcAdapter?.disableReaderMode(this)
+        runCatching { nfcAdapter?.disableReaderMode(this) }
     }
 
     override fun onNewIntent(intent: Intent) {

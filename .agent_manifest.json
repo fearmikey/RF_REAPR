@@ -76,6 +76,13 @@
         "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/components/DeviceDetailBottomSheet.kt",
         "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/components/NetworkNodeList.kt"
       ],
+      "ui_helpers": "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/TopologyUi.kt (shared risk colors, DeviceType icons/names, TopologyFilter search+sort logic, NodeSortOrder, node summary text)",
+      "ui_state_notes": "TopologyViewModel exposes activeNodeScans (per-node scan kinds), auditProgress, deepScanCompleted, nodeResults (last per-node result shown in the sheet), and a messages Flow for snackbars. The port scanner repository is single-target, so port scans are serialized via isPortScannerBusy.",
+      "navigation_out": "TopologyScreen -> Screen.PortScanner.createRoute(ip), Screen.ThreatIntel.createRoute(ip) (wired in MainActivity; ThreatIntel prefills the IP only)",
+      "tests": [
+        "app/src/test/java/com/fearmikey/rf_reapr/ui/topology/TopologyFilterTest.kt",
+        "app/src/test/java/com/fearmikey/rf_reapr/domain/mapper/TopologyMapperTest.kt"
+      ],
       "domain_models": [
         "app/src/main/java/com/fearmikey/rf_reapr/domain/model/NetworkNode.kt",
         "app/src/main/java/com/fearmikey/rf_reapr/domain/model/MappedGraph.kt"
@@ -96,6 +103,83 @@
         "app/src/main/java/com/fearmikey/rf_reapr/domain/service/DeviceIdentificationService.kt",
         "app/src/main/java/com/fearmikey/rf_reapr/domain/layout/TopologyLayoutEngine.kt"
       ]
+    },
+    "dhcp_network_monitor": {
+      "route": "Screen.DhcpMonitor ('dhcp_monitor')",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/dhcp/DhcpMonitorScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/dhcp/DhcpMonitorViewModel.kt",
+      "domain_models": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/MonitoredDevice.kt (MonitoredDevice, NetworkEvent, NetworkEventType, MonitorStats)"
+      ],
+      "domain_repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/DhcpMonitorRepository.kt",
+      "data_repository": "app/src/main/java/com/fearmikey/rf_reapr/data/repository/DhcpMonitorRepositoryImpl.kt (baseline + sweep diffing via NetworkDiscoveryRepository; offline after 2 missed sweeps)",
+      "notifier": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/NetworkAlertNotifier.kt",
+        "app/src/main/java/com/fearmikey/rf_reapr/system/NetworkAlertNotificationManager.kt (channel 'network_alerts_channel')"
+      ],
+      "notes": "Monitoring registers 'Network Monitor' with ActiveTaskMonitor so it keeps running in the foreground service while backgrounded; stops when the screen's ViewModel is cleared.",
+      "tests": ["app/src/test/java/com/fearmikey/rf_reapr/data/repository/DhcpMonitorRepositoryImplTest.kt"]
+    },
+    "mdns_service_discovery": {
+      "route": "Screen.ServiceDiscovery",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/mdns/ServiceDiscoveryScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/mdns/ServiceDiscoveryViewModel.kt (60s timed browse, logs results as TOPOLOGY)",
+      "domain_repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/ServiceDiscoveryRepository.kt (DiscoveredService)",
+      "data_repository": "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ServiceDiscoveryRepositoryImpl.kt (NsdManager; _services._dns-sd._udp meta-query; serialized resolves)",
+      "domain_service": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/MdnsServiceCatalog.kt (service type labels/categories/security notes, host grouping)",
+      "tests": ["app/src/test/java/com/fearmikey/rf_reapr/domain/service/MdnsServiceCatalogTest.kt"]
+    },
+    "mac_oui_lookup": {
+      "route": "Screen.MacLookup",
+      "ui_screen": "app/src/main/java/com/fearmikey/rf_reapr/ui/network/MacLookupScreen.kt",
+      "ui_viewmodel": "app/src/main/java/com/fearmikey/rf_reapr/ui/network/MacLookupViewModel.kt",
+      "domain_repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/OuiRepository.kt",
+      "data_repository": "app/src/main/java/com/fearmikey/rf_reapr/data/repository/OuiRepositoryImpl.kt (DeviceIdentificationService.builtInOuiTable merged with optional assets/oui.json)",
+      "domain_service": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/MacAddressAnalyzer.kt (parse/format/extract MACs, randomized & multicast bits)",
+      "tests": ["app/src/test/java/com/fearmikey/rf_reapr/domain/service/MacAddressAnalyzerTest.kt"]
+    },
+    "network_diagnostics": {
+      "shared": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/HostValidator.kt (validate/normalize hosts before exec'ing ping etc. - prevents option injection)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/components/MiniLineChart.kt (RTT / throughput charts)"
+      ],
+      "ping": {
+        "route": "Screen.PingTool ('ping_tool?host={host}', createRoute(host))",
+        "ui": ["app/src/main/java/com/fearmikey/rf_reapr/ui/ping/PingScreen.kt", "app/src/main/java/com/fearmikey/rf_reapr/ui/ping/PingViewModel.kt"],
+        "repository": ["app/src/main/java/com/fearmikey/rf_reapr/domain/repository/PingRepository.kt (PingOptions)", "app/src/main/java/com/fearmikey/rf_reapr/data/repository/PingRepositoryImpl.kt"],
+        "parser": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/PingOutputParser.kt (PingReply, PingStats, PingQuality)"
+      },
+      "traceroute": {
+        "route": "Screen.Traceroute",
+        "ui": ["app/src/main/java/com/fearmikey/rf_reapr/ui/traceroute/TracerouteScreen.kt", "app/src/main/java/com/fearmikey/rf_reapr/ui/traceroute/TracerouteViewModel.kt"],
+        "repository": ["app/src/main/java/com/fearmikey/rf_reapr/domain/repository/TracerouteRepository.kt (TracerouteHop, TracerouteOptions, TracerouteResult)", "app/src/main/java/com/fearmikey/rf_reapr/data/repository/TracerouteRepositoryImpl.kt (TTL probes + direct per-hop RTT pings + reverse DNS)"]
+      },
+      "iperf": {
+        "ui": ["app/src/main/java/com/fearmikey/rf_reapr/ui/iperf/IperfScreen.kt", "app/src/main/java/com/fearmikey/rf_reapr/ui/iperf/IperfViewModel.kt"],
+        "repository": "app/src/main/java/com/fearmikey/rf_reapr/iperf/IperfRepository.kt (IperfConfig -> args, always -J)",
+        "parser": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/IperfResultParser.kt (Gson; iperf3 JSON -> IperfSummary)"
+      },
+      "packet_capture": {
+        "state": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/PacketCaptureSession.kt (process-wide CaptureState written by PcapVpnService / RootPcapCapture)",
+        "parser": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/PacketSummarizer.kt (PacketSummarizer, CaptureAggregator)",
+        "notes": "VPN mode excludes RF-REAPR via addDisallowedApplication and records but does not forward packets. RootPcapCapture is a singleton (RootPcapCapture.get) with a validated BPF filter. Captures keep running when the screen closes."
+      },
+      "subnet_calculator": {
+        "ui": ["app/src/main/java/com/fearmikey/rf_reapr/ui/network/SubnetCalculatorScreen.kt", "app/src/main/java/com/fearmikey/rf_reapr/ui/network/SubnetCalculatorViewModel.kt"],
+        "engine": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/SubnetCalculator.kt (pure IPv4 maths, SubnetInfo, Ipv4AddressType)"
+      },
+      "dns_query": {
+        "ui": ["app/src/main/java/com/fearmikey/rf_reapr/ui/network/DnsQueryScreen.kt", "app/src/main/java/com/fearmikey/rf_reapr/ui/network/DnsQueryViewModel.kt"],
+        "repository": ["app/src/main/java/com/fearmikey/rf_reapr/domain/repository/DnsQueryRepository.kt (DnsResolver: Cloudflare/Google DoH or device)", "app/src/main/java/com/fearmikey/rf_reapr/data/repository/DnsQueryRepositoryImpl.kt"],
+        "parser": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/DnsTools.kt (DohResponseParser, DnsInput, EmailSecurityAnalyzer)"
+      },
+      "wake_on_lan": {
+        "ui": ["app/src/main/java/com/fearmikey/rf_reapr/ui/network/WolInjectorScreen.kt", "app/src/main/java/com/fearmikey/rf_reapr/ui/network/WolViewModel.kt"],
+        "repository": ["app/src/main/java/com/fearmikey/rf_reapr/domain/repository/WolRepository.kt", "app/src/main/java/com/fearmikey/rf_reapr/data/repository/WolRepositoryImpl.kt (SharedPreferences 'wol_targets')"],
+        "model": "app/src/main/java/com/fearmikey/rf_reapr/domain/model/WolTarget.kt",
+        "packet": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/WolPacketBuilder.kt"
+      },
+      "tests": "app/src/test/java/com/fearmikey/rf_reapr/domain/service/{HostValidator,PingOutputParser,IperfResultParser,PacketSummarizer,SubnetCalculator,DnsTools,WolPacketBuilder}Test.kt"
     },
     "port_scanner": {
       "route": "Screen.PortScanner ('port_scanner?ip={ip}')",
@@ -358,5 +442,25 @@
       ],
       "dao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/EventLogDao.kt"
     }
+  },
+  "analysis_services": {
+    "_note": "Pure-Kotlin analyzers in domain/service (no Android deps, unit-tested). Tools delegate parsing/scoring to these so the logic is testable. Added/expanded in the 2026 tool-enhancement pass.",
+    "port_catalog": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/PortCatalog.kt (service names, exposure notes/risk, COMMON_PORTS, parsePortSpec, webUrl) - powers PortScanner (stateless scan(host,ports,options) in PortScannerRepository + banner grabbing in PortScannerRepositoryImpl)",
+    "upnp": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/UpnpTools.kt (SSDP/description/SOAP/NAT-PMP parsing + findings) - UpnpScannerRepository.audit() reads IGD port mappings read-only; UpnpScannerViewModel/UpnpAuditorScreen",
+    "dns_audit": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/DnsAuditEvaluator.kt (sentinel/NXDOMAIN/DNSSEC/rebinding checks, CheckStatus) - DnsAuditorRepositoryImpl gathers system vs DoH; DnsAuditorViewModel/Screen rewritten to a checklist",
+    "captive_portal": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/CaptivePortalAnalyzer.kt - CaptivePortalViewModel (NetworkCapabilities + probe set); CaptivePortalDetectorScreen now takes a ViewModel",
+    "snmp": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/SnmpTools.kt (ifType/speed, vendor from sysObjectID, default-community list, findings) - SnmpRepositoryImpl adds probeCommunity + walk + tables (interfaces/IP/ARP); SnmpViewModel/SnmpBrowserScreen tabbed",
+    "arp": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ArpMonitorEvaluator.kt (+ system/NeighborTable.kt) - ArpDetectorRepositoryImpl watches gateway MAC/first-hop/DNS/BSSID; notifies via NetworkAlertNotifier.notifySecurityAlert",
+    "ble": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/BleAdvertisementAnalyzer.kt (tracker/beacon classification, distance) - BleScannerRepositoryImpl; BluetoothProximityFinderViewModel (trackers, following alerts, BLE session logs); model/BleDevice.kt enriched",
+    "wifi": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/WifiSecurityAnalyzer.kt (security family, evil-twin, channel advice, band/channel math - NOTE 6GHz channel anchored at 5945MHz+1 per WifiAccessPointTest) - WifiFingerprintRepositoryImpl (status flow, ifXTable, standard); WifiFingerprintViewModel/Screen",
+    "sdr": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/SdrDsp.kt (rtl_tcp header, Hann window, dBFS, peak) - RtlTcpRepositoryImpl (Hann+averaging, ~15fps, PPM/bias-T); FftData/SdrConfig enriched; WaterfallView spectrum+waterfall; SdrScreen",
+    "nfc": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/NfcAnalyzer.kt (NDEF decode, chip ID, findings) - NfcScannerRepositoryImpl (reader-mode gated by screen via readerRequested); NfcTagData enriched; NfcScannerViewModel logs NFC",
+    "magnetometer": "MagnetometerViewModel calibrated baseline/deviation + history + optional beep; MagnetometerRepository exposes accuracy/isAvailable",
+    "usb": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/UsbAuditAnalyzer.kt (class names, attack-board VID:PID, BadUSB findings) - UsbOtgAuditorScreen polls deviceList",
+    "cellular": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/CellAnalyzer.kt (LTE/NR band+freq, IMSI-catcher/2G-downgrade findings) - CellularReconScreen (requestCellInfoUpdate, all RATs)",
+    "ducky": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/DuckyScriptValidator.kt (lint + duration estimate) - surfaced in HidInjectorScreen below the editor",
+    "tls": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/TlsAnalyzer.kt (protocol/cipher grading, overall grade, key/sig risk) - TlsCipherScannerRepositoryImpl (one handshake/protocol + cipher enumeration + certificate inspection); TlsScanResult/ProtocolSupport/CertificateInfo; also reused by CertDecoderScreen",
+    "shared": "HostValidator.normalize is used by PortScanner, SNMP, TLS target parsing. SeverityBadge (ui/scanner) is the shared risk chip reused by UPnP/DNS/SNMP/USB/Cellular/TLS/NFC/Cert screens.",
+    "tests": "app/src/test/java/com/fearmikey/rf_reapr/domain/service/{PortCatalog,UpnpTools,NetworkAuditEvaluators,WirelessAnalyzers,TlsAnalyzer}Test.kt (136 unit tests total pass)"
   }
 }

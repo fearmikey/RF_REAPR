@@ -3,6 +3,7 @@ package com.fearmikey.rf_reapr.ui.wireless
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Password
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -96,6 +97,15 @@ fun WpsPinCalculatorScreen(onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
+                Text(
+                    "For auditing routers you own or are authorized to test. Default WPS PINs are a known weakness; if any apply to your router, disable WPS. Guessing PINs on networks you don't control is illegal in most places.",
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+
             OutlinedTextField(
                 value = bssidInput,
                 onValueChange = { bssidInput = it },
@@ -104,23 +114,35 @@ fun WpsPinCalculatorScreen(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+            com.fearmikey.rf_reapr.domain.service.MacAddressAnalyzer.parse(bssidInput)?.let { mac ->
+                com.fearmikey.rf_reapr.domain.service.DeviceIdentificationService.getManufacturer(mac.colonFormat)?.let { vendor ->
+                    Text("Vendor: $vendor", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+            }
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             
             if (results.isEmpty() && bssidInput.length >= 12) {
                 Text("Invalid MAC Address format", color = MaterialTheme.colorScheme.error)
             } else if (results.isNotEmpty()) {
-                Text("Suggested PINs", style = MaterialTheme.typography.titleMedium)
+                Text("Candidate default PINs", style = MaterialTheme.typography.titleMedium)
+                val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
                 results.forEach { (algo, pin) ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                         ) {
                             Text(algo, style = MaterialTheme.typography.bodyMedium)
-                            Text(pin, style = MaterialTheme.typography.labelLarge)
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Text(pin, style = MaterialTheme.typography.labelLarge, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                                IconButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(pin)) }) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy PIN", modifier = Modifier.size(18.dp))
+                                }
+                            }
                         }
                     }
                 }

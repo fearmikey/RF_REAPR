@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -506,6 +507,19 @@ fun MainMenuScreen(
     }
 
     var expandedCategory by remember { mutableStateOf<ToolCategory?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val trimmedQuery = searchQuery.trim()
+    val filteredTools = remember(trimmedQuery, allTools) {
+        if (trimmedQuery.isBlank()) {
+            emptyList()
+        } else {
+            allTools.filter {
+                it.name.contains(trimmedQuery, ignoreCase = true) ||
+                    it.description.contains(trimmedQuery, ignoreCase = true)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -565,45 +579,88 @@ fun MainMenuScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                Row(
+            item(key = "search_bar") {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Security Audit Categories",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Surface(
-                        color = (if (isPassiveMode) NetworkGreen else PhysicalRed).copy(alpha = 0.1f),
-                        shape = MaterialTheme.shapes.extraSmall,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isPassiveMode) NetworkGreen else PhysicalRed)
+                    singleLine = true,
+                    placeholder = { Text("Search tools…") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear search")
+                            }
+                        }
+                    }
+                )
+            }
+
+            if (trimmedQuery.isBlank()) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            if (isPassiveMode) "Passive Mode (Stealth)" else "Active Mode (Detectable)",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isPassiveMode) NetworkGreen else PhysicalRed,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            "Security Audit Categories",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Surface(
+                            color = (if (isPassiveMode) NetworkGreen else PhysicalRed).copy(alpha = 0.1f),
+                            shape = MaterialTheme.shapes.extraSmall,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isPassiveMode) NetworkGreen else PhysicalRed)
+                        ) {
+                            Text(
+                                if (isPassiveMode) "Passive Mode (Stealth)" else "Active Mode (Detectable)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isPassiveMode) NetworkGreen else PhysicalRed,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                ToolCategory.entries.forEach { category ->
+                    item(key = category.name) {
+                        CategoryCard(
+                            category = category,
+                            isExpanded = expandedCategory == category,
+                            onClick = {
+                                expandedCategory = if (expandedCategory == category) null else category
+                            },
+                            tools = toolsByCategory[category] ?: emptyList(),
+                            isPassiveMode = isPassiveMode,
+                            settingsViewModel = settingsViewModel,
+                            onNavigate = onNavigate,
+                            onInhibitedClick = onInhibitedClick
                         )
                     }
                 }
-            }
-
-            ToolCategory.entries.forEach { category ->
-                item(key = category.name) {
-                    CategoryCard(
-                        category = category,
-                        isExpanded = expandedCategory == category,
-                        onClick = {
-                            expandedCategory = if (expandedCategory == category) null else category
-                        },
-                        tools = toolsByCategory[category] ?: emptyList(),
-                        isPassiveMode = isPassiveMode,
-                        settingsViewModel = settingsViewModel,
-                        onNavigate = onNavigate,
-                        onInhibitedClick = onInhibitedClick
+            } else if (filteredTools.isEmpty()) {
+                item(key = "no_results") {
+                    Text(
+                        "No tools match \"$trimmedQuery\"",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 24.dp)
                     )
+                }
+            } else {
+                item(key = "results_header") {
+                    Text(
+                        "${filteredTools.size} result${if (filteredTools.size == 1) "" else "s"}",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                items(filteredTools, key = { "result_${it.route}_${it.name}" }) { tool ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            ToolItem(tool, isPassiveMode, settingsViewModel, onNavigate, onInhibitedClick)
+                        }
+                    }
                 }
             }
         }

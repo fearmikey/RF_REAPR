@@ -50,11 +50,18 @@ class TlsCipherScannerViewModel(
                     _uiState.value = result
                     
                     if (result.isFinished) {
+                        val weak = result.supportedCiphers.count { it.riskLevel >= com.fearmikey.rf_reapr.domain.model.RiskLevel.HIGH }
                         logRepository.saveLog(
-                            type = "WEB_TLS",
-                            summary = "TLS Cipher scan for $url",
+                            type = "WEB",
+                            summary = "TLS audit ${result.host}: grade ${result.grade ?: "?"}" +
+                                (if (weak > 0) ", $weak weak ciphers" else "") +
+                                (result.certificate?.let { c -> if (c.issues.isNotEmpty()) ", cert issues" else "" } ?: ""),
                             detailJson = gson.toJson(mapOf(
-                                "url" to url,
+                                "tool" to "TLS Cipher Scanner",
+                                "host" to result.host,
+                                "grade" to result.grade,
+                                "protocols" to result.protocols,
+                                "certificate" to result.certificate,
                                 "ciphers" to result.supportedCiphers
                             ))
                         )

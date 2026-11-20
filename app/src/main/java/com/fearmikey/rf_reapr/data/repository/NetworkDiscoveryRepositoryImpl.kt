@@ -163,27 +163,8 @@ class NetworkDiscoveryRepositoryImpl(
         }
     }
 
-    private fun getMacFromArpTable(ip: String): String? {
-        return try {
-            val file = java.io.File("/proc/net/arp")
-            if (!file.exists()) return null
-            
-            file.bufferedReader().useLines { lines ->
-                lines.drop(1).forEach { line ->
-                    val columns = line.split(Regex("\\s+")).filter { it.isNotBlank() }
-                    if (columns.size >= 4 && columns[0] == ip) {
-                        val mac = columns[3]
-                        if (mac != "00:00:00:00:00:00") {
-                            return mac
-                        }
-                    }
-                }
-            }
-            null
-        } catch (e: Exception) {
-            null
-        }
-    }
+    /** /proc/net/arp, falling back to `ip neigh` (both blocked for apps on newer Android). */
+    private fun getMacFromArpTable(ip: String): String? = com.fearmikey.rf_reapr.system.NeighborTable.macFor(ip)
 
     private fun prefixToMask(prefix: Int): String {
         val mask = -1 shl (32 - prefix)

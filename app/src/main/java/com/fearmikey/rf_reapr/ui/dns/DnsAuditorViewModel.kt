@@ -6,6 +6,9 @@ import com.fearmikey.rf_reapr.domain.repository.DnsAuditResult
 import com.fearmikey.rf_reapr.domain.repository.DnsAuditorRepository
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
+import com.fearmikey.rf_reapr.domain.service.CheckStatus
+import com.google.gson.Gson
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,22 +31,48 @@ class DnsAuditorViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    private var job: Job? = null
+    private val gson = Gson()
+
     fun runAudit() {
-        if (isPassiveMode.value) return
-        viewModelScope.launch {
+        if (isPassiveMode.value || _isLoading.value) return
+        job = viewModelScope.launch {
             _isLoading.value = true
-            val result = repository.auditDns()
-            _auditResult.value = result
-            _isLoading.value = false
-            
-            if (result.isHijacked) {
-                logRepository.saveLog("DNS", "Potential DNS Hijack Detected!", "Domain: ${result.testDomain}, System IP: ${result.systemIp}, Hostname: ${result.resolvedHostname}, Trusted IPs: ${result.trustedIps.joinToString()}, Private DNS: ${result.privateDnsMode ?: "unknown"}")
-            } else if (result.isInconclusive) {
-                logRepository.saveLog("DNS", "Audit Inconclusive", "Domain: ${result.testDomain}, System Error: ${result.systemError}, Trusted Error: ${result.trustedError}")
-            } else if (result.isLocalRedirection) {
-                val reason = if (result.isPrivateIp) "Private IP" else "Matches DNS Server"
-                logRepository.saveLog("DNS", "Local DNS Redirection ($reason)", "Domain: ${result.testDomain}, Resolved to: ${result.systemIp}, Private DNS: ${result.privateDnsMode ?: "unknown"}")
+            _error.value = null
+            try {
+                val result = repository.auditDns()
+                _auditResult.value = result
+                val problems = result.checks.filter { it.status == CheckStatus.FAIL || it.status == CheckStatus.WARN }
+                logRepository.saveLog(
+                    type = "DNS",
+                    summary = "DNS audit: ${result.overall.name}" +
+                        if (problems.isNotEmpty()) " (${problems.joinToString { it.title }})" else "",
+                    detailJson = gson.toJson(mapOf("checks" to result.checks, "dnsServers" to result.systemDnsServers))
+                )
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Audit failed"
+            } finally {
+                _isLoading.value = false
             }
         }
+    }
+
+    fun reportText(): String {
+        val r = _auditResult.value ?: return ""
+        return buildString {
+            appendLine("RF-REAPR DNS security audit: ${r.overall}")
+            r.checks.forEach { c ->
+                appendLine("[${c.status}] ${c.title}: ${c.summary}")
+                if (c.detail.isNotBlank()) appendLine("    ${c.detail.replace("\n", "\n    ")}")
+            }
+        }
+    }
+
+    override fun onCleared() {
+        job?.cancel()
+        super.onCleared()
     }
 }

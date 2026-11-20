@@ -2,177 +2,127 @@ package com.fearmikey.rf_reapr.data.repository
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.os.Build
 import com.fearmikey.rf_reapr.domain.repository.DnsAuditResult
 import com.fearmikey.rf_reapr.domain.repository.DnsAuditorRepository
-import com.google.gson.JsonParser
+import com.fearmikey.rf_reapr.domain.service.DnsAuditEvaluator
+import com.fearmikey.rf_reapr.domain.service.DnsObservations
+import com.fearmikey.rf_reapr.domain.service.DnsRecordTypes
+import com.fearmikey.rf_reapr.domain.service.DohResponseParser
+import com.fearmikey.rf_reapr.domain.service.DomainComparison
+import com.fearmikey.rf_reapr.domain.service.LookupOutcome
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.InetAddress
+import java.net.UnknownHostException
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
+/**
+ * Gathers DNS observations (system resolver vs DNS-over-HTTPS) and hands them to
+ * [DnsAuditEvaluator] for the verdict.
+ */
 class DnsAuditorRepositoryImpl(
     private val context: Context,
-    private val client: OkHttpClient
+    client: OkHttpClient
 ) : DnsAuditorRepository {
 
+    private val http = client.newBuilder()
+        .callTimeout(6, TimeUnit.SECONDS)
+        .build()
+
+    /** Hostname endpoints first; IP endpoints as fallback when DoH hostnames are blocked. */
+    private val dohEndpoints = listOf(
+        "https://cloudflare-dns.com/dns-query",
+        "https://dns.google/resolve",
+        "https://1.1.1.1/dns-query",
+        "https://8.8.8.8/resolve"
+    )
+
     override suspend fun auditDns(): DnsAuditResult = withContext(Dispatchers.IO) {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val linkProperties = connectivityManager.getLinkProperties(connectivityManager.activeNetwork)
-        val dnsServers = linkProperties?.dnsServers?.mapNotNull { it.hostAddress } ?: emptyList()
+        val started = System.currentTimeMillis()
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val link = cm.getLinkProperties(cm.activeNetwork)
+        val dnsServers = link?.dnsServers?.mapNotNull { it.hostAddress } ?: emptyList()
+        val privateDnsActive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) link?.isPrivateDnsActive == true else false
+        val privateDnsName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) link?.privateDnsServerName else null
 
-        val privateDnsMode = try {
-            android.provider.Settings.Global.getString(context.contentResolver, "private_dns_mode")
-        } catch (e: Exception) {
-            null
+        // Random label so no cache or legitimate record can answer it.
+        val nxName = "rfreapr-${UUID.randomUUID().toString().replace("-", "").take(20)}.com"
+
+        coroutineScope {
+            val sentinels = DnsAuditEvaluator.SENTINELS.keys.map { name -> async { name to system(name) } }
+            val nx = async { system(nxName) }
+            val bogus = async { system(DnsAuditEvaluator.DNSSEC_BOGUS_DOMAIN) }
+            val rebinding = async { system(DnsAuditEvaluator.REBIND_DOMAIN) }
+            val rebindingTrusted = async { trusted(DnsAuditEvaluator.REBIND_DOMAIN) }
+            val comparisons = DnsAuditEvaluator.COMPARISON_DOMAINS.map { d ->
+                async { DomainComparison(d, system(d), trusted(d)) }
+            }
+            val compared = comparisons.awaitAll()
+            val rebindTrusted = rebindingTrusted.await()
+
+            val observations = DnsObservations(
+                dnsServers = dnsServers,
+                privateDnsActive = privateDnsActive,
+                privateDnsServerName = privateDnsName,
+                sentinels = sentinels.awaitAll().toMap(),
+                nxdomainName = nxName,
+                nxdomain = nx.await(),
+                dnssecBogus = bogus.await(),
+                rebinding = rebinding.await(),
+                rebindingTrusted = rebindTrusted,
+                comparisons = compared,
+                trustedReachable = compared.any { it.trusted.error == null } || rebindTrusted.error == null
+            )
+            DnsAuditResult(observations, DnsAuditEvaluator.evaluate(observations), System.currentTimeMillis() - started)
         }
+    }
 
-        val targetDomain = "google.com" // Switch back to google.com as it's the ultimate test
-        var systemIp = ""
-        var systemError: String? = null
-        
-        // 1. System Resolution
-        try {
-            systemIp = InetAddress.getByName(targetDomain).hostAddress ?: ""
-        } catch (e: Exception) {
-            systemError = e.message ?: "Unknown system resolution error"
-        }
+    private suspend fun system(name: String): LookupOutcome = try {
+        val addresses = runInterruptible { InetAddress.getAllByName(name) }
+        LookupOutcome(ips = addresses.mapNotNull { it.hostAddress }.distinct())
+    } catch (_: UnknownHostException) {
+        LookupOutcome(nxdomain = true)
+    } catch (e: Exception) {
+        LookupOutcome(error = e.message ?: e.javaClass.simpleName)
+    }
 
-        val resolvedHostname = if (systemIp.isNotEmpty()) {
+    private fun trusted(name: String): LookupOutcome {
+        var lastError: String? = null
+        for (endpoint in dohEndpoints) {
             try {
-                InetAddress.getByName(systemIp).canonicalHostName
-            } catch (e: Exception) {
-                null
-            }
-        } else {
-            null
-        }
-
-        val isPrivateIp = if (systemIp.isNotEmpty()) {
-            isIpPrivate(systemIp)
-        } else {
-            false
-        }
-
-        // 2. Trusted Resolution (via DoH) with Bootstrapping
-        var trustedIps = emptyList<String>()
-        var trustedError: String? = null
-        
-        try {
-            // Try Cloudflare first (Hostname then Bootstrap IP)
-            trustedIps = fetchTrustedIps(targetDomain, "https://cloudflare-dns.com/dns-query", "1.1.1.1")
-            
-            if (trustedIps.isEmpty()) {
-                // Try Google (Hostname then Bootstrap IP)
-                trustedIps = fetchTrustedIps(targetDomain, "https://dns.google/resolve", "8.8.8.8")
-            }
-        } catch (e: Exception) {
-            trustedError = e.message ?: "Unknown trusted resolution error"
-        }
-
-        if (trustedIps.isEmpty() && trustedError == null) {
-            trustedError = "No trusted results found"
-        }
-
-        val resolutionMatch = if (systemIp.isEmpty() || trustedIps.isEmpty()) {
-            false
-        } else {
-            trustedIps.contains(systemIp) || 
-            trustedIps.any { isSameSubnet(systemIp, it) } ||
-            isKnownProvider(resolvedHostname, targetDomain)
-        }
-
-        DnsAuditResult(
-            systemDnsServers = dnsServers,
-            canResolveKnownDomain = systemIp.isNotEmpty(),
-            resolutionMatch = resolutionMatch,
-            systemIp = systemIp,
-            trustedIps = trustedIps,
-            isPrivateIp = isPrivateIp,
-            privateDnsMode = privateDnsMode,
-            testDomain = targetDomain,
-            systemError = systemError,
-            trustedError = trustedError,
-            resolvedHostname = resolvedHostname
-        )
-    }
-
-    private fun isKnownProvider(hostname: String?, domain: String): Boolean {
-        if (hostname == null) return false
-        val h = hostname.lowercase()
-        return when (domain) {
-            "google.com" -> h.endsWith(".1e100.net") || h.endsWith(".google.com") || h == "google.com"
-            "one.one.one.one" -> h.endsWith(".cloudflare.com") || h == "one.one.one.one"
-            else -> h.contains(domain.substringBefore("."))
-        }
-    }
-
-    private fun fetchTrustedIps(domain: String, baseUrl: String, bootstrapIp: String): List<String> {
-        val host = baseUrl.substringAfter("https://").substringBefore("/")
-        
-        // Try Hostname resolution first
-        val ipsByHost = tryFetch(domain, baseUrl, host)
-        if (ipsByHost.isNotEmpty()) return ipsByHost
-        
-        // If hostname fails, use Bootstrap IP
-        val ipUrl = baseUrl.replace(host, bootstrapIp)
-        return tryFetch(domain, ipUrl, host)
-    }
-
-    private fun tryFetch(domain: String, url: String, host: String): List<String> {
-        val fullUrl = "$url?name=$domain&type=A"
-        val request = Request.Builder()
-            .url(fullUrl)
-            .header("Accept", "application/dns-json")
-            .header("Host", host) // Crucial for SSL/SNI verification when using IP URL
-            .build()
-        
-        return try {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return emptyList()
-                val body = response.body?.string() ?: ""
-                val json = JsonParser.parseString(body).asJsonObject
-                val answerArray = json.getAsJsonArray("Answer")
-                val ips = mutableListOf<String>()
-                answerArray?.forEach { element ->
-                    val obj = element.asJsonObject
-                    val type = obj.get("type")
-                    if (type != null && type.isJsonPrimitive && (type.asInt == 1 || type.asString == "1")) {
-                        ips.add(obj.get("data").asString)
+                val url = endpoint.toHttpUrl().newBuilder()
+                    .addQueryParameter("name", name)
+                    .addQueryParameter("type", DnsRecordTypes.A.toString())
+                    .build()
+                val request = Request.Builder().url(url).header("Accept", "application/dns-json").build()
+                http.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        lastError = "HTTP ${response.code}"
+                        return@use
                     }
+                    val result = DohResponseParser.parse(response.body?.string().orEmpty(), name, DnsRecordTypes.A, endpoint, 0)
+                    if (result.error != null) {
+                        lastError = result.error
+                        return@use
+                    }
+                    return LookupOutcome(
+                        ips = result.answers.filter { it.type == DnsRecordTypes.A }.map { it.data },
+                        nxdomain = result.status == 3
+                    )
                 }
-                ips
+            } catch (e: Exception) {
+                lastError = e.message ?: e.javaClass.simpleName
             }
-        } catch (e: Exception) {
-            emptyList()
         }
-    }
-
-    private fun isIpPrivate(ip: String): Boolean {
-        return try {
-            val addr = InetAddress.getByName(ip)
-            if (addr.isSiteLocalAddress || addr.isLoopbackAddress || addr.isLinkLocalAddress) return true
-            
-            // Manual range checks for common private ranges
-            val parts = ip.split(".")
-            if (parts.size != 4) return false
-            val p0 = parts[0].toIntOrNull() ?: return false
-            val p1 = parts[1].toIntOrNull() ?: return false
-            
-            p0 == 10 || 
-            (p0 == 172 && p1 in 16..31) || 
-            (p0 == 192 && p1 == 168) ||
-            (p0 == 100 && p1 in 64..127) // CGNAT
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun isSameSubnet(ip1: String, ip2: String): Boolean {
-        // Simple check for large CDNs where IPs might vary slightly (e.g. 74.125.x.x)
-        val p1 = ip1.split(".")
-        val p2 = ip2.split(".")
-        if (p1.size < 2 || p2.size < 2) return false
-        return p1[0] == p2[0] && p1[1] == p2[1]
+        return LookupOutcome(error = lastError ?: "DoH unreachable")
     }
 }

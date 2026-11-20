@@ -1,138 +1,161 @@
 package com.fearmikey.rf_reapr.data.repository
 
 import com.fearmikey.rf_reapr.domain.model.OpenPort
+import com.fearmikey.rf_reapr.domain.repository.PortScanOptions
 import com.fearmikey.rf_reapr.domain.repository.PortScannerRepository
 import com.fearmikey.rf_reapr.domain.scanner.NetworkScanner
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.awaitClose
+import com.fearmikey.rf_reapr.domain.service.PortCatalog
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
+import java.io.InputStream
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.util.Collections
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 class PortScannerRepositoryImpl : PortScannerRepository {
-    private var ipAddress: String = ""
-    private var portsToScan: Iterable<Int> = 1..65535
-    private var scanJob: Job? = null
 
-    private val commonServices = mapOf(
-        21 to "FTP",
-        22 to "SSH",
-        23 to "Telnet",
-        25 to "SMTP",
-        53 to "DNS",
-        80 to "HTTP",
-        110 to "POP3",
-        111 to "SunRPC",
-        135 to "RPC",
-        139 to "NetBIOS",
-        143 to "IMAP",
-        443 to "HTTPS",
-        445 to "SMB",
-        1433 to "MSSQL",
-        3306 to "MySQL",
-        3389 to "RDP",
-        5432 to "PostgreSQL",
-        8080 to "HTTP-Proxy",
-        8443 to "HTTPS-Alt",
-        8843 to "HTTPS-Alt",
-    )
+    // Legacy NetworkScanner config (setConfig + startScan).
+    @Volatile private var legacyHost: String = ""
+    @Volatile private var legacyPorts: List<Int> = emptyList()
+    private val activeJobs = Collections.synchronizedSet(mutableSetOf<Job>())
 
+    @Deprecated("Shared mutable config; use scan(host, ports, options)")
     override fun setConfig(ipAddress: String, portRange: IntRange) {
-        this.ipAddress = ipAddress
-        this.portsToScan = portRange
+        legacyHost = ipAddress
+        legacyPorts = portRange.toList()
     }
 
+    @Deprecated("Shared mutable config; use scan(host, ports, options)")
     override fun setConfig(ipAddress: String, ports: List<Int>) {
-        this.ipAddress = ipAddress
-        this.portsToScan = ports
+        legacyHost = ipAddress
+        legacyPorts = ports
     }
 
-    override fun startScan(): Flow<NetworkScanner.ScanResult<OpenPort>> = callbackFlow {
-        val foundPorts = Collections.synchronizedList(mutableListOf<OpenPort>())
-        val scannedCount = AtomicInteger(0)
-        val portList = portsToScan.toList()
-        val totalPorts = portList.size
-        val portQueue = java.util.ArrayDeque(portList)
+    override fun startScan(): Flow<NetworkScanner.ScanResult<OpenPort>> = scan(legacyHost, legacyPorts)
 
-        scanJob = CoroutineScope(Dispatchers.IO).launch {
-            try {
-                coroutineScope {
-                    // Use a fixed number of workers instead of launching 65k coroutines
-                    repeat(50) {
-                        launch {
-                            while (isActive) {
-                                val port = synchronized(portQueue) {
-                                    if (portQueue.isEmpty()) null else portQueue.removeFirst()
-                                } ?: break
+    /** Cancels every scan currently running through this repository ("Stop all"). */
+    override fun stopScan() {
+        synchronized(activeJobs) { activeJobs.toList() }.forEach { it.cancel() }
+    }
 
-                                var foundOpen = false
-                                if (isPortOpen(ipAddress, port)) {
-                                    val banner = grabBanner(ipAddress, port)
-                                    val openPort = OpenPort(
-                                        port = port,
-                                        serviceName = commonServices[port] ?: "Unknown",
-                                        banner = banner
-                                    )
-                                    foundPorts.add(openPort)
-                                    foundOpen = true
-                                }
-                                val current = scannedCount.incrementAndGet()
-                                
-                                // Throttle UI updates: Every 200 ports instead of 100
-                                if (foundOpen || current % 200 == 0 || current == totalPorts) {
-                                    trySend(NetworkScanner.ScanResult.Progress(current.toFloat() / totalPorts, foundPorts.toList()))
-                                }
+    override fun scan(host: String, ports: List<Int>, options: PortScanOptions): Flow<NetworkScanner.ScanResult<OpenPort>> = channelFlow {
+        val job = currentCoroutineContext().job
+        activeJobs.add(job)
+        try {
+            // Resolve once instead of once per port (a hostname target would otherwise do
+            // up to 65k DNS lookups).
+            val address = try {
+                runInterruptible { InetAddress.getByName(host) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                send(NetworkScanner.ScanResult.Error("Couldn't resolve $host", e))
+                return@channelFlow
+            }
+
+            val total = ports.size
+            if (total == 0) {
+                send(NetworkScanner.ScanResult.Finished(emptyList()))
+                return@channelFlow
+            }
+
+            val queue = ConcurrentLinkedQueue(ports)
+            val found = Collections.synchronizedList(mutableListOf<OpenPort>())
+            val scanned = AtomicInteger(0)
+            val step = (total / 200).coerceAtLeast(1)
+
+            coroutineScope {
+                repeat(options.concurrency.coerceIn(1, 256).coerceAtMost(total)) {
+                    launch {
+                        while (isActive) {
+                            val port = queue.poll() ?: break
+                            val openPort = runInterruptible { probe(address, port, options) }
+                            if (openPort != null) found.add(openPort)
+                            val done = scanned.incrementAndGet()
+                            if (openPort != null || done % step == 0 || done == total) {
+                                send(NetworkScanner.ScanResult.Progress(done.toFloat() / total, found.sortedBy { it.port }))
                             }
                         }
                     }
                 }
-                trySend(NetworkScanner.ScanResult.Finished(foundPorts.toList()))
-            } catch (e: Exception) {
-                trySend(NetworkScanner.ScanResult.Error(e.message ?: "Unknown error", e))
-            } finally {
-                channel.close()
             }
+            send(NetworkScanner.ScanResult.Finished(found.sortedBy { it.port }))
+        } finally {
+            activeJobs.remove(job)
         }
-        
-        awaitClose { 
-            stopScan()
-        }
-    }
+    }.flowOn(Dispatchers.IO)
 
-    override fun stopScan() {
-        scanJob?.cancel()
-    }
-
-    private fun isPortOpen(host: String, port: Int): Boolean {
-        return try {
-            Socket().use { socket ->
-                socket.connect(InetSocketAddress(host, port), 500)
-                true
-            }
+    /**
+     * Connects once; if the port is open, reads whatever the service announces (SSH, FTP,
+     * SMTP...) or sends a HEAD request to plain-HTTP ports to get the Server header.
+     */
+    private fun probe(address: InetAddress, port: Int, options: PortScanOptions): OpenPort? {
+        val socket = Socket()
+        try {
+            socket.connect(InetSocketAddress(address, port), options.connectTimeoutMs)
         } catch (_: Exception) {
-            false
+            runCatching { socket.close() }
+            return null
+        }
+        socket.use { s ->
+            val banner = if (options.grabBanners) runCatching { readBanner(s, address, port) }.getOrNull() else null
+            return OpenPort(port = port, serviceName = PortCatalog.serviceName(port), banner = banner)
         }
     }
 
-    private fun grabBanner(host: String, port: Int): String? {
-        return try {
-            Socket().use { socket ->
-                socket.soTimeout = 1000
-                socket.connect(InetSocketAddress(host, port), 500)
-                
-                // For HTTP/HTTPS, we might need to send something, but for others (SSH, FTP, SMTP) 
-                // they usually send the banner first.
-                // This is a generic banner grabber.
-                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                reader.readLine()?.trim()
+    private fun readBanner(socket: Socket, address: InetAddress, port: Int): String? {
+        socket.soTimeout = 1200
+        val input = socket.getInputStream()
+        if (PortCatalog.shouldProbeHttp(port)) {
+            val hostHeader = address.hostAddress?.let { if (it.contains(':')) "[$it]" else it } ?: ""
+            socket.getOutputStream().apply {
+                write("HEAD / HTTP/1.0\r\nHost: $hostHeader\r\nUser-Agent: RF-REAPR\r\n\r\n".toByteArray())
+                flush()
             }
-        } catch (_: Exception) {
-            null
+            val response = readUpTo(input, 4096) ?: return null
+            val lines = response.lines()
+            val server = lines.firstOrNull { it.startsWith("Server:", ignoreCase = true) }
+                ?.substringAfter(':')?.trim()
+            val status = lines.firstOrNull()?.trim()
+            return server?.takeIf { it.isNotEmpty() } ?: status?.takeIf { it.startsWith("HTTP/") }
         }
+        // Most text protocols greet first; read the first line.
+        val text = readUpTo(input, 512) ?: return null
+        return text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
+            ?.filter { it.code in 32..126 }
+            ?.take(200)
+            ?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun readUpTo(input: InputStream, max: Int): String? {
+        val buffer = ByteArray(max)
+        var total = 0
+        try {
+            while (total < max) {
+                val n = input.read(buffer, total, max - total)
+                if (n <= 0) break
+                total += n
+                // Stop at end of HTTP headers or after the first line of a greeting.
+                val soFar = String(buffer, 0, total, Charsets.ISO_8859_1)
+                if (soFar.contains("\r\n\r\n") || (soFar.contains('\n') && !soFar.startsWith("HTTP/"))) break
+            }
+        } catch (_: SocketTimeoutException) {
+            // Service didn't say anything (common for HTTPS, databases, RDP).
+        }
+        return if (total == 0) null else String(buffer, 0, total, Charsets.ISO_8859_1)
     }
 }

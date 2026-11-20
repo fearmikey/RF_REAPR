@@ -184,6 +184,39 @@ fun HidInjectorScreen(
                 textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
             )
 
+            val lint = remember(currentScript) {
+                com.fearmikey.rf_reapr.domain.service.DuckyScriptValidator.validate(currentScript)
+            }
+            if (currentScript.isNotBlank()) {
+                val color = when {
+                    lint.errors > 0 -> MaterialTheme.colorScheme.error
+                    lint.warnings > 0 -> Color(0xFFFF9800)
+                    else -> Color(0xFF4CAF50)
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    buildString {
+                        append("${lint.commandCount} commands · ~${lint.estimatedDurationMs / 1000.0}s to run")
+                        if (lint.errors > 0) append(" · ${lint.errors} error${if (lint.errors == 1) "" else "s"}")
+                        if (lint.warnings > 0) append(" · ${lint.warnings} warning${if (lint.warnings == 1) "" else "s"}")
+                        if (lint.errors == 0 && lint.warnings == 0) append(" · looks valid")
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = color
+                )
+                lint.issues.take(5).forEach { issue ->
+                    Text(
+                        "Line ${issue.line}: ${issue.message}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when (issue.level) {
+                            com.fearmikey.rf_reapr.domain.service.LintLevel.ERROR -> MaterialTheme.colorScheme.error
+                            com.fearmikey.rf_reapr.domain.service.LintLevel.WARNING -> Color(0xFFFF9800)
+                            com.fearmikey.rf_reapr.domain.service.LintLevel.INFO -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Text("Operation Logs", style = MaterialTheme.typography.titleMedium)

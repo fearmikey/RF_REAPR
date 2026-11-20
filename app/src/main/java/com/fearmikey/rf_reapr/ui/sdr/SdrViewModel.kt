@@ -41,6 +41,32 @@ class SdrViewModel(private val repository: SdrRepository) : ViewModel() {
         }
     }
 
+    fun setSampleRate(rate: Int) {
+        viewModelScope.launch { repository.setSampleRate(rate) }
+    }
+
+    fun setPpm(ppm: Int) {
+        viewModelScope.launch { repository.setPpm(ppm.coerceIn(-200, 200)) }
+    }
+
+    fun setBiasTee(enabled: Boolean) {
+        viewModelScope.launch { repository.setBiasTee(enabled) }
+    }
+
+    /** Nudges the centre frequency by [deltaHz]. */
+    fun step(deltaHz: Long) = setFrequency(config.value.frequency + deltaHz)
+
+    /** Re-centres on the strongest signal currently in view. */
+    fun tuneToPeak() {
+        fftData.value.peak?.let { setFrequency(it.frequencyHz) }
+    }
+
+    override fun onCleared() {
+        // The repository outlives this ViewModel, so close the stream explicitly.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { repository.disconnect() }
+        super.onCleared()
+    }
+
     fun launchDriver(context: Context) {
         val driverPackages = listOf(
             "com.martinmarinov.rtl_tcp_driver",

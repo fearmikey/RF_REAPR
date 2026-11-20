@@ -32,6 +32,16 @@
 -keep class com.fearmikey.rf_reapr.data.remote.dto.** { *; }
 -keep class com.fearmikey.rf_reapr.domain.model.** { *; }
 
+# Result classes in domain.repository / domain.service (DiscoveredService, TracerouteResult,
+# PingStats, IperfSummary, ...) are serialized into event logs with Gson; keep their field
+# names so exported logs stay readable in release builds.
+-keepclassmembers class com.fearmikey.rf_reapr.domain.repository.** {
+    <fields>;
+}
+-keepclassmembers class com.fearmikey.rf_reapr.domain.service.** {
+    <fields>;
+}
+
 # ---------------------------------------------------------------------------
 # Room
 # ---------------------------------------------------------------------------

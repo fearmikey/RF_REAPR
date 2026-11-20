@@ -11,14 +11,30 @@ import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import com.fearmikey.rf_reapr.domain.service.DeviceIdentificationService
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** The kinds of per-device scans that can be triggered from the device detail sheet. */
+enum class NodeScanKind { PORTS, SNMP, RECON }
+
+/** Progress of a network-wide deep scan (ports + SNMP across every node). */
+data class AuditProgress(
+    val completed: Int,
+    val total: Int,
+    val currentIp: String?
+) {
+    val fraction: Float get() = if (total == 0) 0f else completed.toFloat() / total
+}
 
 class TopologyViewModel(
     private val discoveryRepository: NetworkDiscoveryRepository,
@@ -47,8 +63,29 @@ class TopologyViewModel(
     private val _isAuditing = MutableStateFlow(false)
     val isAuditing: StateFlow<Boolean> = _isAuditing.asStateFlow()
 
+    private val _auditProgress = MutableStateFlow<AuditProgress?>(null)
+    val auditProgress: StateFlow<AuditProgress?> = _auditProgress.asStateFlow()
+
+    // True once a network-wide deep scan has completed for the current discovery session,
+    // used to hide the "Run Deep Scan" call-to-action so it stops covering the map.
+    private val _deepScanCompleted = MutableStateFlow(false)
+    val deepScanCompleted: StateFlow<Boolean> = _deepScanCompleted.asStateFlow()
+
+    // Per-device scans currently running, keyed by node id.
+    private val _activeNodeScans = MutableStateFlow<Map<String, Set<NodeScanKind>>>(emptyMap())
+    val activeNodeScans: StateFlow<Map<String, Set<NodeScanKind>>> = _activeNodeScans.asStateFlow()
+
     private val _showNetworkMismatchDialog = MutableStateFlow(false)
     val showNetworkMismatchDialog: StateFlow<Boolean> = _showNetworkMismatchDialog.asStateFlow()
+
+    // One-shot, user-facing messages (scan results, errors) shown as snackbars.
+    private val _messages = Channel<String>(Channel.BUFFERED)
+    val messages: Flow<String> = _messages.receiveAsFlow()
+
+    // Latest per-device scan result text, keyed by node id. Shown inside the device sheet,
+    // since snackbars are hidden behind the modal sheet while it is open.
+    private val _nodeResults = MutableStateFlow<Map<String, String>>(emptyMap())
+    val nodeResults: StateFlow<Map<String, String>> = _nodeResults.asStateFlow()
 
     // IP address of the phone/tablet running the scan, used to highlight "my device" on
     // the map and list views.
@@ -105,6 +142,8 @@ class TopologyViewModel(
                 // Clear previous scan data before starting a new discovery session
                 scanSessionRepository.clearAllData()
                 _mappedGraph.value = null
+                _deepScanCompleted.value = false
+                _nodeResults.value = emptyMap()
 
                 val networkInfo = discoveryRepository.getLocalNetworkInfo()
                 _localDeviceIp.value = networkInfo.localIp
@@ -114,6 +153,9 @@ class TopologyViewModel(
                         is NetworkScanner.ScanResult.Progress -> {
                             val percent = (result.progress * 100).toInt()
                             ActiveTaskMonitor.updateStatus("$taskName: $percent%")
+                        }
+                        is NetworkScanner.ScanResult.Error -> {
+                            _messages.trySend("Discovery failed: ${result.message}")
                         }
                         is NetworkScanner.ScanResult.Finished -> {
                             var nodes = result.foundData.map { node ->
@@ -146,6 +188,7 @@ class TopologyViewModel(
                                 networkName = "Local Network",
                                 gatewayIp = networkInfo.gatewayIp
                             )
+                            _messages.trySend("Discovery complete: ${nodes.size} devices found")
                         }
                         else -> Unit
                     }
@@ -156,7 +199,7 @@ class TopologyViewModel(
         }
     }
 
-    private suspend fun querySnmpForNode(node: NetworkNode) {
+    private suspend fun querySnmpForNode(node: NetworkNode): Boolean {
         // Simple SNMP V2c public community query as discovery step
         val result = snmpRepository.queryDevice(node.ipAddress, "public", 1)
         result.onSuccess { snmpResult ->
@@ -168,6 +211,7 @@ class TopologyViewModel(
             )
             scanSessionRepository.updateNodeDetails(updatedNode)
         }
+        return result.isSuccess
     }
 
     /**
@@ -175,98 +219,160 @@ class TopologyViewModel(
      * If not, prompts for rescan. Otherwise, starts audit.
      */
     fun auditHighImpactPorts() {
-        if (isPassiveMode.value) return
+        if (isPassiveMode.value || _isAuditing.value) return
+        if (isPortScannerBusy) {
+            _messages.trySend("Wait for the current device port scan to finish")
+            return
+        }
         viewModelScope.launch {
             val currentNetwork = discoveryRepository.getLocalNetworkInfo()
             val lastGatewayIp = scanSessionRepository.getLastSessionGatewayIp()
 
             if ((lastGatewayIp != null && currentNetwork.gatewayIp != lastGatewayIp)) {
                 _showNetworkMismatchDialog.value = true
-            } else {
-                val taskName = "Deep Scan (Ports & SNMP)"
-                viewModelScope.launch {
-                    ActiveTaskMonitor.addTask(taskName)
-                    try {
-                        _isAuditing.value = true
-                        val nodes = _mappedGraph.value?.nodes?.map { it.node } ?: emptyList()
-                        nodes.forEachIndexed { index, node ->
-                            ActiveTaskMonitor.updateStatus("$taskName: ${index + 1}/${nodes.size} (${node.ipAddress})")
-                            scanSingleNode(node)
-                            querySnmpForNode(node)
-                        }
-                        _isAuditing.value = false
+                return@launch
+            }
 
-                        // Log the audit completion
-                        _mappedGraph.value?.let { currentGraph ->
-                            logRepository.saveLog(
-                                type = "TOPOLOGY",
-                                summary = "Completed audit (Ports & SNMP) of ${currentGraph.nodes.size} network nodes",
-                                detailJson = gson.toJson(currentGraph)
-                            )
-                        }
-                    } finally {
-                        ActiveTaskMonitor.removeTask(taskName)
-                    }
+            val taskName = "Deep Scan (Ports & SNMP)"
+            ActiveTaskMonitor.addTask(taskName)
+            _isAuditing.value = true
+            try {
+                val nodes = _mappedGraph.value?.nodes?.map { it.node } ?: emptyList()
+                _auditProgress.value = AuditProgress(0, nodes.size, null)
+                nodes.forEachIndexed { index, node ->
+                    _auditProgress.value = AuditProgress(index, nodes.size, node.ipAddress)
+                    ActiveTaskMonitor.updateStatus("$taskName: ${index + 1}/${nodes.size} (${node.ipAddress})")
+                    scanSingleNode(node)
+                    querySnmpForNode(node)
                 }
+                _auditProgress.value = AuditProgress(nodes.size, nodes.size, null)
+                _deepScanCompleted.value = true
+
+                // Log the audit completion
+                _mappedGraph.value?.let { currentGraph ->
+                    val atRisk = currentGraph.nodes.count { it.node.riskLevel >= RiskLevel.HIGH }
+                    logRepository.saveLog(
+                        type = "TOPOLOGY",
+                        summary = "Completed audit (Ports & SNMP) of ${currentGraph.nodes.size} network nodes",
+                        detailJson = gson.toJson(currentGraph)
+                    )
+                    _messages.trySend(
+                        "Deep scan complete: ${currentGraph.nodes.size} devices, $atRisk high/critical risk"
+                    )
+                }
+            } finally {
+                _isAuditing.value = false
+                _auditProgress.value = null
+                ActiveTaskMonitor.removeTask(taskName)
             }
         }
     }
 
+    private fun setNodeScanActive(nodeId: String, kind: NodeScanKind, active: Boolean) {
+        _activeNodeScans.update { current ->
+            val kinds = current[nodeId].orEmpty().let { if (active) it + kind else it - kind }
+            if (kinds.isEmpty()) current - nodeId else current + (nodeId to kinds)
+        }
+    }
+
+    private fun reportNodeResult(node: NetworkNode, message: String) {
+        _nodeResults.update { it + (node.id to message) }
+        _messages.trySend(message)
+    }
+
+    /** True while the shared port scanner is busy (it only supports one target at a time). */
+    private val isPortScannerBusy: Boolean
+        get() = _isAuditing.value || _activeNodeScans.value.values.any { NodeScanKind.PORTS in it }
+
     fun scanSingleNodeTrigger(node: NetworkNode) {
         if (isPassiveMode.value) return
+        if (isPortScannerBusy) {
+            _messages.trySend("A port scan is already running")
+            return
+        }
         viewModelScope.launch {
-            _isAuditing.value = true
-            scanSingleNode(node)
-            _isAuditing.value = false
-            
-            logRepository.saveLog(
-                type = "TOPOLOGY",
-                summary = "Completed individual port audit for ${node.ipAddress}",
-                detailJson = gson.toJson(node)
-            )
+            setNodeScanActive(node.id, NodeScanKind.PORTS, true)
+            try {
+                val portCount = scanSingleNode(node)
+                reportNodeResult(node, "${node.ipAddress}: $portCount open port${if (portCount == 1) "" else "s"} found")
+                logRepository.saveLog(
+                    type = "TOPOLOGY",
+                    summary = "Completed individual port audit for ${node.ipAddress}",
+                    detailJson = gson.toJson(scanSessionRepository.getNodeByIp(node.ipAddress) ?: node)
+                )
+            } finally {
+                setNodeScanActive(node.id, NodeScanKind.PORTS, false)
+            }
         }
     }
 
     fun scanSnmpSingleNodeTrigger(node: NetworkNode) {
         if (isPassiveMode.value) return
+        if (_activeNodeScans.value[node.id]?.contains(NodeScanKind.SNMP) == true) return
         viewModelScope.launch {
-            _isAuditing.value = true
-            querySnmpForNode(node)
-            _isAuditing.value = false
-            
-            logRepository.saveLog(
-                type = "TOPOLOGY",
-                summary = "Completed individual SNMP audit for ${node.ipAddress}",
-                detailJson = gson.toJson(node)
-            )
-        }
-    }
-
-    fun checkExternalExposure(node: NetworkNode) {
-        viewModelScope.launch {
-            internetDbRepository.getIpInfo(node.ipAddress).onSuccess { response ->
-                // If InternetDB has info, this node might be externally exposed or it's a public IP
-                // For simplicity, we just log it and maybe update node details in a real scenario
+            setNodeScanActive(node.id, NodeScanKind.SNMP, true)
+            try {
+                val responded = querySnmpForNode(node)
+                reportNodeResult(
+                    node,
+                    if (responded) "${node.ipAddress}: SNMP responded (community 'public')"
+                    else "${node.ipAddress}: no SNMP response"
+                )
                 logRepository.saveLog(
                     type = "TOPOLOGY",
-                    summary = "External exposure detected for ${node.ipAddress} via InternetDB",
-                    detailJson = gson.toJson(response)
+                    summary = "Completed individual SNMP audit for ${node.ipAddress}",
+                    detailJson = gson.toJson(scanSessionRepository.getNodeByIp(node.ipAddress) ?: node)
                 )
-                
-                // We could also add a tag or update the node risk level
-                if (response.vulns.isNotEmpty() || response.ports.isNotEmpty()) {
-                    val updatedNode = node.copy(
-                        riskLevel = if (response.vulns.isNotEmpty()) RiskLevel.HIGH else node.riskLevel
-                    )
-                    scanSessionRepository.updateNodeDetails(updatedNode)
-                }
+            } finally {
+                setNodeScanActive(node.id, NodeScanKind.SNMP, false)
             }
         }
     }
 
-    private suspend fun scanSingleNode(node: NetworkNode) {
-        portScannerRepository.setConfig(node.ipAddress, NetworkNode.HIGH_IMPACT_PORTS)
-        portScannerRepository.startScan().collect { result ->
+    fun checkExternalExposure(node: NetworkNode) {
+        if (_activeNodeScans.value[node.id]?.contains(NodeScanKind.RECON) == true) return
+        viewModelScope.launch {
+            setNodeScanActive(node.id, NodeScanKind.RECON, true)
+            try {
+                internetDbRepository.getIpInfo(node.ipAddress)
+                    .onSuccess { response ->
+                        // Gson can leave these null despite the Kotlin defaults.
+                        val ports = response.ports.orEmpty()
+                        val vulns = response.vulns.orEmpty()
+                        logRepository.saveLog(
+                            type = "TOPOLOGY",
+                            summary = "External exposure check for ${node.ipAddress} via InternetDB",
+                            detailJson = gson.toJson(response)
+                        )
+                        reportNodeResult(
+                            node,
+                            if (ports.isEmpty() && vulns.isEmpty()) {
+                                "${node.ipAddress}: no public exposure indexed by InternetDB"
+                            } else {
+                                "${node.ipAddress}: exposed ports ${ports.joinToString()}" +
+                                    if (vulns.isNotEmpty()) " · ${vulns.size} known CVEs" else ""
+                            }
+                        )
+                        if (vulns.isNotEmpty()) {
+                            val latestNode = scanSessionRepository.getNodeByIp(node.ipAddress) ?: node
+                            if (latestNode.riskLevel < RiskLevel.HIGH) {
+                                scanSessionRepository.updateNodeDetails(latestNode.copy(riskLevel = RiskLevel.HIGH))
+                            }
+                        }
+                    }
+                    .onFailure { error ->
+                        reportNodeResult(node, "Quick recon failed: ${error.message ?: "unknown error"}")
+                    }
+            } finally {
+                setNodeScanActive(node.id, NodeScanKind.RECON, false)
+            }
+        }
+    }
+
+    /** Scans [node] for high-impact ports, persists the result, and returns the open-port count. */
+    private suspend fun scanSingleNode(node: NetworkNode): Int {
+        var openPortCount = 0
+        portScannerRepository.scan(node.ipAddress, NetworkNode.HIGH_IMPACT_PORTS).collect { result ->
             if (result is NetworkScanner.ScanResult.Finished) {
                 // 1. Fetch latest state to avoid overwriting manual changes
                 val latestNode = scanSessionRepository.getNodeByIp(node.ipAddress) ?: node
@@ -276,7 +382,8 @@ class TopologyViewModel(
                     val vulns = vulnerabilityRepository.lookupVulnerabilities(port.serviceName, port.banner)
                     port.copy(vulnerabilities = vulns)
                 }
-                
+                openPortCount = auditedPorts.size
+
                 // 3. Only auto-identify if type is currently UNKNOWN
                 val newDeviceType = if (latestNode.deviceType == DeviceType.UNKNOWN) {
                     DeviceIdentificationService.identifyDevice(
@@ -298,6 +405,7 @@ class TopologyViewModel(
                 scanSessionRepository.updateNodeDetails(updatedNode)
             }
         }
+        return openPortCount
     }
 
     fun dismissNetworkMismatchDialog() {
@@ -313,6 +421,8 @@ class TopologyViewModel(
         viewModelScope.launch {
             scanSessionRepository.clearAllData()
             _mappedGraph.value = null
+            _deepScanCompleted.value = false
+            _nodeResults.value = emptyMap()
         }
     }
 

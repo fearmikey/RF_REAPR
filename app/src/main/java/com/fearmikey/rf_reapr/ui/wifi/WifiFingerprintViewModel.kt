@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.WifiAccessPoint
 import com.fearmikey.rf_reapr.domain.repository.LogRepository
 import com.fearmikey.rf_reapr.domain.repository.WifiFingerprintRepository
+import com.fearmikey.rf_reapr.domain.repository.WifiScanStatus
+import com.fearmikey.rf_reapr.domain.service.WifiBand
+import com.fearmikey.rf_reapr.domain.service.WifiSecurityAnalyzer
 import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,8 +22,8 @@ class WifiFingerprintViewModel(
     private val logRepository: LogRepository,
 ) : ViewModel() {
 
-    enum class FrequencyRange {
-        FREQ_2_4GHZ, FREQ_5GHZ, FREQ_6GHZ
+    enum class FrequencyRange(val band: WifiBand) {
+        FREQ_2_4GHZ(WifiBand.GHZ_2_4), FREQ_5GHZ(WifiBand.GHZ_5), FREQ_6GHZ(WifiBand.GHZ_6)
     }
 
     private val _accessPoints = MutableStateFlow<List<WifiAccessPoint>>(emptyList())
@@ -44,15 +47,23 @@ class WifiFingerprintViewModel(
         _simplifyGraph.value = !_simplifyGraph.value
     }
 
-    val filteredAccessPoints = combine(accessPoints, _selectedRange) { aps, range ->
+    val scanStatus: StateFlow<WifiScanStatus> = repository.status
+
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query
+    fun setQuery(q: String) { _query.value = q }
+
+    val filteredAccessPoints = combine(accessPoints, _selectedRange, _query) { aps, range, q ->
         aps.filter { ap ->
-            when (range) {
-                FrequencyRange.FREQ_2_4GHZ -> (ap.frequency in 2400..2484)
-                FrequencyRange.FREQ_5GHZ -> (ap.frequency in 5145..5840)
-                FrequencyRange.FREQ_6GHZ -> (ap.frequency in 5900..7150)
-            }
+            WifiSecurityAnalyzer.band(ap.frequency) == range.band &&
+                (q.isBlank() || ap.ssid.contains(q, true) || ap.bssid.contains(q, true) || ap.vendor?.contains(q, true) == true)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Least congested channel for the selected band. */
+    val channelAdvice = combine(accessPoints, _selectedRange) { aps, range ->
+        WifiSecurityAnalyzer.recommendChannel(aps, range.band)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun setSelectedRange(range: FrequencyRange) {
         _selectedRange.value = range
@@ -69,6 +80,7 @@ class WifiFingerprintViewModel(
 
     private var scanJob: Job? = null
     private val gson = Gson()
+    private val sessionAps = LinkedHashMap<String, WifiAccessPoint>()
 
     fun setImportedData(jsonData: String) {
         stopScan()
@@ -118,8 +130,13 @@ class WifiFingerprintViewModel(
         stopScan()
         _isScanning.value = true
         scanJob = viewModelScope.launch {
-            repository.startWifiScan().collect {
-                _accessPoints.value = it
+            repository.startWifiScan().collect { latest ->
+                _accessPoints.value = latest
+                // Keep the strongest reading per BSSID for the session log.
+                latest.forEach { ap ->
+                    val prev = sessionAps[ap.bssid]
+                    if (prev == null || ap.signalLevel > prev.signalLevel) sessionAps[ap.bssid] = ap
+                }
             }
         }
     }
@@ -130,13 +147,18 @@ class WifiFingerprintViewModel(
             scanJob?.cancel()
             repository.stopWifiScan()
             
-            // Log the results
-            val aps = _accessPoints.value
+            // Log every AP seen during the session (not just the last snapshot).
+            val aps = sessionAps.values.sortedByDescending { it.signalLevel }.ifEmpty { _accessPoints.value }
+            sessionAps.clear()
             if (aps.isNotEmpty()) {
+                val rogues = aps.count { it.isRogueSuspect }
+                val weak = aps.count { WifiSecurityAnalyzer.analyze(it.capabilities).risk >= com.fearmikey.rf_reapr.domain.model.RiskLevel.HIGH }
                 viewModelScope.launch {
                     logRepository.saveLog(
                         type = "WIFI",
-                        summary = "Scanned ${aps.size} WiFi access points",
+                        summary = "Scanned ${aps.size} WiFi access points" +
+                            (if (rogues > 0) ", $rogues suspected evil twins" else "") +
+                            (if (weak > 0) ", $weak open/WEP" else ""),
                         detailJson = gson.toJson(aps)
                     )
                 }

@@ -28,7 +28,9 @@ sealed class Screen(val route: String) {
     data object ThreatIntel : Screen("threat_intel?ip={ip}") {
         fun createRoute(ip: String? = null) = if (ip != null) "threat_intel?ip=$ip" else "threat_intel"
     }
-    data object PingTool : Screen("ping_tool")
+    data object PingTool : Screen("ping_tool?host={host}") {
+        fun createRoute(host: String? = null) = if (host != null) "ping_tool?host=${android.net.Uri.encode(host)}" else "ping_tool"
+    }
     
     // New Physical Access & Wireless Tools
     data object HidInjector : Screen("hid_injector")
