@@ -19,9 +19,9 @@ Repo: https://github.com/fearmikey/RF_REAPR.git
 Binaries: https://github.com/fearmikey/RF_REAPR/releases/download/v%v/app-release.apk
 
 Builds:
-  - versionName: 1.5.7
-    versionCode: 22
-    commit: 43d431b762da0a36eca71221a79724c0cf071eff
+  - versionName: 1.6.0
+    versionCode: 23
+    commit: 98b37021096feabc647abf5d75b9e50596c95272
     subdir: app
     submodules: true
     gradle:
@@ -32,5 +32,5 @@ AllowedAPKSigningKeys: 9caaad2cf535abd6f64159aaa7c63e3471e3f38fbbd88ff536fc894af
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9.]+$
-CurrentVersion: 1.5.7
-CurrentVersionCode: 22
+CurrentVersion: 1.6.0
+CurrentVersionCode: 23
