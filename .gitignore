@@ -9,6 +9,8 @@
 .cxx
 local.properties
 .artifacts/
+# Release APKs built by scripts/build-release.sh
+/dist
 
 # Signing keys must NEVER be committed
 *.jks
