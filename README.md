@@ -1,6 +1,6 @@
 # RF-REAPR (Reconnaissance, Evaluation, Analysis, and Penetration Reporting)
 
-[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/fearmikey/RF_REAPR/releases)
+[![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)](https://github.com/fearmikey/RF_REAPR/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![F-Droid](https://img.shields.io/f-droid/v/com.fearmikey.rf_reapr.svg)](https://f-droid.org/packages/com.fearmikey.rf_reapr/)
 

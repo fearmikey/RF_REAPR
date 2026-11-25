@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.1] - 2026-11-25
+
+### Changed
+- **Reproducible release builds**: Release APKs are now built from a fresh checkout of the release tag (`scripts/build-release.sh`) the same way F-Droid builds them, so F-Droid can verify its build against the published APK and distribute it with the same signature. The 1.6.0 APK came from an incremental build that did not match a clean build.
+- **Release asset name**: The GitHub release APK is now named `RF_REAPR-<version>.apk` (was `app-release.apk`).
+- **APK signing**: Release APKs are signed with APK Signature Scheme v2 and v3.
+- **Build**: Removed the Foojay toolchain resolver Gradle plugin; building now needs a locally installed JDK 17 (no automatic JDK downloads).
+
+No app functionality changes since 1.6.0.
+
 ## [1.6.0] - 2026-11-24
 
 ### Added

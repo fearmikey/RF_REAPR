@@ -1,0 +1,6 @@
+Build-only release, no app changes since 1.6.0.
+
+• Release APKs are now built reproducibly from the tagged source, so F-Droid can verify its build against the developer-signed APK and ship it with the same signature
+• GitHub release APK renamed to RF_REAPR-<version>.apk
+• Signed with APK Signature Scheme v2 + v3
+• Removed the Foojay toolchain resolver from the Gradle build
