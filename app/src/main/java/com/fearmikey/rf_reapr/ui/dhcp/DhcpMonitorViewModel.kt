@@ -7,7 +7,13 @@ import com.fearmikey.rf_reapr.domain.model.MonitoredDevice
 import com.fearmikey.rf_reapr.domain.model.NetworkEvent
 import com.fearmikey.rf_reapr.domain.repository.DhcpMonitorRepository
 import com.fearmikey.rf_reapr.domain.repository.DhcpMonitorRepository.MonitoringStatus
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
+import com.fearmikey.rf_reapr.domain.repository.KnownDeviceRepository
 import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
+import com.fearmikey.rf_reapr.domain.service.KnownDeviceMatcher
+import com.fearmikey.rf_reapr.domain.service.ObservedDevice
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import com.fearmikey.rf_reapr.domain.service.NetworkAlertNotifier
 import kotlinx.coroutines.Job
@@ -31,8 +37,49 @@ enum class MonitorInterval(val label: String, val millis: Long) {
 class DhcpMonitorViewModel(
     private val repository: DhcpMonitorRepository,
     settingsRepository: SettingsRepository,
-    private val alertNotifier: NetworkAlertNotifier? = null
+    private val alertNotifier: NetworkAlertNotifier? = null,
+    private val knownDevices: KnownDeviceRepository? = null,
+    private val findingRepository: FindingRepository? = null
 ) : ViewModel() {
+
+    /** MACs on the active project's known-device list; empty = the list isn't in use. */
+    val knownMacs: StateFlow<Set<String>> =
+        (knownDevices?.observeActive()?.map { KnownDeviceMatcher.macSet(it) } ?: flowOf(emptySet()))
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Unknown MACs already reported as findings, so every sweep doesn't re-record the same set. */
+    private var reportedUnknown: Set<String> = emptySet()
+
+    private fun MonitoredDevice.observed() = ObservedDevice(ipAddress, macAddress, hostname, manufacturer)
+
+    fun markKnown(device: MonitoredDevice) = viewModelScope.launch {
+        val added = knownDevices?.add(listOf(device.observed())) ?: 0
+        _messages.trySend(if (added > 0) "${device.displayName} added to known devices" else "This device has no MAC address to match on")
+    }
+
+    fun unmarkKnown(device: MonitoredDevice) = viewModelScope.launch {
+        device.macAddress?.let { knownDevices?.removeByMac(it) }
+    }
+
+    /** Adds every listed device that has a MAC to the known-device list. */
+    fun markAllKnown() = viewModelScope.launch {
+        val added = knownDevices?.add(devices.value.map { it.observed() }) ?: 0
+        _messages.trySend(
+            if (added > 0) "$added device${if (added == 1) "" else "s"} added to known devices"
+            else "No new devices to add (devices without a MAC address can't be listed)"
+        )
+    }
+
+    /** Records online devices that aren't on the known list as findings (only when the list is in use). */
+    private fun reportUnknownDevices() {
+        val known = knownMacs.value
+        if (known.isEmpty() || findingRepository == null) return
+        val online = devices.value.filter { it.isOnline }.map { it.observed() }
+        val unknown = KnownDeviceMatcher.unknown(online, known).mapNotNull { KnownDeviceMatcher.normalize(it.mac) }.toSet()
+        if (unknown == reportedUnknown) return
+        reportedUnknown = unknown
+        viewModelScope.launch { findingRepository.record(KnownDeviceMatcher.findings(online, known)) }
+    }
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -132,6 +179,7 @@ class DhcpMonitorViewModel(
                 _status.value = status
                 val online = devices.value.count { it.isOnline }
                 ActiveTaskMonitor.updateStatus("$TASK_NAME: $online devices online")
+                reportUnknownDevices() // a sweep just finished
             }
             is MonitoringStatus.Error -> {
                 _status.value = status

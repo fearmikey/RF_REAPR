@@ -1,5 +1,9 @@
 package com.fearmikey.rf_reapr.domain.model
 
+/**
+ * A Have I Been Pwned breach. Property names double as the keys of the stored HIBP log
+ * entries that ReportRepositoryImpl reads (name, domain, breachDate, dataClasses).
+ */
 data class Breach(
     val name: String,
     val title: String,
@@ -14,7 +18,9 @@ data class Breach(
     val isFabricated: Boolean,
     val isSensitive: Boolean,
     val isRetired: Boolean,
-    val isSpamList: Boolean
+    val isSpamList: Boolean,
+    val isMalware: Boolean = false,
+    val isStealerLog: Boolean = false
 )
 
 data class Paste(

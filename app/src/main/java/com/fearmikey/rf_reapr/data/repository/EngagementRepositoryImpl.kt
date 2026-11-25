@@ -1,6 +1,13 @@
 package com.fearmikey.rf_reapr.data.repository
 
+import com.fearmikey.rf_reapr.data.db.dao.AuditRunDao
 import com.fearmikey.rf_reapr.data.db.dao.EventLogDao
+import com.fearmikey.rf_reapr.domain.model.AuditRun
+import com.fearmikey.rf_reapr.domain.model.EventLog
+import com.fearmikey.rf_reapr.domain.model.Evidence
+import com.fearmikey.rf_reapr.domain.service.AuditRunCodec
+import com.fearmikey.rf_reapr.domain.service.TimelineBuilder
+import com.fearmikey.rf_reapr.domain.service.TimelineEvent
 import com.fearmikey.rf_reapr.data.db.dao.EvidenceDao
 import com.fearmikey.rf_reapr.data.db.dao.ScanSessionDao
 import com.fearmikey.rf_reapr.data.db.entity.EvidenceProjectEntity
@@ -15,7 +22,12 @@ import com.fearmikey.rf_reapr.domain.repository.EngagementRepository
 import com.fearmikey.rf_reapr.domain.repository.EngagementStats
 import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.service.EngagementReport
+import com.fearmikey.rf_reapr.domain.service.EvidenceHasher
+import com.fearmikey.rf_reapr.domain.service.ExportEvidence
 import com.fearmikey.rf_reapr.domain.service.ExportHost
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,8 +44,41 @@ class EngagementRepositoryImpl(
     private val scanSessionDao: ScanSessionDao,
     private val eventLogDao: EventLogDao,
     private val findingRepository: FindingRepository,
-    private val activeProjectStore: ActiveProjectStore
+    private val activeProjectStore: ActiveProjectStore,
+    private val auditRunDao: AuditRunDao
 ) : EngagementRepository {
+
+    override fun observeTimeline(projectId: String?): Flow<List<TimelineEvent>> {
+        val logs = if (projectId == null) eventLogDao.getAllLogs() else eventLogDao.getLogsForProject(projectId)
+        val evidence = if (projectId == null) flowOf(emptyList()) else evidenceDao.getEvidenceForProject(projectId)
+        return combine(
+            logs,
+            findingRepository.observe(projectId),
+            evidence,
+            observeScanSessions(projectId),
+            auditRunDao.observeForProject(projectId.orEmpty())
+        ) { logList, findings, evidenceList, scans, runs ->
+            TimelineBuilder.build(
+                logs = logList.map { EventLog(it.id, it.type, it.timestamp, it.summary, "", it.projectId) },
+                findings = findings,
+                evidence = evidenceList.map { e ->
+                    Evidence(
+                        id = e.id, filePath = e.filePath, timestamp = Date(e.timestamp), latitude = e.latitude,
+                        longitude = e.longitude, notes = e.notes, sha256 = e.sha256, findingId = e.findingId
+                    )
+                },
+                scans = scans,
+                audits = runs.map { r ->
+                    AuditRun(
+                        id = r.id, projectId = r.projectId.ifEmpty { null }, startedAt = r.startedAt, finishedAt = r.finishedAt,
+                        networkLabel = r.networkLabel, grade = r.grade, score = r.score, completed = r.completed,
+                        checks = AuditRunCodec.decodeChecks(r.checks), hostCount = r.hostCount,
+                        findings = AuditRunCodec.decode(r.findingsJson), reportMarkdown = ""
+                    )
+                }
+            )
+        }
+    }
 
     override val activeProjectId: StateFlow<String?> get() = activeProjectStore.activeProjectId
 
@@ -111,17 +156,29 @@ class EngagementRepositoryImpl(
             }
         val logs = if (projectId == null) eventLogDao.getAllLogs().first() else eventLogDao.getLogsForProject(projectId).first()
         val evidence = if (projectId == null) 0 else evidenceDao.countEvidenceForProject(projectId).first()
+        val findings = findingRepository.getForProject(projectId)
+        val findingIds = findings.map { it.id }.toSet()
+        // Re-check each linked item's capture hash so the export states its integrity as of now.
+        val evidenceByFinding = withContext(Dispatchers.IO) {
+            evidenceDao.getLinkedEvidence()
+                .filter { it.findingId in findingIds }
+                .groupBy({ it.findingId!! }) { e ->
+                    val file = File(e.filePath)
+                    ExportEvidence(file.name, e.timestamp, e.sha256, EvidenceHasher.verify(file, e.sha256), e.notes)
+                }
+        }
         return EngagementReport(
             projectName = project?.name ?: "Unassigned work",
             description = project?.description.orEmpty(),
             scope = project?.scope.orEmpty(),
             generatedAt = System.currentTimeMillis(),
-            findings = findingRepository.getForProject(projectId),
+            findings = findings,
             hosts = hosts,
             scanCount = sessions.size,
             logCount = logs.size,
             evidenceCount = evidence,
-            appVersion = appVersion
+            appVersion = appVersion,
+            evidenceByFinding = evidenceByFinding
         )
     }
 
@@ -134,7 +191,8 @@ class EngagementRepositoryImpl(
         timestamp = session.timestamp,
         networkName = session.networkName,
         gatewayIp = session.gatewayIp,
-        nodes = nodes.map { it.toDomain() }
+        nodes = nodes.map { it.toDomain() },
+        projectId = session.projectId
     )
 
     private fun NetworkNodeEntity.toDomain() = NetworkNode(

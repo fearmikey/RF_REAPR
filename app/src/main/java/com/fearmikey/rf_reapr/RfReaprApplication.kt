@@ -34,6 +34,12 @@ class RfReaprApplication : Application() {
         // tagged and the out-of-scope warnings have the scope available.
         container.activeProjectStore
 
+        // Evidence captured before hashes were recorded (pre-v18) gets its SHA-256 now, so it
+        // can be integrity-checked from here on. A no-op once everything is hashed.
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching { container.evidenceRepository.backfillHashes() }
+        }
+
         applicationScope.launch {
             ActiveTaskMonitor.activeTasks
                 .map { it.isNotEmpty() }

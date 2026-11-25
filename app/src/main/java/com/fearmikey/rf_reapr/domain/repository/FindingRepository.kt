@@ -25,4 +25,7 @@ interface FindingRepository {
     suspend fun setStatus(id: Long, status: FindingStatus)
     suspend fun setNotes(id: Long, notes: String?)
     suspend fun delete(id: Long)
+
+    /** Removes every finding of [projectId]; null = findings recorded with no active project. */
+    suspend fun deleteAll(projectId: String?)
 }

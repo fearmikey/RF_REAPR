@@ -4,6 +4,7 @@ import com.fearmikey.rf_reapr.domain.model.*
 import com.fearmikey.rf_reapr.domain.repository.WebsiteInspectorRepository
 import com.fearmikey.rf_reapr.domain.repository.WebsiteInspectorRepository.InspectorStatus
 import com.fearmikey.rf_reapr.domain.repository.WebsiteInspectorRepository.WebsiteInspectorStatus
+import com.fearmikey.rf_reapr.domain.service.SecurityHeaderAnalyzer
 import com.google.gson.JsonParser
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -34,15 +35,25 @@ class WebsiteInspectorRepositoryImpl(
             state.value = state.value.copy(httpStatus = InspectorStatus.Loading)
             send(state.value)
             try {
-                val request = Request.Builder().url(cleanUrl).head().build()
-                client.newCall(request).execute().use { response ->
-                    val headers = response.headers.toMap()
-                    val misconfigs = analyzeHeaders(headers)
+                var response = client.newCall(Request.Builder().url(cleanUrl).head().build()).execute()
+                // Some servers reject HEAD or answer it without their usual headers.
+                if (response.code == 405 || response.code == 501) {
+                    response.close()
+                    response = client.newCall(Request.Builder().url(cleanUrl).get().build()).execute()
+                }
+                response.use {
+                    val headers = it.headers.toMap()
+                    // Grade the page actually served (after redirects), e.g. http:// -> https://.
+                    val finalUrl = it.request.url.toString()
+                    val audit = SecurityHeaderAnalyzer.analyze(finalUrl, headers, it.headers("Set-Cookie"))
                     val result = HttpSecurityResult(
-                        url = cleanUrl,
-                        statusCode = response.code,
+                        url = finalUrl,
+                        statusCode = it.code,
                         headers = headers,
-                        misconfigurations = misconfigs
+                        misconfigurations = audit.issues,
+                        grade = audit.grade,
+                        score = audit.score,
+                        passed = audit.passed
                     )
                     state.value = state.value.copy(httpStatus = InspectorStatus.Success(result))
                     send(state.value)
@@ -167,25 +178,6 @@ class WebsiteInspectorRepositoryImpl(
                 send(state.value)
             }
         }
-    }
-
-    private fun analyzeHeaders(headers: Map<String, String>): List<SecurityMisconfiguration> {
-        val misconfigs = mutableListOf<SecurityMisconfiguration>()
-        val normalizedHeaders = headers.mapKeys { it.key.lowercase() }
-
-        if (!normalizedHeaders.containsKey("content-security-policy")) {
-            misconfigs.add(SecurityMisconfiguration("Content-Security-Policy", "Header is missing", RiskLevel.MEDIUM, "Implement a strict CSP to prevent XSS and data injection attacks."))
-        }
-        if (!normalizedHeaders.containsKey("x-frame-options")) {
-            misconfigs.add(SecurityMisconfiguration("X-Frame-Options", "Header is missing", RiskLevel.LOW, "Set X-Frame-Options to DENY or SAMEORIGIN to prevent Clickjacking."))
-        }
-        if (!normalizedHeaders.containsKey("strict-transport-security")) {
-            misconfigs.add(SecurityMisconfiguration("Strict-Transport-Security", "HSTS is not enabled", RiskLevel.MEDIUM, "Enable HSTS to force HTTPS connections and prevent SSL stripping."))
-        }
-        if (!normalizedHeaders.containsKey("x-content-type-options")) {
-            misconfigs.add(SecurityMisconfiguration("X-Content-Type-Options", "Header is missing", RiskLevel.LOW, "Set to 'nosniff' to prevent MIME-type sniffing."))
-        }
-        return misconfigs
     }
 
     private fun analyzeTls(protocol: String?, cipherSuite: String, cert: X509Certificate?): List<TlsVulnerability> {

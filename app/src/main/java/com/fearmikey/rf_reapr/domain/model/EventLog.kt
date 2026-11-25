@@ -5,5 +5,7 @@ data class EventLog(
     val type: String,
     val timestamp: Long,
     val summary: String,
-    val detailJson: String
+    val detailJson: String,
+    /** Project that was active when the entry was written, if any. */
+    val projectId: String? = null
 )

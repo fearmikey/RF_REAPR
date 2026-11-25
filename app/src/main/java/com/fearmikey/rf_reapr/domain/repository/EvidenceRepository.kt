@@ -3,6 +3,7 @@ package com.fearmikey.rf_reapr.domain.repository
 import com.fearmikey.rf_reapr.domain.model.Evidence
 import com.fearmikey.rf_reapr.domain.model.EvidenceFolder
 import com.fearmikey.rf_reapr.domain.model.EvidenceProject
+import com.fearmikey.rf_reapr.domain.service.EvidenceIntegrity
 import kotlinx.coroutines.flow.Flow
 
 interface EvidenceRepository {
@@ -43,6 +44,18 @@ interface EvidenceRepository {
 
     suspend fun moveFolder(folderId: String, targetProjectId: String?, targetFolderId: String?)
     suspend fun copyFolder(folderId: String, targetProjectId: String?, targetFolderId: String?)
+
+    /** Evidence attached to a finding (see [linkToFinding]). */
+    fun getEvidenceForFinding(findingId: Long): Flow<List<Evidence>>
+
+    /** Attach an item to a finding, or detach it with a null [findingId]. */
+    suspend fun linkToFinding(evidenceId: String, findingId: Long?)
+
+    /** Re-hashes the file and compares it with the SHA-256 recorded at capture. */
+    suspend fun verifyIntegrity(evidence: Evidence): EvidenceIntegrity
+
+    /** Hashes items captured before hashes were recorded. Returns how many were hashed. */
+    suspend fun backfillHashes(): Int
 
     suspend fun hideData(evidence: Evidence, message: String, passphrase: CharArray)
     suspend fun revealData(evidence: Evidence, passphrase: CharArray): Result<String>

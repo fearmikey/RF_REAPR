@@ -10,7 +10,11 @@ import com.fearmikey.rf_reapr.domain.scanner.NetworkScanner
 import com.fearmikey.rf_reapr.domain.service.ActiveTaskMonitor
 import com.fearmikey.rf_reapr.domain.service.DeviceIdentificationService
 import com.google.gson.Gson
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,6 +98,25 @@ class TopologyViewModel(
 
     private val gson = Gson()
 
+    // Parent of all work tied to the current map (discovery, deep scan, per-node scans).
+    // Replaced on every new discovery / clear so late results from a previous network
+    // can never be written into the new map.
+    private var sessionJob: Job = SupervisorJob(viewModelScope.coroutineContext[Job])
+    private val sessionScope: CoroutineScope
+        get() = CoroutineScope(viewModelScope.coroutineContext + sessionJob)
+
+    /**
+     * Cancels all work belonging to the current map, waits for it to unwind (so its `finally`
+     * blocks can't race the next session), and returns the scope for the new session.
+     */
+    private suspend fun resetSession(): CoroutineScope {
+        val old = sessionJob
+        sessionJob = SupervisorJob(viewModelScope.coroutineContext[Job])
+        val scope = sessionScope
+        old.cancelAndJoin()
+        return scope
+    }
+
     init {
         loadPersistedNodes()
 
@@ -135,67 +158,79 @@ class TopologyViewModel(
      */
     fun startNetworkDiscovery() {
         if (isPassiveMode.value) return
-        val taskName = "Network Discovery"
         viewModelScope.launch {
-            ActiveTaskMonitor.addTask(taskName)
-            try {
-                // Clear previous scan data before starting a new discovery session
-                scanSessionRepository.clearAllData()
-                _mappedGraph.value = null
-                _deepScanCompleted.value = false
-                _nodeResults.value = emptyMap()
+            // Stop any previous discovery/deep scan/node scans first. If another tap superseded
+            // this one while we waited, `scope` is already cancelled and this launch is a no-op.
+            val scope = resetSession()
+            scope.launch { runDiscovery() }
+        }
+    }
 
-                val networkInfo = discoveryRepository.getLocalNetworkInfo()
-                _localDeviceIp.value = networkInfo.localIp
-                discoveryRepository.discoverDevices().collect { result ->
-                    _discoveryState.value = result
-                    when (result) {
-                        is NetworkScanner.ScanResult.Progress -> {
-                            val percent = (result.progress * 100).toInt()
-                            ActiveTaskMonitor.updateStatus("$taskName: $percent%")
-                        }
-                        is NetworkScanner.ScanResult.Error -> {
-                            _messages.trySend("Discovery failed: ${result.message}")
-                        }
-                        is NetworkScanner.ScanResult.Finished -> {
-                            var nodes = result.foundData.map { node ->
-                                node.copy(
-                                    deviceType = DeviceIdentificationService.identifyDevice(
-                                        ipAddress = node.ipAddress,
-                                        macAddress = node.macAddress,
-                                        hostname = node.hostname,
-                                        gatewayIp = networkInfo.gatewayIp
-                                    ),
-                                    manufacturer = DeviceIdentificationService.getManufacturer(node.macAddress)
-                                )
-                            }
+    private suspend fun runDiscovery() {
+        val taskName = "Network Discovery"
+        ActiveTaskMonitor.addTask(taskName)
+        try {
+            // Clear previous scan data before starting a new discovery session
+            scanSessionRepository.clearAllData()
+            _mappedGraph.value = null
+            _deepScanCompleted.value = false
+            _nodeResults.value = emptyMap()
 
-                            // The scanning device itself doesn't always respond to its own
-                            // liveness probes (no open ports, pinging self can behave
-                            // differently across devices) - ensure it's always represented
-                            // on the map so it can be highlighted as "my device".
-                            val localIp = networkInfo.localIp
-                            if (nodes.none { it.ipAddress == localIp }) {
-                                nodes = nodes + NetworkNode(
-                                    id = localIp,
-                                    ipAddress = localIp,
-                                    deviceType = DeviceType.MOBILE
-                                )
-                            }
-
-                            scanSessionRepository.saveDiscoveredNodes(
-                                nodes = nodes,
-                                networkName = "Local Network",
-                                gatewayIp = networkInfo.gatewayIp
-                            )
-                            _messages.trySend("Discovery complete: ${nodes.size} devices found")
-                        }
-                        else -> Unit
-                    }
-                }
-            } finally {
-                ActiveTaskMonitor.removeTask(taskName)
+            val networkInfo = try {
+                discoveryRepository.getLocalNetworkInfo()
+            } catch (e: Exception) {
+                _messages.trySend("Discovery failed: ${e.message ?: "no network"}")
+                return
             }
+            _localDeviceIp.value = networkInfo.localIp
+            discoveryRepository.discoverDevices().collect { result ->
+                _discoveryState.value = result
+                when (result) {
+                    is NetworkScanner.ScanResult.Progress -> {
+                        val percent = (result.progress * 100).toInt()
+                        ActiveTaskMonitor.updateStatus("$taskName: $percent%")
+                    }
+                    is NetworkScanner.ScanResult.Error -> {
+                        _messages.trySend("Discovery failed: ${result.message}")
+                    }
+                    is NetworkScanner.ScanResult.Finished -> {
+                        var nodes = result.foundData.map { node ->
+                            node.copy(
+                                deviceType = DeviceIdentificationService.identifyDevice(
+                                    ipAddress = node.ipAddress,
+                                    macAddress = node.macAddress,
+                                    hostname = node.hostname,
+                                    gatewayIp = networkInfo.gatewayIp
+                                ),
+                                manufacturer = DeviceIdentificationService.getManufacturer(node.macAddress)
+                            )
+                        }
+
+                        // The scanning device itself doesn't always respond to its own
+                        // liveness probes (no open ports, pinging self can behave
+                        // differently across devices) - ensure it's always represented
+                        // on the map so it can be highlighted as "my device".
+                        val localIp = networkInfo.localIp
+                        if (nodes.none { it.ipAddress == localIp }) {
+                            nodes = nodes + NetworkNode(
+                                id = localIp,
+                                ipAddress = localIp,
+                                deviceType = DeviceType.MOBILE
+                            )
+                        }
+
+                        scanSessionRepository.saveDiscoveredNodes(
+                            nodes = nodes,
+                            networkName = "Local Network",
+                            gatewayIp = networkInfo.gatewayIp
+                        )
+                        _messages.trySend("Discovery complete: ${nodes.size} devices found")
+                    }
+                    else -> Unit
+                }
+            }
+        } finally {
+            ActiveTaskMonitor.removeTask(taskName)
         }
     }
 
@@ -224,7 +259,7 @@ class TopologyViewModel(
             _messages.trySend("Wait for the current device port scan to finish")
             return
         }
-        viewModelScope.launch {
+        sessionScope.launch {
             val currentNetwork = discoveryRepository.getLocalNetworkInfo()
             val lastGatewayIp = scanSessionRepository.getLastSessionGatewayIp()
 
@@ -290,7 +325,7 @@ class TopologyViewModel(
             _messages.trySend("A port scan is already running")
             return
         }
-        viewModelScope.launch {
+        sessionScope.launch {
             setNodeScanActive(node.id, NodeScanKind.PORTS, true)
             try {
                 val portCount = scanSingleNode(node)
@@ -309,7 +344,7 @@ class TopologyViewModel(
     fun scanSnmpSingleNodeTrigger(node: NetworkNode) {
         if (isPassiveMode.value) return
         if (_activeNodeScans.value[node.id]?.contains(NodeScanKind.SNMP) == true) return
-        viewModelScope.launch {
+        sessionScope.launch {
             setNodeScanActive(node.id, NodeScanKind.SNMP, true)
             try {
                 val responded = querySnmpForNode(node)
@@ -331,7 +366,7 @@ class TopologyViewModel(
 
     fun checkExternalExposure(node: NetworkNode) {
         if (_activeNodeScans.value[node.id]?.contains(NodeScanKind.RECON) == true) return
-        viewModelScope.launch {
+        sessionScope.launch {
             setNodeScanActive(node.id, NodeScanKind.RECON, true)
             try {
                 internetDbRepository.getIpInfo(node.ipAddress)
@@ -419,6 +454,7 @@ class TopologyViewModel(
 
     fun clearData() {
         viewModelScope.launch {
+            resetSession()
             scanSessionRepository.clearAllData()
             _mappedGraph.value = null
             _deepScanCompleted.value = false

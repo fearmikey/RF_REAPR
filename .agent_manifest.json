@@ -9,12 +9,13 @@
     "dependency_injection": "Manual DI via AppContainer.kt (owned by RfReaprApplication.container; lazy, process-lifetime repositories with the Application context). MainActivity pulls them with local delegates (`val x by container::x`) and passes them into ViewModels via viewModel { } factories. Workers reach the container via (applicationContext as RfReaprApplication).container.",
     "ui_framework": "Jetpack Compose with Material 3",
     "async_concurrency": "Kotlin Coroutines & Flow / StateFlow",
-    "persistence": "Room Database (AppDatabase v17, SQLite; schemas exported to app/schemas/, AutoMigration 16->17, destructive fallback ONLY from legacy v1-15) + EncryptedSharedPreferences (SettingsRepositoryImpl) + plain prefs: engagement_prefs (active project id), network_watch, wol_targets",
+    "persistence": "Room Database (AppDatabase v18, SQLite; schemas exported to app/schemas/, AutoMigrations 16->17 and 17->18, destructive fallback ONLY from legacy v1-15) + EncryptedSharedPreferences (SettingsRepositoryImpl; also holds main-menu favorites under 'favorite_tools') + plain prefs: engagement_prefs (active project id), network_watch, wol_targets",
     "migration_rules": "Every schema change MUST bump AppDatabase.VERSION and add an AutoMigration/Migration; rebuild so app/schemas/<version>.json is exported and commit it; extend app/src/androidTest/.../data/db/AppDatabaseMigrationTest.kt. KSP2 is enabled in gradle.properties (ksp.useKSP2=true) because Room's schema reader fails under KSP1.",
     "network": "Retrofit 2 + Gson + OkHttpClient for external APIs (Shodan, HIBP, NVD, etc.)",
-    "background_processing": "WorkManager (VulnerabilityUpdateWorker, RecycleBinWorker) + ScanForegroundService (promotes scans to Android Foreground Service via ActiveTaskMonitor)",
+    "background_processing": "WorkManager (VulnerabilityUpdateWorker, RecycleBinWorker) + ScanForegroundService (promotes scans to Android Foreground Service via ActiveTaskMonitor; type dataSync, plus location ONLY while the SURVEY_TASK_NAME task is active and fine location is granted - see ScanForegroundService.promote)",
     "native_code": "C++ / JNI iperf3 wrapper compiled via CMake with custom Android longjmp patch in app/src/main/cpp/iperf_android/",
-    "foss_compliance": "Strict 100% FOSS. Zero proprietary SDKs (No Google Play Services/GMS, Ads, Billing, ML Kit, Firebase, or Analytics)."
+    "foss_compliance": "Strict 100% FOSS. Zero proprietary SDKs (No Google Play Services/GMS, Ads, Billing, ML Kit, Firebase, or Analytics).",
+    "lint": "gradle.properties sets android.experimental.lint.version (newer lint than the one bundled with AGP 8.7.3). The bundled lint crashed in the Compose 1.9 / Lifecycle 2.9 detectors (IncompatibleClassChangeError on Ka* analysis-API classes). Do NOT 'fix' such crashes by disabling checks; drop the property once AGP itself is upgraded. `:app:lintDebug` must pass with 0 errors."
   },
   "entry_points": {
     "application_class": "app/src/main/java/com/fearmikey/rf_reapr/RfReaprApplication.kt",
@@ -41,8 +42,8 @@
   },
   "database_map": {
     "class": "app/src/main/java/com/fearmikey/rf_reapr/data/db/AppDatabase.kt",
-    "version": 17,
-    "schemas": "app/schemas/com.fearmikey.rf_reapr.data.db.AppDatabase/{16,17}.json",
+    "version": 18,
+    "schemas": "app/schemas/com.fearmikey.rf_reapr.data.db.AppDatabase/{16,17,18}.json",
     "migration_test": "app/src/androidTest/java/com/fearmikey/rf_reapr/data/db/AppDatabaseMigrationTest.kt",
     "daos": {
       "findingDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/FindingDao.kt",
@@ -54,7 +55,10 @@
       "vulnerabilityDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/VulnerabilityDao.kt",
       "hidScriptDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/HidScriptDao.kt",
       "hidAssetDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/HidAssetDao.kt",
-      "usbDriveDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/UsbDriveDao.kt"
+      "usbDriveDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/UsbDriveDao.kt",
+      "auditRunDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/AuditRunDao.kt (v18)",
+      "knownDeviceDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/KnownDeviceDao.kt (v18)",
+      "surveyDao": "app/src/main/java/com/fearmikey/rf_reapr/data/db/dao/SurveyDao.kt (v18; geotagged survey sessions/observations AND floor-plan site surveys/samples)"
     },
     "entities": [
       "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/ScanSessionEntity.kt",
@@ -69,17 +73,116 @@
       "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/HidScriptEntity.kt",
       "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/HidAssetEntity.kt",
       "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/UsbDriveEntity.kt",
-      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/FindingEntity.kt (v17; unique (projectId, fingerprint); projectId '' = no project)"
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/FindingEntity.kt (v17; unique (projectId, fingerprint); projectId '' = no project)",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/AuditRunEntity.kt (v18; audit_runs, projectId '' = no project)",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/KnownDeviceEntity.kt (v18; known_devices, unique (projectId, mac))",
+      "app/src/main/java/com/fearmikey/rf_reapr/data/db/entity/SurveyEntities.kt (v18; survey_sessions, survey_observations [unique (sessionId, kind, identifier), FK cascade], site_surveys, site_survey_samples [FK cascade])"
     ],
+    "v18_columns": "evidence.sha256 (capture hash, nullable; backfilled at app start by EvidenceRepository.backfillHashes) and evidence.findingId (nullable link to findings.id, no FK: unlinked by FindingRepositoryImpl.delete/deleteAll and EvidenceRepositoryImpl.purgeProject)",
+    "project_purge": "EvidenceRepositoryImpl.purgeProject is the single place that removes everything tagged with a project (no FK cascades): evidence files, folders, findings, logs, audit_runs, known_devices, survey sessions, site surveys + floor plan files. Add any new per-project table there.",
     "v17_columns": "event_logs.projectId, scan_sessions.projectId (nullable, stamped by LogRepositoryImpl/ScanSessionRepositoryImpl from ActiveProjectStore); evidence_projects.scope (newline-separated, see ScopeMatcher)"
   },
   "feature_map": {
+    "evidence_integrity_and_finding_links": {
+      "summary": "Evidence gets a SHA-256 at capture/import (EvidenceRepositoryImpl.saveEvidence; re-hashed after stego embedding) and can be attached to one finding. Integrity is re-checked on display, in exports and in reports.",
+      "domain": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/EvidenceHasher.kt (EvidenceHasher, EvidenceIntegrity)",
+      "repository": "EvidenceRepository.getEvidenceForFinding / linkToFinding / verifyIntegrity / backfillHashes",
+      "ui": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/compliance/EvidenceIntegrityRow.kt (shared hash + status row; used by the gallery detail dialog and the finding detail)",
+        "FindingsScreen.FindingDetail (attach/detach picker; FindingsViewModel takes evidenceRepository)"
+      ]
+    },
+    "compliance_mapping": {
+      "summary": "Findings are mapped to compliance controls by tool + title keywords. Suggestion only: a control is never marked automatically.",
+      "domain": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ComplianceCatalog.kt (ComplianceCatalog = the ONLY static control list, used by ComplianceRepositoryImpl and ReportRepositoryImpl; ControlTheme; ComplianceMapper)",
+      "ui": "AuditChecklistScreen.ControlItem(relatedFindings, onApplySuggestion); ComplianceViewModel(repository, findingRepository).findingsByControl; chips in FindingsScreen.FindingDetail",
+      "notes": "New FindingTools need a branch in ComplianceMapper.themes. New controls go in ComplianceCatalog and, if a theme should point at them, ControlTheme.controlIds (EngagementExtensionsTest checks they exist)."
+    },
+    "audit_history": {
+      "route": "Screen.AuditHistory ('audit_history'); opened from AuditModeScreen (History icon), EngagementScreen workspace card and the main menu. The raw log list stays at Screen.AuditLogs.",
+      "ui": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/audit/AuditHistoryScreen.kt (+ AuditComparisonCard shown on the Audit Mode result screen)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/audit/AuditHistoryViewModel.kt"
+      ],
+      "repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/AuditRunRepository.kt -> data/repository/AuditRunRepositoryImpl.kt (AppContainer.auditRunRepository; AuditEngine saves a run in its finally block when at least one check finished)",
+      "domain": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/AuditRun.kt (AuditRun, AuditRunFinding)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/AuditRunDiff.kt (AuditRunCodec = Gson tree API snapshot codec; AuditRunDiff: new/resolved/persisting/notRetested - 'resolved' requires the producing check to have run again, matched via AuditCheck.tool)"
+      ]
+    },
+    "engagement_timeline": {
+      "route": "Screen.Timeline ('timeline')",
+      "ui": "app/src/main/java/com/fearmikey/rf_reapr/ui/engagement/TimelineScreen.kt (TimelineViewModel + screen, Markdown export)",
+      "domain": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/TimelineBuilder.kt (merges logs, findings, evidence, scans, audit runs)",
+      "repository": "EngagementRepository.observeTimeline(projectId)"
+    },
+    "known_devices": {
+      "summary": "Per-project allowlist of expected devices (by MAC). Once it has entries, the Network Monitor tags other devices and records them as findings (tool FindingTools.NETWORK_MONITOR, target = MAC).",
+      "route": "Screen.KnownDevices ('known_devices')",
+      "ui": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/dhcp/KnownDevicesScreen.kt (KnownDevicesViewModel + screen)",
+        "DhcpMonitorScreen/DhcpMonitorViewModel (knownMacs, markKnown, markAllKnown, reportUnknownDevices after each sweep)"
+      ],
+      "domain": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/KnownDeviceMatcher.kt (KnownDevice, ObservedDevice, DeviceStanding, KnownDeviceMatcher)",
+      "repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/KnownDeviceRepository.kt -> data/repository/KnownDeviceRepositoryImpl.kt"
+    },
+    "geotagged_survey": {
+      "summary": "Wardriving-style survey: passive Wi-Fi/BLE/cell logging with GPS (android.location only, no Play Services). One row per emitter per session at its strongest position. Export WiGLE CSV / KML / GPX to a user-picked file; nothing is uploaded.",
+      "route": "Screen.GeoSurvey ('geo_survey')",
+      "ui": "app/src/main/java/com/fearmikey/rf_reapr/ui/survey/GeoSurveyScreen.kt (GeoSurveyViewModel + screen)",
+      "repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/SurveyRepository.kt (SurveyRepository, SiteSurveyRepository, SURVEY_TASK_NAME) -> data/repository/SurveyRepositoryImpl.kt (AppContainer.surveyRepository, process lifetime; own LocationManager/BLE/Telephony/Wi-Fi sources)",
+      "wifi_source": "app/src/main/java/com/fearmikey/rf_reapr/data/survey/WifiScanSource.kt (direct WifiManager access shared by both survey tools so they don't disturb WifiFingerprintRepository)",
+      "domain": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/SurveyExporter.kt (SurveyKind, SurveyObservation, SurveySighting, SurveyFix, SurveyMerger, SurveyExporter)",
+      "notes": "BLUETOOTH_SCAN keeps its neverForLocation flag, so the platform filters some beacons from BLE results."
+    },
+    "wifi_site_survey": {
+      "route": "Screen.SiteSurvey ('site_survey')",
+      "ui": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/survey/SiteSurveyScreen.kt (list + tap-to-measure canvas with heatmap overlay)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/survey/SiteSurveyViewModel.kt"
+      ],
+      "repository": "SiteSurveyRepository -> data/repository/SiteSurveyRepositoryImpl.kt (floor plans copied to filesDir/floorplans; measure() uses WifiScanSource.freshScan and rejects stale cached results)",
+      "domain": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/SignalHeatmap.kt (SiteSample, HeatPoint, SignalQuality, SurveyNetwork, SignalHeatmap: IDW interpolation with no extrapolation beyond maxDistance)"
+    },
+    "gatt_inspector": {
+      "summary": "Read-only BLE GATT enumeration behind an explicit consent card. NEVER writes, subscribes or pairs - keep it that way (safety-sensitive).",
+      "route": "Screen.GattInspector ('gatt_inspector/{address}?name={name}'), opened from BluetoothProximityFinderScreen's tracking view",
+      "ui": "app/src/main/java/com/fearmikey/rf_reapr/ui/wireless/GattInspectorScreen.kt (GattInspectorViewModel + screen)",
+      "repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/GattInspectorRepository.kt -> data/repository/GattInspectorRepositoryImpl.kt",
+      "domain": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/GattAnalyzer.kt (GattCatalog, GattAnalyzer; findings recorded under FindingTools.BLE)"
+    },
+    "nmap_import": {
+      "entry": "EngagementScreen workspace card -> EngagementViewModel.importNmap(uri)",
+      "manager": "app/src/main/java/com/fearmikey/rf_reapr/data/audit/NmapImportManager.kt (AppContainer.nmapImportManager; 25 MB cap; nodes -> ScanSessionRepository, exposures -> findings under FindingTools.NMAP)",
+      "domain": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/NmapXmlParser.kt (NmapXmlParser with external entities disabled, NmapImporter)"
+    },
+    "main_menu": {
+      "ui": "app/src/main/java/com/fearmikey/rf_reapr/ui/menu/MainMenuScreen.kt (tool list, search incl. ToolkitTool.keywords and category titles, Favorites card; favorites keyed by tool NAME via SettingsViewModel.favoriteTools/toggleFavoriteTool)",
+      "notes": "Every new tool needs a ToolkitTool entry here plus a Screen route and a composable(...) in MainActivity."
+    },
+    "adaptive_layouts": "Width >= 840dp: FindingsScreen shows list + detail panes (BoxWithConstraints; bottom sheet otherwise) and TopologyScreen shows map + device list side by side (LocalConfiguration.screenWidthDp).",
+    "audit_mode": {
+      "summary": "Selection-based guided audit: the user picks checks (or a preset) and AuditEngine runs them in order against the current network or a manual target list, recording every result into the shared findings store under the active project, then grades the run (A-F) and exports a Markdown report.",
+      "route": "Screen.AuditMode ('audit_mode'); entry card ui/menu/AuditModeCard.kt under ActiveEngagementCard in MainMenuScreen. Past runs: Screen.AuditLogs ('logs/audit') = LogListScreen type 'AUDIT' (History icon in AuditModeScreen + 'Audit Mode Logs' in the Compliance tool list). Runs are not stored as records; only the current run lives in AuditEngine.state ('New audit' clears it).",
+      "ui": [
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/audit/AuditModeScreen.kt (setup: presets, check list, targets, port depth, scope toggle; run: live steps, grade, hosts, export)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/audit/AuditModeViewModel.kt (AuditDraft -> AuditConfig, live plan preview)"
+      ],
+      "engine": "app/src/main/java/com/fearmikey/rf_reapr/data/audit/AuditEngine.kt (AppContainer.auditEngine, process-lifetime on applicationScope; ActiveTaskMonitor task AUDIT_TASK_NAME so it survives leaving the screen and honours Stop All; records findings per host/check so cancelled runs keep partial results; saves discovered nodes/ports/SNMP to ScanSessionRepository so the Network Discovery map reflects the audit; logs type 'AUDIT')",
+      "domain": [
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/model/Audit.kt (AuditCheck enum = execution order + active/needsHosts flags, AuditPreset, PortDepth, AuditTargets, AuditConfig, AuditStepState, AuditHost, AuditRunState, AUDIT_TASK_NAME)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/AuditPlanner.kt (AuditPlanner: dependency resolution TLS->PORTS->DISCOVERY, Passive Mode gating, parseTargets with /24+ CIDR and a.b.c.x-y ranges, partitionByScope, tlsEndpoints; AuditScoring: weighted score + grade caps)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/AuditReportBuilder.kt (Markdown report)"
+      ],
+      "checks_to_repositories": "WIFI->WifiFingerprintRepository, CAPTIVE_PORTAL->CaptivePortalRepository, DNS->DnsAuditorRepository, UPNP->UpnpScannerRepository, DISCOVERY->NetworkDiscoveryRepository, PORTS->PortScannerRepository.scan + VulnerabilityRepository, TLS->TlsCipherScannerRepository, SNMP->SnmpRepository.probeCommunity/queryDevice. To add a check: new AuditCheck entry (position = order), a run* branch in AuditEngine, and a FindingAdapters function with stable titles.",
+      "tests": "app/src/test/java/com/fearmikey/rf_reapr/domain/service/AuditModeTest.kt"
+    },
     "engagement_findings_scope": {
       "summary": "Evidence projects double as engagements. The active project (ActiveProjectStore -> ActiveEngagement singleton) tags logs, scan sessions and findings; its scope drives ScopeWarning under target inputs.",
       "routes": ["Screen.Engagement ('engagement')", "Screen.Findings ('findings')", "Screen.Backup ('backup')"],
       "ui": [
         "app/src/main/java/com/fearmikey/rf_reapr/ui/engagement/EngagementScreen.kt + EngagementViewModel.kt (project picker, scope editor, stats, exports, scan comparison)",
-        "app/src/main/java/com/fearmikey/rf_reapr/ui/findings/FindingsScreen.kt + FindingsViewModel.kt (filter, triage status/notes, manual findings, export)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/findings/FindingsScreen.kt + FindingsViewModel.kt (filter, triage status/notes, manual findings, export, overflow 'Clear all findings' -> FindingRepository.deleteAll(activeProjectId))",
         "app/src/main/java/com/fearmikey/rf_reapr/ui/menu/ActiveEngagementCard.kt (main menu banner)",
         "app/src/main/java/com/fearmikey/rf_reapr/ui/components/ScopeWarning.kt (used by Port Scanner, Ping, Traceroute, SNMP, TLS, Website Inspector, Subdomain Finder)",
         "app/src/main/java/com/fearmikey/rf_reapr/ui/components/ExportUtils.kt (ExportFormat, SAF text writer)"
@@ -95,12 +198,13 @@
       "domain": [
         "app/src/main/java/com/fearmikey/rf_reapr/domain/model/Finding.kt (Finding, FindingDraft, FindingStatus, FindingTools)",
         "app/src/main/java/com/fearmikey/rf_reapr/domain/service/FindingMerger.kt (fingerprint, dedupe, FIXED->OPEN regression)",
-        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/FindingAdapters.kt (tool results -> FindingDraft: ports, TLS, DNS audit, UPnP, SNMP, ARP, NFC, USB, cellular)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/FindingAdapters.kt (tool results -> FindingDraft: ports, TLS, DNS audit, UPnP, SNMP, ARP, NFC, USB, cellular, Wi-Fi (connected network + evil twins), captive portal)",
         "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ScopeMatcher.kt (CIDR/range/domain/wildcard/!exclusion, no DNS)",
-        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/FindingsExporter.kt (CSV w/ formula-injection guard, JSON, Markdown)",
+        "app/src/main/java/com/fearmikey/rf_reapr/domain/service/FindingsExporter.kt (CSV w/ formula-injection guard, JSON, Markdown, self-contained HTML, DefectDojo Generic Findings JSON; exports list related controls and linked evidence with hash + integrity)",
+        "app/src/main/java/com/fearmikey/rf_reapr/ui/components/ExportUtils.kt (ExportFormat.render(report) / fileSuffix - add new text formats here)",
         "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ScanDiff.kt"
       ],
-      "tool_wiring": "ViewModels take an optional findingRepository (PortScanner, UPnP, SNMP, TLS, DnsAuditor, NFC, ARP). UsbOtgAuditorScreen/CellularReconScreen take onFindings callbacks (recorded only when the finding set changes). New finding-producing tools: add an adapter in FindingAdapters with STABLE titles (titles are part of the fingerprint).",
+      "tool_wiring": "ViewModels take an optional findingRepository (PortScanner, UPnP, SNMP, TLS, DnsAuditor, NFC, ARP, CaptivePortal, and the OSINT tools Shodan, ThreatIntel, HIBP, CloudAssetScanner via their analyzers' toDrafts); AuditEngine also records via FindingAdapters. UsbOtgAuditorScreen/CellularReconScreen take onFindings callbacks (recorded only when the finding set changes). New finding-producing tools: add an adapter in FindingAdapters with STABLE titles (titles are part of the fingerprint).",
       "tests": [
         "app/src/test/java/com/fearmikey/rf_reapr/domain/service/EngagementServicesTest.kt",
         "app/src/test/java/com/fearmikey/rf_reapr/domain/service/FindingAdaptersTest.kt"
@@ -129,7 +233,7 @@
         "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/components/NetworkNodeList.kt"
       ],
       "ui_helpers": "app/src/main/java/com/fearmikey/rf_reapr/ui/topology/TopologyUi.kt (shared risk colors, DeviceType icons/names, TopologyFilter search+sort logic, NodeSortOrder, node summary text)",
-      "ui_state_notes": "TopologyViewModel exposes activeNodeScans (per-node scan kinds), auditProgress, deepScanCompleted, nodeResults (last per-node result shown in the sheet), and a messages Flow for snackbars. The port scanner repository is single-target, so port scans are serialized via isPortScannerBusy.",
+      "ui_state_notes": "TopologyViewModel exposes activeNodeScans (per-node scan kinds), auditProgress, deepScanCompleted, nodeResults (last per-node result shown in the sheet), and a messages Flow for snackbars. The port scanner repository is single-target, so port scans are serialized via isPortScannerBusy. All map-bound work (discovery, deep scan, per-node scans) runs in a per-session scope that resetSession() cancels-and-joins before each new discovery/clear. ScanSessionRepository.updateNodeDetails is update-only (never re-inserts a cleared node); every discovery, including AuditEngine's, replaces the map rather than merging.",
       "navigation_out": "TopologyScreen -> Screen.PortScanner.createRoute(ip), Screen.ThreatIntel.createRoute(ip), and via onNavigate(route) from DeviceDetailBottomSheet: Ping, Traceroute, TLS (if a TLS port is open), SNMP. Tools accepting a prefilled target use `?target=` (Screen.withTarget; MainActivity NavBackStackEntry.targetArg()): WebsiteInspector, SubdomainFinder, TlsCipherScanner, SnmpBrowser, Traceroute.",
       "tests": [
         "app/src/test/java/com/fearmikey/rf_reapr/ui/topology/TopologyFilterTest.kt",
@@ -381,7 +485,8 @@
         "app/src/main/java/com/fearmikey/rf_reapr/util/StegoEngine.kt",
         "app/src/main/java/com/fearmikey/rf_reapr/util/AuditExporter.kt"
       ],
-      "worker": "app/src/main/java/com/fearmikey/rf_reapr/data/worker/RecycleBinWorker.kt"
+      "worker": "app/src/main/java/com/fearmikey/rf_reapr/data/worker/RecycleBinWorker.kt",
+      "deletion": "Project delete = soft delete to Recycle Bin (restore/purge, auto-purge after 30 days via RecycleBinWorker). EvidenceRepositoryImpl.purgeProject also deletes the project's findings (FindingDao.deleteForProject) and logs (EventLogDao.deleteLogsForProject) since there are no FK cascades; scan sessions are kept (shared network history). EvidenceRepositoryImpl takes evidenceDao, findingDao, eventLogDao, context (AppContainer + RecycleBinWorker)."
     },
     "web_osint_and_threat_intel": {
       "routes": [
@@ -462,13 +567,14 @@
       "domain_model": "app/src/main/java/com/fearmikey/rf_reapr/domain/model/ReportData.kt",
       "domain_repository": "app/src/main/java/com/fearmikey/rf_reapr/domain/repository/ReportRepository.kt",
       "data_repository": "app/src/main/java/com/fearmikey/rf_reapr/data/repository/ReportRepositoryImpl.kt",
-      "graph_renderer": "app/src/main/java/com/fearmikey/rf_reapr/util/ReportGraphRenderer.kt"
+      "graph_renderer": "app/src/main/java/com/fearmikey/rf_reapr/util/ReportGraphRenderer.kt",
+      "findings": "ReportBuilderViewModel(repository, initialProjectId) filters scans/logs by project and adds a Findings section (ReportData.findings: ReportFinding with controlIds + linked evidence and integrity). ReportRepositoryImpl takes findingRepository; drawEvidence (PDF) and addDocxEvidence (DOCX) render evidence with its SHA-256."
     },
     "settings_and_logs": {
       "routes": [
         "Screen.Settings ('settings')",
         "Screen.ApiKeys ('api_keys')",
-        "Screen.*Logs ('logs/*')"
+        "Screen.*Logs ('logs/*'), incl. Screen.AuditLogs ('logs/audit')"
       ],
       "ui_screens": [
         "app/src/main/java/com/fearmikey/rf_reapr/ui/settings/SettingsScreen.kt",
@@ -500,7 +606,7 @@
     "port_catalog": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/PortCatalog.kt (service names, exposure notes/risk, COMMON_PORTS, parsePortSpec, webUrl) - powers PortScanner (stateless scan(host,ports,options) in PortScannerRepository + banner grabbing in PortScannerRepositoryImpl)",
     "upnp": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/UpnpTools.kt (SSDP/description/SOAP/NAT-PMP parsing + findings) - UpnpScannerRepository.audit() reads IGD port mappings read-only; UpnpScannerViewModel/UpnpAuditorScreen",
     "dns_audit": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/DnsAuditEvaluator.kt (sentinel/NXDOMAIN/DNSSEC/rebinding checks, CheckStatus) - DnsAuditorRepositoryImpl gathers system vs DoH; DnsAuditorViewModel/Screen rewritten to a checklist",
-    "captive_portal": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/CaptivePortalAnalyzer.kt - CaptivePortalViewModel (NetworkCapabilities + probe set); CaptivePortalDetectorScreen now takes a ViewModel",
+    "captive_portal": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/CaptivePortalAnalyzer.kt - probing lives in domain/repository/CaptivePortalRepository.kt -> data/repository/CaptivePortalRepositoryImpl.kt (AppContainer.captivePortalRepository, shared with AuditEngine); CaptivePortalViewModel(repository, logRepository, findingRepository)",
     "snmp": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/SnmpTools.kt (ifType/speed, vendor from sysObjectID, default-community list, findings) - SnmpRepositoryImpl adds probeCommunity + walk + tables (interfaces/IP/ARP); SnmpViewModel/SnmpBrowserScreen tabbed",
     "arp": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ArpMonitorEvaluator.kt (+ system/NeighborTable.kt) - ArpDetectorRepositoryImpl watches gateway MAC/first-hop/DNS/BSSID; notifies via NetworkAlertNotifier.notifySecurityAlert",
     "ble": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/BleAdvertisementAnalyzer.kt (tracker/beacon classification, distance) - BleScannerRepositoryImpl; BluetoothProximityFinderViewModel (trackers, following alerts, BLE session logs); model/BleDevice.kt enriched",
@@ -512,7 +618,24 @@
     "cellular": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/CellAnalyzer.kt (LTE/NR band+freq, IMSI-catcher/2G-downgrade findings) - CellularReconScreen (requestCellInfoUpdate, all RATs)",
     "ducky": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/DuckyScriptValidator.kt (lint + duration estimate) - surfaced in HidInjectorScreen below the editor",
     "tls": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/TlsAnalyzer.kt (protocol/cipher grading, overall grade, key/sig risk) - TlsCipherScannerRepositoryImpl (one handshake/protocol + cipher enumeration + certificate inspection); TlsScanResult/ProtocolSupport/CertificateInfo; also reused by CertDecoderScreen",
+    "web": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/WebSecurityAnalyzer.kt (SecurityHeaderAnalyzer: A-F header grade + cookie/CORS checks, used by WebsiteInspectorRepositoryImpl; SubdomainTakeoverAnalyzer: dangling-CNAME hints, used by SubdomainFinderRepositoryImpl via Cloudflare DoH CNAME lookups). WebsiteInspectorViewModel and SubdomainFinderViewModel take findingRepository (FindingTools.WEB / SUBDOMAIN). The remaining OSINT tools were reworked in the same pass, see 'osint'.",
+    "osint": {
+      "_note": "Every OSINT tool delegates parsing / judging to a pure analyzer here. API responses are parsed with the Gson TREE API (never reflection: Gson fills Kotlin non-null fields with null when a key is missing). Online lookups run only on an explicit tap.",
+      "public_ip_guard": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ThreatIntelAnalyzer.kt -> PublicIpGuard (hand-written IPv4/IPv6 literal check, NEVER does DNS). Shodan, InternetDB and AbuseIPDB lookups refuse private / loopback / link-local addresses locally so internal addressing is not leaked to third parties. Reuse it for any new reputation/recon service.",
+      "threat_intel": "ThreatIntelAnalyzer.kt (AbuseIpDbParser, ThreatIntelAnalyzer: verdict levels, AbuseIPDB category names, findings under FindingTools.THREAT_INTEL when score >= 25). ThreatIntelViewModel(repository, settings, logRepository, findingRepository); log type 'THREAT_INTEL'.",
+      "shodan": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ShodanAnalyzer.kt (ShodanParser for host/search/InternetDB/error bodies; ShodanAnalyzer: risky-port exposures via PortCatalog, findings under FindingTools.SHODAN, clipboard summaries, and hostLog/searchLog/internetDbLog whose KEY NAMES are a stored format read by ReportRepositoryImpl). ShodanRepositoryImpl builds URLs with HttpUrl (query is encoded; never surface OkHttp error text because the URL carries the API key). ShodanViewModel has search pagination (loadMore).",
+      "breaches": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/BreachAnalyzer.kt (HibpParser, BreachAnalyzer: per-breach severity, summary + advice, findings under FindingTools.BREACH; PwnedPasswords: k-anonymity range matching). HibpRepository.pwnedPasswordCount needs NO API key and sends only the 5-char SHA-1 prefix; the password must never be logged, saved to instance state or put in a finding. Account lookup keeps breach results when the paste lookup fails and honours one short Retry-After.",
+      "cloud_assets": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/CloudBucketAnalyzer.kt (CloudProvider, CloudBucketPlanner: candidate names + probe URLs, CloudBucketClassifier: provider answers -> BucketState, findings under FindingTools.CLOUD only for anonymously listable assets). CloudAssetScannerRepositoryImpl: 10 concurrent cancellable probes, follows S3's x-amz-bucket-region once, probes common container names on Azure accounts that exist. CloudAsset.platform/url/status are stored-log keys read by ReportRepositoryImpl. A domain passed from Subdomain Finder is prefilled, never auto-scanned.",
+      "usernames": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/UsernameCheckEvaluator.kt + domain/model/UsernameSite.kt (UsernameSitesDatabase with per-site UsernameDetection STATUS_CODE / BODY_PRESENT / BODY_ABSENT, username patterns, UsernameStatus incl. UNCERTAIN for blocked checks). Every site rule was checked against a known and a nonexistent account on 2026-11-24; do not add a site whose rule you have not verified both ways (soft 404s make 'HTTP 200 = found' wrong). Log type 'USERNAME'.",
+      "phone": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/PhoneNumberAnalyzer.kt (full ITU calling-code table, NANP area-code countries, trunk-prefix rules, validity, line-type estimate, search variants + exact-match query, lookup links). PhoneOsintViewModel is a thin wrapper; fully offline.",
+      "dorks": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/DorkQueryBuilder.kt (SearchEngine, target normalisation, scoping) + domain/model/GoogleDork.kt (DorkScope: SITE prefixes site:target, KEYWORD appends the quoted target for dorks that already search a third-party site; OsintToolsTest enforces that scope matches the query).",
+      "exif": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ExifPrivacyAnalyzer.kt (privacy findings, editing indicators, DMS / GPS-time formatting, text report). ExifRepositoryImpl reads tags by EXIF tag NAME (rawTags keys), hashes the file, and stripMetadata re-encodes with a memory-safe sample size then re-reads the copy to verify it is clean (SanitizedImage.remainingTags); saveSanitized writes to a SAF document.",
+      "payloads": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/PayloadCodec.kt (PayloadCodec: 11 formats, lenient decode, format detection; JwtAnalyzer: claims, security findings, HS256/384/512 secret verification). PayloadEncoderViewModel is a thin wrapper.",
+      "reverse_shells": "app/src/main/java/com/fearmikey/rf_reapr/domain/service/ReverseShellCatalog.kt (templates, listeners, TTY upgrade steps, strict host/port validation so input cannot alter a generated command, URL-encoded form). Safety-sensitive: keep it a reference of standard public one-liners; do not add AV/EDR evasion or obfuscation.",
+      "ui": "app/src/main/java/com/fearmikey/rf_reapr/ui/web/OsintUi.kt (OsintNotice, FindingsRecordedNotice, rememberCopyAction shared by the OSINT screens)",
+      "tests": "app/src/test/java/com/fearmikey/rf_reapr/domain/service/OsintAnalyzersTest.kt (IP guard, AbuseIPDB, Shodan, breaches, Pwned Passwords, cloud buckets, usernames) and OsintToolsTest.kt (phone, dorks, EXIF, codec, JWT, reverse shells)"
+    },
     "shared": "HostValidator.normalize is used by PortScanner, SNMP, TLS target parsing. SeverityBadge (ui/scanner) is the shared risk chip reused by UPnP/DNS/SNMP/USB/Cellular/TLS/NFC/Cert screens.",
-    "tests": "app/src/test/java/com/fearmikey/rf_reapr/domain/service/{PortCatalog,UpnpTools,NetworkAuditEvaluators,WirelessAnalyzers,TlsAnalyzer}Test.kt (136 unit tests total pass)"
+    "tests": "app/src/test/java/com/fearmikey/rf_reapr/domain/service/{PortCatalog,UpnpTools,NetworkAuditEvaluators,WirelessAnalyzers,TlsAnalyzer,AuditMode,EngagementExtensions,SurveyAndImport}Test.kt (268 unit tests total pass as of the OSINT rework, incl. Osint{Analyzers,Tools}Test; EngagementExtensionsTest = hashing, compliance mapping, audit-run diff, timeline, known devices, HTML/DefectDojo exports; SurveyAndImportTest = survey merge/exports, heatmap, GATT, Nmap, security headers, takeover)"
   }
 }

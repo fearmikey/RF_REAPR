@@ -4,61 +4,49 @@ import androidx.lifecycle.ViewModel
 import com.fearmikey.rf_reapr.domain.model.DorkCategory
 import com.fearmikey.rf_reapr.domain.model.GoogleDork
 import com.fearmikey.rf_reapr.domain.model.GoogleDorkDatabase
+import com.fearmikey.rf_reapr.domain.service.DorkQueryBuilder
+import com.fearmikey.rf_reapr.domain.service.SearchEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.flow.update
 
 data class GoogleDorksUiState(
     val selectedCategory: DorkCategory? = null,
     val searchQuery: String = "",
-    val targetDomain: String = ""
-)
+    val targetDomain: String = "",
+    val engine: SearchEngine = SearchEngine.GOOGLE,
+    val customQuery: String = ""
+) {
+    /** The cleaned target host; "" when none was entered, null when the input isn't a hostname. */
+    val target: String? get() = DorkQueryBuilder.normalizeTarget(targetDomain)
 
+    val filteredDorks: List<GoogleDork>
+        get() = DorkQueryBuilder.filter(GoogleDorkDatabase.dorks, selectedCategory, searchQuery)
+}
+
+/** Builds queries only; a search runs in the user's browser when they tap a dork. */
 class GoogleDorksViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(GoogleDorksUiState())
     val uiState: StateFlow<GoogleDorksUiState> = _uiState.asStateFlow()
 
     fun selectCategory(category: DorkCategory?) {
-        _uiState.value = _uiState.value.copy(
-            selectedCategory = if (_uiState.value.selectedCategory == category) null else category
-        )
+        _uiState.update { it.copy(selectedCategory = if (it.selectedCategory == category) null else category) }
     }
 
-    fun updateSearchQuery(query: String) {
-        _uiState.value = _uiState.value.copy(searchQuery = query)
-    }
+    fun updateSearchQuery(query: String) = _uiState.update { it.copy(searchQuery = query) }
 
-    fun updateTargetDomain(domain: String) {
-        _uiState.value = _uiState.value.copy(targetDomain = domain)
-    }
+    fun updateTargetDomain(domain: String) = _uiState.update { it.copy(targetDomain = domain) }
 
-    fun getFilteredDorks(): List<GoogleDork> {
-        val state = _uiState.value
-        return GoogleDorkDatabase.dorks.filter { dork ->
-            val matchesCategory = state.selectedCategory == null || dork.category == state.selectedCategory
-            val matchesSearch = state.searchQuery.isEmpty() ||
-                    dork.title.contains(state.searchQuery, ignoreCase = true) ||
-                    dork.description.contains(state.searchQuery, ignoreCase = true) ||
-                    dork.query.contains(state.searchQuery, ignoreCase = true)
-            matchesCategory && matchesSearch
-        }
-    }
+    fun selectEngine(engine: SearchEngine) = _uiState.update { it.copy(engine = engine) }
 
-    fun buildDorkQuery(dork: GoogleDork): String {
-        val domain = _uiState.value.targetDomain.trim()
-        return if (domain.isNotEmpty()) {
-            "site:$domain ${dork.query}"
-        } else {
-            dork.query
-        }
-    }
+    fun updateCustomQuery(query: String) = _uiState.update { it.copy(customQuery = query) }
 
-    fun buildGoogleSearchUrl(dork: GoogleDork): String {
-        val fullQuery = buildDorkQuery(dork)
-        val encodedQuery = URLEncoder.encode(fullQuery, StandardCharsets.UTF_8.toString())
-        return "https://www.google.com/search?q=$encodedQuery"
+    /** Appends an operator chip to the custom query, separated by a space from what is already there. */
+    fun appendOperator(operator: String) = _uiState.update { state ->
+        val current = state.customQuery
+        val separator = if (current.isEmpty() || current.endsWith(" ")) "" else " "
+        state.copy(customQuery = current + separator + operator)
     }
 }

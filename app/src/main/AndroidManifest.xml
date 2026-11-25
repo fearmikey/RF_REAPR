@@ -23,6 +23,9 @@
     <!-- Used by ScanForegroundService to keep long-running network scans/recon workflows
          alive and reported via a live notification while the app is backgrounded. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Only used while a user-started geotagged survey is running, so GPS keeps tagging
+         observations with the screen off. Never requested for other scans. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -110,7 +113,7 @@
         <service
             android:name=".system.ScanForegroundService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync|location" />
 
     </application>
 

@@ -136,4 +136,30 @@ interface EvidenceDao {
     
     @Query("SELECT * FROM evidence_projects WHERE isDeleted = 1 AND deletedAt <= :threshold")
     suspend fun getProjectsDeletedBefore(threshold: Long): List<EvidenceProjectEntity>
+
+    // ---- Integrity hashes and finding links (v18) --------------------------------------
+
+    @Query("UPDATE evidence SET sha256 = :sha256 WHERE id = :evidenceId")
+    suspend fun setHash(evidenceId: String, sha256: String?)
+
+    @Query("SELECT * FROM evidence WHERE sha256 IS NULL")
+    suspend fun getUnhashedEvidence(): List<EvidenceEntity>
+
+    @Query("UPDATE evidence SET findingId = :findingId WHERE id = :evidenceId")
+    suspend fun setFinding(evidenceId: String, findingId: Long?)
+
+    @Query("SELECT * FROM evidence WHERE isDeleted = 0 AND findingId = :findingId ORDER BY timestamp DESC")
+    fun getEvidenceForFinding(findingId: Long): Flow<List<EvidenceEntity>>
+
+    @Query("SELECT * FROM evidence WHERE isDeleted = 0 AND findingId IS NOT NULL ORDER BY timestamp")
+    suspend fun getLinkedEvidence(): List<EvidenceEntity>
+
+    @Query("UPDATE evidence SET findingId = NULL WHERE findingId = :findingId")
+    suspend fun unlinkFinding(findingId: Long)
+
+    @Query("UPDATE evidence SET findingId = NULL WHERE findingId IN (SELECT id FROM findings WHERE projectId = :projectId)")
+    suspend fun unlinkFindingsOfProject(projectId: String)
+
+    @Query("SELECT * FROM evidence WHERE isDeleted = 0 AND projectId = :projectId ORDER BY timestamp DESC")
+    suspend fun getEvidenceForProjectSync(projectId: String): List<EvidenceEntity>
 }

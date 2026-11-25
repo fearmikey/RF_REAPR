@@ -30,6 +30,7 @@ fun LogListScreen(
 ) {
     val logs by viewModel.logs.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var confirmClear by remember { mutableStateOf(false) }
 
     LaunchedEffect(type) {
         viewModel.loadLogs(type)
@@ -45,13 +46,27 @@ fun LogListScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.clearLogs(type) }) {
+                    IconButton(onClick = { confirmClear = true }, enabled = logs.isNotEmpty()) {
                         Icon(Icons.Default.Delete, contentDescription = "Clear All")
                     }
                 }
             )
         }
     ) { padding ->
+        if (confirmClear) {
+            AlertDialog(
+                onDismissRequest = { confirmClear = false },
+                title = { Text("Clear all logs?") },
+                text = { Text("This permanently deletes all ${logs.size} entries in $title.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = { confirmClear = false; viewModel.clearLogs(type) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Delete all") }
+                },
+                dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } }
+            )
+        }
         if (logs.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("No logs found for $type", style = MaterialTheme.typography.bodyLarge)

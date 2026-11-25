@@ -3,6 +3,7 @@ package com.fearmikey.rf_reapr.domain.repository
 import com.fearmikey.rf_reapr.domain.model.EvidenceProject
 import com.fearmikey.rf_reapr.domain.model.ReportScanSession
 import com.fearmikey.rf_reapr.domain.service.EngagementReport
+import com.fearmikey.rf_reapr.domain.service.TimelineEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -32,6 +33,9 @@ interface EngagementRepository {
 
     /** Scan sessions of [projectId]; null = all sessions on the device. */
     fun observeScanSessions(projectId: String?): Flow<List<ReportScanSession>>
+
+    /** Everything recorded under [projectId] in one chronological list, newest first. */
+    fun observeTimeline(projectId: String?): Flow<List<TimelineEvent>>
 
     suspend fun buildReport(projectId: String?, appVersion: String): EngagementReport
 }

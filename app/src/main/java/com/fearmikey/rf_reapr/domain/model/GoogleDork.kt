@@ -5,14 +5,29 @@ enum class DorkCategory(val displayName: String) {
     LOGINS("Admin & Logins"),
     DIRECTORIES("Open Directories"),
     EXPOSURES("Exposures & Leaks"),
+    DOCUMENTS("Documents & People"),
+    THIRD_PARTY("Code & Paste Sites"),
     DEVICES("Cameras & IoT")
+}
+
+/** How a target domain is combined with a dork. */
+enum class DorkScope {
+    /** Results must be on the target itself: `site:target query`. */
+    SITE,
+
+    /**
+     * The dork already searches a third-party site (GitHub, Pastebin, a cloud provider), so a
+     * second `site:` would return nothing; the target is added as a quoted keyword instead.
+     */
+    KEYWORD
 }
 
 data class GoogleDork(
     val title: String,
     val description: String,
     val query: String,
-    val category: DorkCategory
+    val category: DorkCategory,
+    val scope: DorkScope = DorkScope.SITE
 )
 
 object GoogleDorkDatabase {
@@ -112,12 +127,39 @@ object GoogleDorkDatabase {
             title = "AWS S3 Bucket URLs",
             description = "Finds exposed Amazon S3 cloud storage buckets.",
             query = "site:s3.amazonaws.com OR inurl:\".s3.amazonaws.com\"",
-            category = DorkCategory.EXPOSURES
+            category = DorkCategory.EXPOSURES,
+            scope = DorkScope.KEYWORD
         ),
         GoogleDork(
             title = "Firebase Realtime Databases",
             description = "Locates open Firebase database endpoints.",
             query = "site:firebaseio.com",
+            category = DorkCategory.EXPOSURES,
+            scope = DorkScope.KEYWORD
+        ),
+        GoogleDork(
+            title = "Azure Blob & Google Cloud Storage",
+            description = "Finds indexed objects in Azure Blob containers and Google Cloud Storage buckets.",
+            query = "site:blob.core.windows.net OR site:storage.googleapis.com",
+            category = DorkCategory.EXPOSURES,
+            scope = DorkScope.KEYWORD
+        ),
+        GoogleDork(
+            title = "Verbose Error Messages",
+            description = "Finds pages leaking stack traces, SQL errors and file-system paths.",
+            query = "intext:\"Fatal error\" OR intext:\"Stack trace\" OR intext:\"SQL syntax\" OR intext:\"Warning: mysql\"",
+            category = DorkCategory.EXPOSURES
+        ),
+        GoogleDork(
+            title = "phpinfo() Pages",
+            description = "Locates phpinfo output exposing server configuration, paths and environment variables.",
+            query = "intitle:\"phpinfo()\" \"PHP Version\"",
+            category = DorkCategory.EXPOSURES
+        ),
+        GoogleDork(
+            title = "Subdomains (excluding www)",
+            description = "Lists indexed hosts under the target domain. Needs a target domain.",
+            query = "-inurl:www",
             category = DorkCategory.EXPOSURES
         ),
         GoogleDork(
@@ -131,6 +173,83 @@ object GoogleDorkDatabase {
             description = "Discovers exposed Actuator endpoints (heapdump, env, beans).",
             query = "inurl:actuator/env OR inurl:actuator/health",
             category = DorkCategory.EXPOSURES
+        ),
+
+        // Documents & People
+        GoogleDork(
+            title = "Office Documents & PDFs",
+            description = "Published documents often carry author names, usernames and software versions in their metadata.",
+            query = "filetype:pdf OR filetype:docx OR filetype:xlsx OR filetype:pptx",
+            category = DorkCategory.DOCUMENTS
+        ),
+        GoogleDork(
+            title = "Confidential / Internal Documents",
+            description = "Finds documents marked as not intended for the public.",
+            query = "(filetype:pdf OR filetype:docx OR filetype:xlsx) (\"confidential\" OR \"internal use only\" OR \"not for distribution\")",
+            category = DorkCategory.DOCUMENTS
+        ),
+        GoogleDork(
+            title = "Spreadsheets & CSV Exports",
+            description = "Data exports that may contain contact lists or account data.",
+            query = "filetype:csv OR filetype:xls OR filetype:xlsx \"email\"",
+            category = DorkCategory.DOCUMENTS
+        ),
+        GoogleDork(
+            title = "Staff Email Addresses",
+            description = "Surfaces published email addresses, which reveal the address format for phishing-risk assessments.",
+            query = "intext:\"@\" (\"contact\" OR \"email\" OR \"staff\" OR \"team\")",
+            category = DorkCategory.DOCUMENTS
+        ),
+        GoogleDork(
+            title = "Employees on LinkedIn",
+            description = "Lists public LinkedIn profiles that mention the target.",
+            query = "site:linkedin.com/in",
+            category = DorkCategory.DOCUMENTS,
+            scope = DorkScope.KEYWORD
+        ),
+
+        // Code & Paste Sites
+        GoogleDork(
+            title = "GitHub Mentions of Secrets",
+            description = "Finds repositories mentioning the target next to credential keywords.",
+            query = "site:github.com (\"password\" OR \"api_key\" OR \"secret\" OR \"token\")",
+            category = DorkCategory.THIRD_PARTY,
+            scope = DorkScope.KEYWORD
+        ),
+        GoogleDork(
+            title = "GitLab & Bitbucket Mentions",
+            description = "Finds public repositories and snippets on other code hosts that mention the target.",
+            query = "site:gitlab.com OR site:bitbucket.org",
+            category = DorkCategory.THIRD_PARTY,
+            scope = DorkScope.KEYWORD
+        ),
+        GoogleDork(
+            title = "Paste Sites",
+            description = "Finds pastes mentioning the target, a common place for leaked credentials and configs.",
+            query = "site:pastebin.com OR site:paste.ee OR site:ghostbin.com OR site:rentry.co",
+            category = DorkCategory.THIRD_PARTY,
+            scope = DorkScope.KEYWORD
+        ),
+        GoogleDork(
+            title = "Public Trello Boards",
+            description = "Finds public Trello boards mentioning the target; teams often paste credentials into cards.",
+            query = "site:trello.com",
+            category = DorkCategory.THIRD_PARTY,
+            scope = DorkScope.KEYWORD
+        ),
+        GoogleDork(
+            title = "Stack Overflow Questions",
+            description = "Developers asking for help sometimes paste internal hostnames, code and config.",
+            query = "site:stackoverflow.com",
+            category = DorkCategory.THIRD_PARTY,
+            scope = DorkScope.KEYWORD
+        ),
+        GoogleDork(
+            title = "Shared Google Docs & Drive Files",
+            description = "Finds publicly shared documents that mention the target.",
+            query = "site:docs.google.com OR site:drive.google.com",
+            category = DorkCategory.THIRD_PARTY,
+            scope = DorkScope.KEYWORD
         ),
 
         // Cameras & IoT

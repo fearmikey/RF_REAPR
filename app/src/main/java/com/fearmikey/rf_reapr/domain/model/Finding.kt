@@ -58,5 +58,13 @@ object FindingTools {
     const val WIFI = "Wi-Fi Fingerprinter"
     const val BLE = "Bluetooth Proximity"
     const val CAPTIVE_PORTAL = "Captive Portal"
+    const val NETWORK_MONITOR = "Network Monitor"
+    const val WEB = "Website Inspector"
+    const val SUBDOMAIN = "Subdomain Finder"
+    const val NMAP = "Nmap Import"
+    const val SHODAN = "Shodan Recon"
+    const val THREAT_INTEL = "Threat Intel"
+    const val BREACH = "Breach Check"
+    const val CLOUD = "Cloud Asset Discovery"
     const val MANUAL = "Manual"
 }

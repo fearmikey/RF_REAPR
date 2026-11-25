@@ -90,6 +90,18 @@ sealed class Screen(val route: String) {
     data object Engagement : Screen("engagement")
     data object Findings : Screen("findings")
     data object Backup : Screen("backup")
+    data object AuditMode : Screen("audit_mode")
+    data object AuditHistory : Screen("audit_history")
+    data object Timeline : Screen("timeline")
+    data object KnownDevices : Screen("known_devices")
+
+    // Survey tools
+    data object GeoSurvey : Screen("geo_survey")
+    data object SiteSurvey : Screen("site_survey")
+    data object GattInspector : Screen("gatt_inspector/{address}?name={name}") {
+        fun createRoute(address: String, name: String? = null) =
+            "gatt_inspector/${android.net.Uri.encode(address)}" + (if (name.isNullOrBlank()) "" else "?name=${android.net.Uri.encode(name)}")
+    }
 
     // Log Screens
     data object WifiLogs : Screen("logs/wifi")
@@ -101,6 +113,7 @@ sealed class Screen(val route: String) {
     data object TopologyLogs : Screen("logs/network_discovery")
     data object SnmpLogs : Screen("logs/snmp")
     data object PacketCaptureLogs : Screen("logs/pcap")
+    data object AuditLogs : Screen("logs/audit")
 
     companion object {
         /** Builds `base?target=<encoded>` (or just `base`) for tools that accept a prefilled target. */

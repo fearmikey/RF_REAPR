@@ -168,7 +168,13 @@ fun EvidenceProjectSelectionScreen(
             AlertDialog(
                 onDismissRequest = { projectToDelete = null },
                 title = { Text("Delete Project?") },
-                text = { Text("Are you sure you want to delete '${project.name}'? This will permanently remove all folders and evidence.") },
+                text = {
+                    Text(
+                        "'${project.name}' and its folders and evidence will be moved to the Recycle Bin. " +
+                            "You can restore it from there; purging it (or leaving it for 30 days) permanently deletes " +
+                            "its evidence, findings and logs."
+                    )
+                },
                 confirmButton = {
                     Button(
                         onClick = {

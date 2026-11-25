@@ -47,7 +47,9 @@ class ScanSessionRepositoryImpl(
     }
 
     override suspend fun updateNodeDetails(node: NetworkNode) {
-        networkDao.insertNode(node.toEntity())
+        // Update-only: a scan that finishes after the map was cleared (e.g. the user started a
+        // discovery on another network) must not resurrect its node onto the new map.
+        networkDao.updateNode(node.toEntity())
     }
 
     override suspend fun getNodeByIp(ip: String): NetworkNode? {

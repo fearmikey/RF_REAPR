@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.util.Log
 import com.fearmikey.rf_reapr.domain.model.ThemePreference
 import com.fearmikey.rf_reapr.domain.repository.SettingsRepository
 import kotlinx.coroutines.channels.awaitClose
@@ -12,6 +13,11 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.onStart
 
 class SettingsRepositoryImpl(private val context: Context) : SettingsRepository {
+    private companion object {
+        /** Fully-qualified activity-alias name from AndroidManifest.xml (namespace-based). */
+        const val CAMERA_SHORTCUT_ALIAS = "com.fearmikey.rf_reapr.CameraShortcutActivity"
+    }
+
     private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     override val themePreference: Flow<ThemePreference> = callbackFlow {
@@ -139,19 +145,27 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
     override suspend fun setCameraShortcutEnabled(enabled: Boolean) {
         prefs.edit().putBoolean("camera_shortcut_enabled", enabled).apply()
         
-        val packageManager = context.packageManager
-        val componentName = ComponentName(context, "${context.packageName}.CameraShortcutActivity")
+        // The alias class name is derived from the manifest namespace, NOT the applicationId.
+        // Debug builds use applicationIdSuffix ".debug", so "${context.packageName}.CameraShortcutActivity"
+        // would point to a non-existent class and setComponentEnabledSetting would throw.
+        val componentName = ComponentName(context.packageName, CAMERA_SHORTCUT_ALIAS)
         val state = if (enabled) {
             PackageManager.COMPONENT_ENABLED_STATE_ENABLED
         } else {
             PackageManager.COMPONENT_ENABLED_STATE_DISABLED
         }
-        
-        packageManager.setComponentEnabledSetting(
-            componentName,
-            state,
-            PackageManager.DONT_KILL_APP
-        )
+
+        try {
+            context.packageManager.setComponentEnabledSetting(
+                componentName,
+                state,
+                PackageManager.DONT_KILL_APP
+            )
+        } catch (e: IllegalArgumentException) {
+            Log.w("SettingsRepository", "Unable to toggle camera shortcut alias", e)
+        } catch (e: SecurityException) {
+            Log.w("SettingsRepository", "Unable to toggle camera shortcut alias", e)
+        }
     }
 
     override suspend fun setPassiveMode(enabled: Boolean) {
@@ -196,6 +210,27 @@ class SettingsRepositoryImpl(private val context: Context) : SettingsRepository 
         awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }.onStart {
         emit(prefs.getInt("app_launch_count", 0))
+    }
+
+    private fun readFavoriteTools(p: SharedPreferences): Set<String> =
+        p.getString("favorite_tools", null).orEmpty().lineSequence().filter { it.isNotBlank() }.toSet()
+
+    override val favoriteTools: Flow<Set<String>> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "favorite_tools") {
+                trySend(readFavoriteTools(p))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }.onStart {
+        emit(readFavoriteTools(prefs))
+    }
+
+    override suspend fun setFavoriteTool(name: String, favorite: Boolean) {
+        val current = readFavoriteTools(prefs)
+        val updated = if (favorite) current + name else current - name
+        prefs.edit().putString("favorite_tools", updated.joinToString("\n")).apply()
     }
 
     override suspend fun incrementAppLaunchCount(): Int {

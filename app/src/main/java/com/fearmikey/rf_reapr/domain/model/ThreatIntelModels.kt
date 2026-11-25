@@ -22,5 +22,6 @@ data class ThreatIntelResult(
     val totalReports: Int,
     val numDistinctUsers: Int,
     val lastReportedAt: String?,
-    val reports: List<ThreatIntelReport>
+    val reports: List<ThreatIntelReport>,
+    val isTor: Boolean = false
 )

@@ -57,6 +57,8 @@ import java.util.Locale
 @Composable
 fun BluetoothProximityFinderScreen(
     viewModel: BluetoothProximityFinderViewModel,
+    /** Opens the read-only GATT inspector for the device being located. */
+    onInspectGatt: (address: String, name: String?) -> Unit = { _, _ -> },
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -181,7 +183,8 @@ fun BluetoothProximityFinderScreen(
                     vibrationEnabled = vibrationEnabled,
                     onToggleVibration = { viewModel.setVibrationEnabled(!vibrationEnabled) },
                     onToggle = viewModel::toggleTracking,
-                    onChangeTarget = { viewModel.setTarget("") }
+                    onChangeTarget = { viewModel.setTarget("") },
+                    onInspectGatt = { onInspectGatt(target, targetName) }
                 )
             }
         }
@@ -392,7 +395,8 @@ fun TrackingView(
     vibrationEnabled: Boolean,
     onToggleVibration: () -> Unit,
     onToggle: () -> Unit,
-    onChangeTarget: () -> Unit
+    onChangeTarget: () -> Unit,
+    onInspectGatt: () -> Unit = {}
 ) {
     val lost = isTracking && (silenceMs ?: 0) > BluetoothProximityFinderViewModel.LOST_AFTER_MS
     Column(
@@ -466,6 +470,12 @@ fun TrackingView(
         )
 
         Spacer(Modifier.weight(1f))
+
+        TextButton(onClick = onInspectGatt) {
+            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Inspect GATT services (connects to the device)")
+        }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = onToggle, modifier = Modifier.weight(1f)) { Text(if (isTracking) "Pause" else "Resume") }

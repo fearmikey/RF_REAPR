@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
@@ -23,12 +24,17 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fearmikey.rf_reapr.domain.model.ThreatIntelReport
 import com.fearmikey.rf_reapr.domain.model.ThreatIntelResult
 import com.fearmikey.rf_reapr.domain.repository.ThreatIntelStatus
+import com.fearmikey.rf_reapr.domain.service.ThreatAssessment
+import com.fearmikey.rf_reapr.domain.service.ThreatIntelAnalyzer
+import com.fearmikey.rf_reapr.domain.service.ThreatLevel
+import com.fearmikey.rf_reapr.ui.components.ScopeWarning
 import com.fearmikey.rf_reapr.ui.theme.NetworkGreen
 import com.fearmikey.rf_reapr.ui.theme.WebGold
 
@@ -42,7 +48,18 @@ fun ThreatIntelScreen(
     val ipAddress by viewModel.ipAddress.collectAsStateWithLifecycle()
     val status by viewModel.status.collectAsStateWithLifecycle()
     val apiKey by viewModel.abuseIpDbApiKey.collectAsStateWithLifecycle()
+    val assessment by viewModel.assessment.collectAsStateWithLifecycle()
+    val recorded by viewModel.recordedFindings.collectAsStateWithLifecycle()
+    val inputProblem by viewModel.inputProblem.collectAsStateWithLifecycle()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val canSearch = ipAddress.isNotBlank() && inputProblem == null && apiKey.isNotBlank() && status !is ThreatIntelStatus.Loading
+
+    val submit = {
+        if (canSearch) {
+            keyboardController?.hide()
+            viewModel.checkThreat()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -109,29 +126,25 @@ fun ThreatIntelScreen(
                 value = ipAddress,
                 onValueChange = { viewModel.onIpAddressChanged(it) },
                 label = { Text("IP Address") },
-                placeholder = { Text("e.g. 1.1.1.1 or 185.220.101.5") },
+                placeholder = { Text("e.g. 1.1.1.1 or 2606:4700:4700::1111") },
                 leadingIcon = { Icon(Icons.Default.Security, contentDescription = null, tint = WebGold) },
                 trailingIcon = {
-                    IconButton(
-                        onClick = {
-                            keyboardController?.hide()
-                            viewModel.checkThreat()
-                        },
-                        enabled = ipAddress.isNotBlank() && status !is ThreatIntelStatus.Loading
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = "Check Threat", tint = WebGold)
+                    IconButton(onClick = submit, enabled = canSearch) {
+                        Icon(Icons.Default.Search, contentDescription = "Check Threat", tint = if (canSearch) WebGold else Color.Gray)
                     }
                 },
+                isError = inputProblem != null,
+                supportingText = {
+                    Text(inputProblem ?: "Sends this address to AbuseIPDB when you tap search.")
+                },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        keyboardController?.hide()
-                        viewModel.checkThreat()
-                    }
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri, imeAction = ImeAction.Search, autoCorrectEnabled = false
                 ),
+                keyboardActions = KeyboardActions(onSearch = { submit() }),
                 modifier = Modifier.fillMaxWidth()
             )
+            ScopeWarning(target = ipAddress.trim())
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -144,7 +157,7 @@ fun ThreatIntelScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Enter an IPv4 or IPv6 address to audit reputation and abuse reports",
+                            text = "Look up the reputation and abuse reports of a public IPv4 or IPv6 address.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -158,20 +171,9 @@ fun ThreatIntelScreen(
                         CircularProgressIndicator(color = WebGold)
                     }
                 }
-                is ThreatIntelStatus.Error -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                    ) {
-                        Text(
-                            text = current.message,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                }
+                is ThreatIntelStatus.Error -> OsintNotice(current.message, kind = NoticeKind.ERROR)
                 is ThreatIntelStatus.Success -> {
-                    ThreatIntelResultView(result = current.result)
+                    ThreatIntelResultView(result = current.result, assessment = assessment, recordedFindings = recorded)
                 }
             }
         }
@@ -179,13 +181,18 @@ fun ThreatIntelScreen(
 }
 
 @Composable
-fun ThreatIntelResultView(result: ThreatIntelResult) {
-    val score = result.abuseConfidenceScore
-    val scoreColor = when {
-        score >= 75 -> MaterialTheme.colorScheme.error
-        score >= 25 -> WebGold
-        else -> NetworkGreen
-    }
+private fun levelColor(level: ThreatLevel): Color = when (level) {
+    ThreatLevel.MALICIOUS -> MaterialTheme.colorScheme.error
+    ThreatLevel.SUSPICIOUS -> Color(0xFFFF9800)
+    ThreatLevel.LOW -> WebGold
+    ThreatLevel.CLEAN, ThreatLevel.WHITELISTED -> NetworkGreen
+}
+
+@Composable
+fun ThreatIntelResultView(result: ThreatIntelResult, assessment: ThreatAssessment?, recordedFindings: Int = 0) {
+    val level = assessment?.level ?: ThreatIntelAnalyzer.level(result)
+    val scoreColor = levelColor(level)
+    val copy = rememberCopyAction()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -197,51 +204,73 @@ fun ThreatIntelResultView(result: ThreatIntelResult) {
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = result.ipAddress,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "${result.isp ?: "Unknown ISP"} • ${result.countryName ?: result.countryCode ?: "Global"}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Abuse Confidence Score Badge
-                    Box(
-                        modifier = Modifier
-                            .size(68.dp)
-                            .background(scoreColor.copy(alpha = 0.2f), shape = CircleShape),
-                        contentAlignment = Alignment.Center
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "$score%",
-                                style = MaterialTheme.typography.titleMedium,
+                                text = result.ipAddress,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = scoreColor
+                                fontFamily = FontFamily.Monospace
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Abuse",
-                                fontSize = 10.sp,
-                                color = scoreColor
+                                text = "${result.isp ?: "Unknown ISP"} • ${result.countryName ?: result.countryCode ?: "Unknown country"}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(68.dp)
+                                .background(scoreColor.copy(alpha = 0.2f), shape = CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "${result.abuseConfidenceScore}%",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = scoreColor
+                                )
+                                Text(text = "Abuse", fontSize = 10.sp, color = scoreColor)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(level.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = scoreColor)
+                    assessment?.let {
+                        Text(it.headline, style = MaterialTheme.typography.bodySmall)
+                        it.notes.forEach { note ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("• $note", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            copy(
+                                "Summary",
+                                "${result.ipAddress}: AbuseIPDB ${result.abuseConfidenceScore}% (${level.label}), " +
+                                    "${result.totalReports} reports from ${result.numDistinctUsers} reporters, " +
+                                    "${result.isp ?: "unknown ISP"}, ${result.countryName ?: result.countryCode ?: "unknown country"}"
+                            )
+                        }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copy summary")
                         }
                     }
                 }
             }
+        }
+
+        if (recordedFindings > 0) {
+            item { FindingsRecordedNotice(recordedFindings) }
         }
 
         item {
@@ -252,13 +281,51 @@ fun ThreatIntelResultView(result: ThreatIntelResult) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text("Host Information", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    ThreatDetailRow("Domain:", result.domain ?: "N/A")
-                    ThreatDetailRow("Usage Type:", result.usageType ?: "N/A")
-                    ThreatDetailRow("IP Version:", "IPv${result.ipVersion}")
-                    ThreatDetailRow("Whitelisted:", if (result.isWhitelisted) "Yes (Safe/Legitimate)" else "No")
-                    ThreatDetailRow("Total Reports:", "${result.totalReports} reports by ${result.numDistinctUsers} distinct users")
+                    ThreatDetailRow("Domain", result.domain ?: "N/A")
+                    ThreatDetailRow("Usage type", result.usageType ?: "N/A")
+                    ThreatDetailRow("IP version", "IPv${result.ipVersion}")
+                    ThreatDetailRow("Whitelisted", if (result.isWhitelisted) "Yes" else "No")
+                    ThreatDetailRow("Tor exit node", if (result.isTor) "Yes" else "No")
+                    ThreatDetailRow("Reports (90 days)", "${result.totalReports} from ${result.numDistinctUsers} reporters")
+                    assessment?.let {
+                        ThreatDetailRow("Recent activity", "${it.reportsLast7Days} in 7 days, ${it.reportsLast30Days} in 30 days")
+                    }
+                    result.lastReportedAt?.let { ThreatDetailRow("Last reported", it.take(10)) }
                     if (result.hostnames.isNotEmpty()) {
-                        ThreatDetailRow("Hostnames:", result.hostnames.joinToString(", "))
+                        ThreatDetailRow("Hostnames", result.hostnames.joinToString(", "))
+                    }
+                }
+            }
+        }
+
+        assessment?.topCategories?.takeIf { it.isNotEmpty() }?.let { categories ->
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text("Reported For", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val max = categories.first().second.coerceAtLeast(1)
+                        categories.take(8).forEach { (name, count) ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(name, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                                LinearProgressIndicator(
+                                    progress = { count.toFloat() / max },
+                                    modifier = Modifier.weight(1f).height(6.dp),
+                                    color = scoreColor
+                                )
+                                Text(
+                                    count.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.width(36.dp).padding(start = 8.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -325,10 +392,21 @@ fun AbuseReportCard(report: ThreatIntelReport) {
                 }
             }
 
+            val categories = ThreatIntelAnalyzer.categoryNames(report)
+            if (categories.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = categories.joinToString(" · "),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = WebGold
+                )
+            }
+
             if (report.comment.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = report.comment.trim(),
+                    text = report.comment.trim().take(400),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp

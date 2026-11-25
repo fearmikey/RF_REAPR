@@ -4,7 +4,12 @@ import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository
 import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository.DiscoverySource
 import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository.SubdomainItem
 import com.fearmikey.rf_reapr.domain.repository.SubdomainFinderRepository.SubdomainResult
+import com.fearmikey.rf_reapr.domain.service.SubdomainTakeoverAnalyzer
 import com.google.gson.JsonParser
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -48,6 +53,8 @@ class SubdomainFinderRepositoryImpl(
         val foundSubdomains = Collections.synchronizedList(mutableListOf<SubdomainItem>())
         var processedCount = 0
         val total = commonSubdomains.size
+        // Certificate logs can list thousands of dead names; bound the CNAME checks on them.
+        val danglingChecks = AtomicInteger(0)
 
         // Add the naked domain first
         try {
@@ -72,7 +79,23 @@ class SubdomainFinderRepositoryImpl(
                         // Emit updates for passive findings immediately
                         val currentResults = synchronized(foundSubdomains) { foundSubdomains.toList() }
                         send(SubdomainResult(currentResults, processedCount.toFloat() / total))
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                        // A name that no longer resolves is only interesting if it is a dangling
+                        // CNAME to a hosting platform (a subdomain-takeover candidate).
+                        if (danglingChecks.incrementAndGet() <= MAX_DANGLING_CHECKS) {
+                            val cname = lookupCname(hostname)
+                            val hint = SubdomainTakeoverAnalyzer.assess(cname, resolves = false)
+                            if (hint != null) {
+                                synchronized(foundSubdomains) {
+                                    if (foundSubdomains.none { it.hostname == hostname }) {
+                                        foundSubdomains.add(SubdomainItem(hostname, null, DiscoverySource.PASSIVE, cname, hint))
+                                    }
+                                }
+                                val currentResults = synchronized(foundSubdomains) { foundSubdomains.toList() }
+                                send(SubdomainResult(currentResults, processedCount.toFloat() / total))
+                            }
+                        }
+                    }
                 }
             }
 
@@ -108,8 +131,43 @@ class SubdomainFinderRepositoryImpl(
                 }
             }
         }
-        val finalResults = synchronized(foundSubdomains) { foundSubdomains.toList() }
-        send(SubdomainResult(finalResults, 1f, isFinished = true))
+        // Tag live names that are hosted on third-party platforms (context, not a finding).
+        val resolved = synchronized(foundSubdomains) { foundSubdomains.toList() }
+        val semaphore = Semaphore(8)
+        val annotated = coroutineScope {
+            resolved.mapIndexed { index, item ->
+                async(Dispatchers.IO) {
+                    if (item.cname != null || index >= MAX_CNAME_LOOKUPS) return@async item
+                    val cname = semaphore.withPermit { lookupCname(item.hostname) }
+                    item.copy(cname = cname, takeover = SubdomainTakeoverAnalyzer.assess(cname, resolves = true))
+                }
+            }.awaitAll()
+        }
+        send(SubdomainResult(annotated, 1f, isFinished = true))
+    }
+
+    /** The CNAME target of [hostname] via DNS-over-HTTPS, or null if it has none / the lookup fails. */
+    private fun lookupCname(hostname: String): String? = try {
+        val url = "https://cloudflare-dns.com/dns-query".toHttpUrl().newBuilder()
+            .addQueryParameter("name", hostname)
+            .addQueryParameter("type", "CNAME")
+            .build()
+        val request = Request.Builder().url(url).header("Accept", "application/dns-json").build()
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string()
+            if (!response.isSuccessful || body == null) return@use null
+            JsonParser.parseString(body).asJsonObject.getAsJsonArray("Answer")
+                ?.map { it.asJsonObject }
+                ?.firstOrNull { it.get("type")?.asInt == 5 }
+                ?.get("data")?.asString?.trimEnd('.')
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    private companion object {
+        const val MAX_DANGLING_CHECKS = 150
+        const val MAX_CNAME_LOOKUPS = 200
     }
 
     private suspend fun findSubdomainsPassively(domain: String): List<String> = withContext(Dispatchers.IO) {

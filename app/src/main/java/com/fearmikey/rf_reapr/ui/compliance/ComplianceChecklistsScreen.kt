@@ -14,13 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import com.fearmikey.rf_reapr.domain.model.ComplianceControl
 import com.fearmikey.rf_reapr.domain.model.ComplianceFramework
-import com.fearmikey.rf_reapr.domain.model.ComplianceStatus
-import com.fearmikey.rf_reapr.domain.repository.ComplianceRepository
 import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,7 +25,17 @@ fun ComplianceChecklistsScreen(
     onBack: () -> Unit
 ) {
     val frameworks by viewModel.frameworks.collectAsStateWithLifecycle()
+    ComplianceChecklistsContent(frameworks = frameworks, onFrameworkClick = onFrameworkClick, onBack = onBack)
+}
 
+/** Stateless body, so previews don't have to construct a ViewModel. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ComplianceChecklistsContent(
+    frameworks: List<ComplianceFramework>,
+    onFrameworkClick: (String) -> Unit,
+    onBack: () -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -82,14 +87,9 @@ fun FrameworkCard(framework: ComplianceFramework, onClick: () -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun ComplianceChecklistsScreenPreview() {
-    val mockRepository = object : ComplianceRepository {
-        override fun getFrameworks(): List<ComplianceFramework> = ComplianceFramework.entries
-        override fun getControlsForFramework(frameworkId: String): Flow<List<ComplianceControl>> = flowOf(emptyList())
-        override suspend fun updateControlStatus(controlId: String, frameworkId: String, status: ComplianceStatus, notes: String) {}
-    }
     RF_REAPRTheme {
-        ComplianceChecklistsScreen(
-            viewModel = ComplianceViewModel(mockRepository),
+        ComplianceChecklistsContent(
+            frameworks = ComplianceFramework.entries,
             onFrameworkClick = {},
             onBack = {}
         )

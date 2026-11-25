@@ -1,6 +1,8 @@
 package com.fearmikey.rf_reapr.ui.engagement
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
+import com.fearmikey.rf_reapr.data.audit.NmapImportManager
 import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.EvidenceProject
 import com.fearmikey.rf_reapr.domain.model.ReportScanSession
@@ -35,8 +37,29 @@ data class ScanComparison(
 @OptIn(ExperimentalCoroutinesApi::class)
 class EngagementViewModel(
     private val repository: EngagementRepository,
-    private val appVersion: String
+    private val appVersion: String,
+    private val nmapImport: NmapImportManager? = null
 ) : ViewModel() {
+
+    private val _importing = MutableStateFlow(false)
+    val importing: StateFlow<Boolean> = _importing
+
+    /** Imports an Nmap XML file into the active project's network map and findings. */
+    fun importNmap(uri: Uri) {
+        val importer = nmapImport ?: return
+        if (_importing.value) return
+        _importing.value = true
+        viewModelScope.launch {
+            try {
+                _messages.value = importer.import(uri).fold(
+                    onSuccess = { "Imported ${it.hosts} hosts, ${it.openPorts} open ports, ${it.findings} findings" },
+                    onFailure = { "Import failed: ${it.message ?: it.javaClass.simpleName}" }
+                )
+            } finally {
+                _importing.value = false
+            }
+        }
+    }
 
     val projects: StateFlow<List<EvidenceProject>> = repository.observeProjects()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -115,13 +138,7 @@ class EngagementViewModel(
     }
 
     suspend fun buildExport(format: ExportFormat): String {
-        val report = repository.buildReport(repository.activeProjectId.value, appVersion)
-        return when (format) {
-            ExportFormat.MARKDOWN -> FindingsExporter.toMarkdown(report)
-            ExportFormat.JSON -> FindingsExporter.toJson(report)
-            ExportFormat.CSV -> FindingsExporter.toCsv(report.findings)
-            ExportFormat.HOSTS_CSV -> FindingsExporter.hostsToCsv(report.hosts)
-        }
+        return format.render(repository.buildReport(repository.activeProjectId.value, appVersion))
     }
 
     fun showMessage(text: String) {

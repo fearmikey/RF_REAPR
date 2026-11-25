@@ -174,7 +174,9 @@ fun EvidenceGalleryScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            Crossfade(targetState = currentFolder, label = "GalleryTransition") { folder ->
+            // The grid always renders the ViewModel's current folder contents, so a Crossfade
+            // keyed on the folder only blended two copies of the same (new) content.
+            run {
                 // Always use SubFolderAndEvidenceGrid because any level can have both
                 SubFolderAndEvidenceGrid(
                     folders = folders,
@@ -705,6 +707,21 @@ fun EvidenceDetailDialog(
                         )
                     }
                     
+                    Spacer(modifier = Modifier.height(12.dp))
+                    EvidenceIntegrityRow(
+                        evidence = evidence,
+                        verify = { viewModel.verifyIntegrity(it) },
+                        contentColor = Color.LightGray
+                    )
+                    if (evidence.findingId != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Linked to a finding (manage links from the Findings screen)",
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),

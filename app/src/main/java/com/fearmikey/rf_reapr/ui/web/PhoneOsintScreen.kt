@@ -2,11 +2,14 @@ package com.fearmikey.rf_reapr.ui.web
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
-import androidx.compose.foundation.horizontalScroll
+import androidx.core.net.toUri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -16,16 +19,21 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fearmikey.rf_reapr.domain.model.PhoneOsintLink
 import com.fearmikey.rf_reapr.domain.model.PhoneOsintResult
+import com.fearmikey.rf_reapr.domain.model.PhoneValidity
+import com.fearmikey.rf_reapr.domain.service.PhoneCountry
+import com.fearmikey.rf_reapr.domain.service.PhoneNumberAnalyzer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,11 +41,12 @@ fun PhoneOsintScreen(
     viewModel: PhoneOsintViewModel,
     onBack: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
-    var showCountryPicker by remember { mutableStateOf(false) }
+    val copy = rememberCopyAction()
+    var showCountryPicker by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -49,6 +58,11 @@ fun PhoneOsintScreen(
                     }
                 },
                 actions = {
+                    viewModel.report()?.let { report ->
+                        IconButton(onClick = { copy("Report", report) }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy report")
+                        }
+                    }
                     if (uiState.inputPhone.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clear() }) {
                             Icon(Icons.Default.Clear, contentDescription = "Clear")
@@ -66,176 +80,114 @@ fun PhoneOsintScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Input Card
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Target Phone Number",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Country Code Selector Chip
                         OutlinedButton(
                             onClick = { showCountryPicker = true },
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
                         ) {
                             Text(uiState.defaultCountryCode, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "Change default country")
                         }
-
-                        // Phone Input Field
                         OutlinedTextField(
                             value = uiState.inputPhone,
                             onValueChange = { viewModel.updateInputPhone(it) },
-                            placeholder = { Text("e.g. +1 415 555 2671") },
-                            leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                            label = { Text("Phone number") },
+                            placeholder = { Text("+1 415 555 2671") },
                             trailingIcon = {
                                 IconButton(onClick = {
-                                    val clip = clipboardManager.getText()?.text
-                                    if (!clip.isNullOrBlank()) {
-                                        viewModel.updateInputPhone(clip)
-                                    }
+                                    clipboardManager.getText()?.text?.takeIf { it.isNotBlank() }?.let { viewModel.updateInputPhone(it.take(64)) }
                                 }) {
                                     Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
                                 }
                             },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             modifier = Modifier.weight(1f),
                             singleLine = true
                         )
                     }
-
-                    // Sample preset buttons
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        SuggestionChip(
-                            onClick = { viewModel.loadSample("+14155552671") },
-                            label = { Text("US Sample (+1)") }
-                        )
-                        SuggestionChip(
-                            onClick = { viewModel.loadSample("+447911123456") },
-                            label = { Text("UK Mobile (+44)") }
-                        )
-                        SuggestionChip(
-                            onClick = { viewModel.loadSample("+4915123456789") },
-                            label = { Text("DE Mobile (+49)") }
-                        )
-                        SuggestionChip(
-                            onClick = { viewModel.loadSample("+61412345678") },
-                            label = { Text("AU Mobile (+61)") }
-                        )
-                    }
+                    Text(
+                        "Parsed on the device. The country on the left is only used for numbers written without \"+\" or \"00\".",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
-            // Country Code Picker Dialog
             if (showCountryPicker) {
-                AlertDialog(
-                    onDismissRequest = { showCountryPicker = false },
-                    title = { Text("Select Default Country Code") },
-                    text = {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 350.dp)
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            PhoneOsintViewModel.ALL_COUNTRY_CODES.forEach { item ->
-                                TextButton(
-                                    onClick = {
-                                        viewModel.setDefaultCountryCode(item.code)
-                                        showCountryPicker = false
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text("${item.name} (${item.iso})", modifier = Modifier.weight(1f))
-                                        Text(item.code, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
+                CountryPickerDialog(
+                    countries = viewModel.countries,
+                    onSelect = {
+                        viewModel.setDefaultCountryCode(it.dialCode)
+                        showCountryPicker = false
                     },
-                    confirmButton = {
-                        TextButton(onClick = { showCountryPicker = false }) {
-                            Text("Cancel")
-                        }
-                    }
+                    onDismiss = { showCountryPicker = false }
                 )
             }
 
-            // Error display
-            uiState.errorMessage?.let { errorMsg ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                        Text(
-                            text = errorMsg,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
+            uiState.errorMessage?.let { OsintNotice(it, kind = NoticeKind.ERROR) }
 
-            // Result Cards
             uiState.result?.let { result ->
-                PhoneDetailsCard(
-                    result = result,
-                    clipboardManager = clipboardManager,
-                    onShowToast = { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() }
-                )
-
-                PhoneOsintLinksCard(
-                    links = result.osintLinks,
-                    onLinkClick = { link -> openPhoneOsintLink(context, link) }
-                )
+                PhoneDetailsCard(result = result, onCopy = { copy("Number", result.e164) })
+                SearchFormatsCard(result = result, onCopy = copy)
+                PhoneOsintLinksCard(links = result.osintLinks, onLinkClick = { link -> openPhoneOsintLink(context, link) })
             }
         }
     }
 }
 
-@Suppress("DEPRECATION")
 @Composable
-private fun PhoneDetailsCard(
-    result: PhoneOsintResult,
-    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
-    onShowToast: (String) -> Unit
-) {
+private fun CountryPickerDialog(countries: List<PhoneCountry>, onSelect: (PhoneCountry) -> Unit, onDismiss: () -> Unit) {
+    var filter by remember { mutableStateOf("") }
+    val shown = remember(filter, countries) {
+        val needle = filter.trim().removePrefix("+")
+        if (needle.isEmpty()) countries
+        else countries.filter { it.name.contains(needle, true) || it.callingCode.startsWith(needle) || it.iso.equals(needle, true) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Default country") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = filter,
+                    onValueChange = { filter = it },
+                    label = { Text("Search name or code") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).padding(top = 8.dp)) {
+                    items(shown, key = { it.callingCode }) { country ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onSelect(country) }.padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(country.name, modifier = Modifier.weight(1f))
+                            Text(country.dialCode, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+private fun PhoneDetailsCard(result: PhoneOsintResult, onCopy: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = result.e164,
                         style = MaterialTheme.typography.titleLarge,
@@ -243,27 +195,40 @@ private fun PhoneDetailsCard(
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = result.formattedInternational,
+                        text = result.formattedInternational + (result.extension?.let { " ext. $it" } ?: ""),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
-                IconButton(onClick = {
-                    clipboardManager.setText(AnnotatedString(result.e164))
-                    onShowToast("E.164 number copied to clipboard")
-                }) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy")
+                IconButton(onClick = onCopy) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy E.164 number")
                 }
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-            PhoneInfoRow("Country / Region", "${result.countryName} (${result.countryIso})")
-            PhoneInfoRow("Calling Code", result.countryCallingCode)
-            PhoneInfoRow("National Number", result.nationalNumber)
-            PhoneInfoRow("Estimated Line Type", result.estimatedLineType)
-            PhoneInfoRow("Valid E.164 Format", if (result.isValidFormat) "Yes (7-15 digits)" else "Questionable length")
+            PhoneInfoRow("Country / region", "${result.countryName} (${result.countryIso})")
+            result.region?.let { PhoneInfoRow("Numbering area", it) }
+            PhoneInfoRow("Calling code", result.countryCallingCode)
+            PhoneInfoRow("National number", result.nationalNumber)
+            PhoneInfoRow("Line type (estimate)", result.estimatedLineType)
+            Text(
+                result.validity.label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = when (result.validity) {
+                    PhoneValidity.VALID_LENGTH -> MaterialTheme.colorScheme.primary
+                    PhoneValidity.POSSIBLE -> MaterialTheme.colorScheme.onSurfaceVariant
+                    PhoneValidity.UNUSUAL_LENGTH, PhoneValidity.INVALID -> MaterialTheme.colorScheme.error
+                }
+            )
+            result.notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+            Text(
+                "Country and line type come from the numbering plan. Ported numbers keep their prefix, so the current " +
+                    "carrier and location can differ.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -274,54 +239,55 @@ private fun PhoneInfoRow(label: String, value: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End
         )
     }
 }
 
 @Composable
-private fun PhoneOsintLinksCard(
-    links: List<PhoneOsintLink>,
-    onLinkClick: (PhoneOsintLink) -> Unit
-) {
+private fun SearchFormatsCard(result: PhoneOsintResult, onCopy: (String, String) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    Icons.Default.Security,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "OSINT Shortcuts & Direct Actions",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Search Formats", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
-                text = "Launch direct WhatsApp chat without adding contact, query Telegram profiles, or lookup directories.",
+                "People publish the same number in different spellings. Searching all of them finds mentions a single format misses.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            result.searchVariants.forEach { variant ->
+                Text(variant, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace)
+            }
+            TextButton(
+                onClick = { onCopy("Search query", PhoneNumberAnalyzer.exactMatchQuery(result.searchVariants)) },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Copy combined query")
+            }
+        }
+    }
+}
 
+@Composable
+private fun PhoneOsintLinksCard(links: List<PhoneOsintLink>, onLinkClick: (PhoneOsintLink) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Lookups", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Each entry opens a third-party site or app with the number filled in. Nothing is sent until you tap one.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             links.forEach { link ->
@@ -342,22 +308,15 @@ private fun PhoneOsintLinksCard(
                                 link.url.startsWith("sms:") -> Icons.AutoMirrored.Filled.Chat
                                 link.url.contains("wa.me") -> Icons.Default.ChatBubble
                                 link.url.contains("t.me") -> Icons.AutoMirrored.Filled.Send
+                                link.url.contains("search") || link.url.contains("duckduckgo") -> Icons.Default.Search
                                 else -> Icons.AutoMirrored.Filled.OpenInNew
                             },
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = link.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = link.subtitle,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text(text = link.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(text = link.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Icon(
                             Icons.AutoMirrored.Filled.OpenInNew,
@@ -374,9 +333,8 @@ private fun PhoneOsintLinksCard(
 
 private fun openPhoneOsintLink(context: Context, link: PhoneOsintLink) {
     try {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link.url))
-        context.startActivity(intent)
-    } catch (e: Exception) {
-        Toast.makeText(context, "Could not open action: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        context.startActivity(Intent(Intent.ACTION_VIEW, link.url.toUri()))
+    } catch (_: Exception) {
+        Toast.makeText(context, "No app can open this link", Toast.LENGTH_SHORT).show()
     }
 }

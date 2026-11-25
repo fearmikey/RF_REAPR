@@ -23,4 +23,7 @@ interface EventLogDao {
 
     @Query("DELETE FROM event_logs WHERE type = :type")
     suspend fun clearLogsByType(type: String)
+
+    @Query("DELETE FROM event_logs WHERE projectId = :projectId")
+    suspend fun deleteLogsForProject(projectId: String)
 }

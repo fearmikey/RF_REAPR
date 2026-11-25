@@ -89,6 +89,20 @@ class SettingsViewModel(
         }
     }
 
+    /** Tool names pinned to the top of the main menu. */
+    val favoriteTools: StateFlow<Set<String>> = repository.favoriteTools
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptySet()
+        )
+
+    fun toggleFavoriteTool(name: String) {
+        viewModelScope.launch {
+            repository.setFavoriteTool(name, name !in favoriteTools.value)
+        }
+    }
+
     fun setSupportDialogNeverAsk(neverAsk: Boolean) {
         viewModelScope.launch {
             repository.setSupportDialogNeverAsk(neverAsk)

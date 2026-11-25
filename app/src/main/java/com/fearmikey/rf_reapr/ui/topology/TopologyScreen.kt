@@ -61,6 +61,8 @@ fun TopologyScreen(
 
     // UI state that should survive rotation / process recreation.
     var isListView by rememberSaveable { mutableStateOf(false) }
+    // Tablets, unfolded foldables and desktop windows show the map and the device list side by side.
+    val isWideLayout = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 840
     var selectedNodeId by rememberSaveable { mutableStateOf<String?>(null) }
     var showFilterBar by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -183,11 +185,13 @@ fun TopologyScreen(
                             tint = if (isAuditing) MaterialTheme.colorScheme.error else if (isPassiveMode) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    IconButton(onClick = { isListView = !isListView }) {
-                        Icon(
-                            imageVector = if (isListView) Icons.Default.Map else Icons.AutoMirrored.Filled.List,
-                            contentDescription = if (isListView) "Show Map" else "Show List"
-                        )
+                    if (!isWideLayout) {
+                        IconButton(onClick = { isListView = !isListView }) {
+                            Icon(
+                                imageVector = if (isListView) Icons.Default.Map else Icons.AutoMirrored.Filled.List,
+                                contentDescription = if (isListView) "Show Map" else "Show List"
+                            )
+                        }
                     }
                     Box {
                         IconButton(onClick = { showOverflowMenu = true }) {
@@ -245,7 +249,7 @@ fun TopologyScreen(
                         riskFilter = if (level in riskFilter) riskFilter - level else riskFilter + level
                     },
                     riskCounts = riskCounts,
-                    showSort = isListView,
+                    showSort = isListView || isWideLayout,
                     sortOrder = sortOrder,
                     onSortChange = { sortOrder = it },
                     onClear = {
@@ -258,7 +262,42 @@ fun TopologyScreen(
 
             Box(modifier = Modifier.fillMaxSize()) {
                 mappedGraph?.let { graph ->
-                    if (isListView) {
+                    if (isWideLayout) {
+                        Row(Modifier.fillMaxSize()) {
+                            Box(Modifier.weight(0.6f).fillMaxHeight()) {
+                                NetworkMapView(
+                                    mappedGraph = graph,
+                                    onNodeClick = { selectedNodeId = it.id },
+                                    localDeviceIp = localDeviceIp,
+                                    selectedNodeId = selectedNodeId,
+                                    matchingNodeIds = matchingNodeIds,
+                                    activeScanNodeIds = scanningNodeIds
+                                )
+                            }
+                            VerticalDivider()
+                            Box(Modifier.weight(0.4f).fillMaxHeight()) {
+                                if (listNodes.isEmpty()) {
+                                    NoMatchesMessage(
+                                        onClear = {
+                                            searchQuery = ""
+                                            riskFilter = emptySet()
+                                        },
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                } else {
+                                    val nodesState = remember(listNodes) { NetworkNodeListState(listNodes) }
+                                    val onNodeClickRemembered = remember { { node: NetworkNode -> selectedNodeId = node.id } }
+                                    NetworkNodeList(
+                                        state = nodesState,
+                                        onNodeClick = onNodeClickRemembered,
+                                        localDeviceIp = localDeviceIp,
+                                        selectedNodeId = selectedNodeId,
+                                        activeScanNodeIds = scanningNodeIds
+                                    )
+                                }
+                            }
+                        }
+                    } else if (isListView) {
                         if (listNodes.isEmpty()) {
                             NoMatchesMessage(
                                 onClear = {

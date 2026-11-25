@@ -1,6 +1,6 @@
 # RF-REAPR (Reconnaissance, Evaluation, Analysis, and Penetration Reporting)
 
-[![Version](https://img.shields.io/badge/version-1.5.7-blue.svg)](https://github.com/fearmikey/RF_REAPR/releases)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/fearmikey/RF_REAPR/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![F-Droid](https://img.shields.io/f-droid/v/com.fearmikey.rf_reapr.svg)](https://f-droid.org/packages/com.fearmikey.rf_reapr/)
 
@@ -14,18 +14,29 @@ RF-REAPR integrates a wide range of security modules:
 *   **Centralized Dashboard**: Categorized security audit toolkit with instant access to network, wireless, web, physical, and compliance modules.
 *   **Passive vs. Active Modes**: Global stealth mode toggle to inhibit active network transmissions when operating in sensitive environments.
 *   **Background Scanning Service**: Persistent foreground service with real-time progress notifications and accurate scan time estimation (ETA).
+*   **Favorites & Search**: Pin frequently used tools and search the toolkit by name or keyword.
+
+### Engagements, Findings & Audit Mode
+*   **Engagements & Scope**: Active project with an authorized scope; out-of-scope targets are flagged before scanning.
+*   **Shared Findings**: De-duplicated findings from every tool with triage status, notes, regression detection and compliance control suggestions. Export as CSV, JSON, Markdown, HTML or DefectDojo JSON.
+*   **Audit Mode**: Guided multi-check network audit with A-F grading, Markdown report and run-to-run history comparison.
+*   **Engagement Timeline**: Chronological view of logs, findings, evidence, scans and audit runs.
+*   **Nmap Import**: Bring Nmap XML results into the network history and findings.
+*   **Known Devices**: Per-project MAC allowlist; unknown devices on the network are flagged.
+*   **Encrypted Backup**: Password-protected backup and restore of all local data.
 
 ### Compliance & Auditing
 *   **Audit Checklists**: Built-in checklists for various security frameworks (ISO 27001, SOC2, etc.).
 *   **Evidence Capture**: Integrated camera system to capture and tag physical security evidence with FOSS location tagging.
-*   **Evidence Gallery**: Organize and review collected evidence by project and folder.
+*   **Evidence Gallery**: Organize and review collected evidence by project and folder, with SHA-256 integrity verification and links to findings.
+*   **Report Builder**: PDF/DOCX reports with findings, related controls and hashed evidence.
 *   **Recycle Bin**: Secure deletion with an automated 30-day retention and cleanup worker.
 
 ### Network Discovery & Analysis
 *   **Network Topology Map**: Interactive visualization of network structure and connected devices with persistent state.
 *   **Port Scanner**: Identify open ports and potential vulnerabilities on network devices.
 *   **Packet Capture (PCAP)**: Integrated traffic capture (VPN or Root) for deep packet analysis.
-*   **Website Inspector**: Basic web auditing and security header analysis.
+*   **Website Inspector**: A-F security header grading with cookie and CORS checks.
 *   **Ping Tool**: Network latency and connectivity testing.
 *   **Network Throughput (iPerf)**: High-performance bandwidth testing via integrated native iperf3.
 *   **SNMP Browser**: Query and analyze network devices using the SNMP protocol.
@@ -44,14 +55,19 @@ RF-REAPR integrates a wide range of security modules:
 *   **WPS PIN Calculator**: Audit router WPS PIN algorithms and security status.
 *   **SDR Controller**: Real-time spectrum analysis and waterfall display via RTL-SDR (rtl_tcp).
 *   **NFC Scanner**: Read and analyze NFC tag data and technology types.
+*   **BLE GATT Inspector**: Read-only enumeration of a BLE device's services and characteristics.
+*   **Geotagged Survey**: Passive Wi-Fi/BLE/cell logging with GPS, exported to WiGLE CSV, KML or GPX (never uploaded).
+*   **Wi-Fi Site Survey**: Measure signal on a floor plan and view an interpolated heatmap.
 
 ### Web, OSINT & Infrastructure Security
 *   **Username OSINT Recon**: Search for accounts and digital footprints across 30+ platforms.
 *   **Phone Number OSINT**: E.164 phone number analysis, carrier validation, and country formatting.
 *   **Google Dorks Generator**: Generate targeted search dorks for exposed files, admin portals, and open directories.
-*   **Threat Intelligence Aggregator**: Query AlienVault OTX threat indicators and pulse counts.
+*   **Threat Intelligence Aggregator**: AbuseIPDB IP reputation lookups with clear verdicts and abuse categories.
+*   **Breach Check (HIBP)**: Account breach lookups plus a key-free Pwned Passwords check (k-anonymity; only a 5-character hash prefix is sent).
+*   **Cloud Asset Scanner**: Find anonymously listable cloud storage buckets for a target name.
 *   **EXIF Metadata Inspector**: Analyze image EXIF tags, GPS coordinates, and generate scrubbed images.
-*   **Payload Encoder / Decoder**: Convert payloads between URL, Base64, Hex, HTML Entities, UTF-8, and Rot13.
+*   **Payload Encoder / Decoder**: Convert payloads between 11 formats (URL, Base64, Hex, HTML entities, and more) and analyze JWTs.
 *   **Cert Decoder**: Decode and inspect SSL/TLS X.509 certificate chains.
 *   **Hash Calculator**: Compute MD5, SHA-1, SHA-256, and SHA-512 cryptographic hashes.
 *   **Reverse Shell Cheatsheet**: Reference payload generator for authorized penetration testing.

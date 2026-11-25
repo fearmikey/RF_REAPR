@@ -53,8 +53,14 @@ data class ToolkitTool(
     val category: ToolCategory,
     val tint: Color? = null,
     val isAggressive: Boolean = false,
-    val requiresApiKey: Boolean = false
-)
+    val requiresApiKey: Boolean = false,
+    /** Extra search terms that aren't in the name or description (synonyms, jargon). */
+    val keywords: String = ""
+) {
+    fun matches(query: String): Boolean =
+        name.contains(query, ignoreCase = true) || description.contains(query, ignoreCase = true) ||
+            keywords.contains(query, ignoreCase = true) || category.title.contains(query, ignoreCase = true)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +72,8 @@ fun MainMenuScreen(
     val isPassiveMode by settingsViewModel?.isPassiveMode?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
     val appLaunchCount by settingsViewModel?.appLaunchCount?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(0) }
     val supportDialogNeverAsk by settingsViewModel?.supportDialogNeverAsk?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
+    val favorites by settingsViewModel?.favoriteTools?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptySet<String>()) }
+    val onToggleFavorite: (ToolkitTool) -> Unit = { tool -> settingsViewModel?.toggleFavoriteTool(tool.name) }
 
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
@@ -215,6 +223,14 @@ fun MainMenuScreen(
                 ToolCategory.MONITORING
             ),
             ToolkitTool(
+                "Known Devices",
+                "List the devices expected on a network; strangers are flagged as findings.",
+                Icons.Default.VerifiedUser,
+                Screen.KnownDevices.route,
+                ToolCategory.MONITORING,
+                keywords = "allowlist whitelist rogue device inventory asset"
+            ),
+            ToolkitTool(
                 "Bluetooth Proximity Finder",
                 "Consolidated auditor and locator for BLE devices.",
                 Icons.Default.Bluetooth,
@@ -292,6 +308,24 @@ fun MainMenuScreen(
                 ToolCategory.WIRELESS_PHYSICAL,
                 WifiOrange,
                 isAggressive = true
+            ),
+            ToolkitTool(
+                "Geotagged Survey",
+                "Log Wi-Fi, Bluetooth and cell emitters with GPS; export WiGLE CSV, KML or GPX.",
+                Icons.Default.MyLocation,
+                Screen.GeoSurvey.route,
+                ToolCategory.WIRELESS_PHYSICAL,
+                WifiOrange,
+                keywords = "wardriving wardrive warwalking wigle gps map location"
+            ),
+            ToolkitTool(
+                "Wi-Fi Site Survey",
+                "Tap a floor plan as you walk to build a coverage heatmap and find dead zones.",
+                Icons.Default.Map,
+                Screen.SiteSurvey.route,
+                ToolCategory.WIRELESS_PHYSICAL,
+                WifiOrange,
+                keywords = "heatmap coverage floorplan signal strength dead zone"
             ),
             ToolkitTool(
                 "Website Inspector",
@@ -449,6 +483,13 @@ fun MainMenuScreen(
             ),
             // Log Tools
             ToolkitTool(
+                "Audit Mode Logs",
+                "Review or delete past Audit Mode run summaries.",
+                Icons.Default.History,
+                Screen.AuditLogs.route,
+                ToolCategory.COMPLIANCE
+            ),
+            ToolkitTool(
                 "WiFi Spectrum Logs",
                 "Export event logs for WiFi scans.",
                 Icons.Default.Wifi,
@@ -510,6 +551,30 @@ fun MainMenuScreen(
                 Icons.Default.Waves,
                 Screen.PacketCaptureLogs.route,
                 ToolCategory.COMPLIANCE
+            ),
+            ToolkitTool(
+                "Findings",
+                "Triage what the tools found: status, notes, evidence and exports.",
+                Icons.Default.BugReport,
+                Screen.Findings.route,
+                ToolCategory.COMPLIANCE,
+                keywords = "issues vulnerabilities triage defectdojo html"
+            ),
+            ToolkitTool(
+                "Audit History",
+                "Past Audit Mode runs and what changed between them.",
+                Icons.Default.History,
+                Screen.AuditHistory.route,
+                ToolCategory.COMPLIANCE,
+                keywords = "retest compare diff grade"
+            ),
+            ToolkitTool(
+                "Activity Timeline",
+                "Everything recorded under the active project, in order.",
+                Icons.Default.Timeline,
+                Screen.Timeline.route,
+                ToolCategory.COMPLIANCE,
+                keywords = "chronology history chain of custody"
             )
         )
     }
@@ -536,10 +601,7 @@ fun MainMenuScreen(
         if (trimmedQuery.isBlank()) {
             emptyList()
         } else {
-            allTools.filter {
-                it.name.contains(trimmedQuery, ignoreCase = true) ||
-                    it.description.contains(trimmedQuery, ignoreCase = true)
-            }
+            allTools.filter { it.matches(trimmedQuery) }
         }
     }
 
@@ -623,6 +685,9 @@ fun MainMenuScreen(
                 item(key = "engagement") {
                     ActiveEngagementCard(onClick = { onNavigate(Screen.Engagement.route) })
                 }
+                item(key = "audit_mode") {
+                    AuditModeCard(onClick = { onNavigate(Screen.AuditMode.route) })
+                }
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -648,9 +713,29 @@ fun MainMenuScreen(
                     }
                 }
 
+                val favoriteTools = allTools.filter { it.name in favorites }
+                if (favoriteTools.isNotEmpty()) {
+                    item(key = "favorites") {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                                    Icon(Icons.Default.Star, contentDescription = null, tint = ComplianceGold)
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Text("Favorites", fontWeight = FontWeight.Bold)
+                                }
+                                favoriteTools.forEach { tool ->
+                                    ToolItem(tool, isPassiveMode, settingsViewModel, onNavigate, onInhibitedClick, true) { onToggleFavorite(tool) }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 ToolCategory.entries.forEach { category ->
                     item(key = category.name) {
                         CategoryCard(
+                            favorites = favorites,
+                            onToggleFavorite = onToggleFavorite,
                             category = category,
                             isExpanded = expandedCategory == category,
                             onClick = {
@@ -683,7 +768,7 @@ fun MainMenuScreen(
                 items(filteredTools, key = { "result_${it.route}_${it.name}" }) { tool ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            ToolItem(tool, isPassiveMode, settingsViewModel, onNavigate, onInhibitedClick)
+                            ToolItem(tool, isPassiveMode, settingsViewModel, onNavigate, onInhibitedClick, tool.name in favorites) { onToggleFavorite(tool) }
                         }
                     }
                 }
@@ -816,7 +901,9 @@ fun CategoryCard(
     isPassiveMode: Boolean,
     settingsViewModel: SettingsViewModel?,
     onNavigate: (String) -> Unit,
-    onInhibitedClick: () -> Unit
+    onInhibitedClick: () -> Unit,
+    favorites: Set<String> = emptySet(),
+    onToggleFavorite: (ToolkitTool) -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -846,7 +933,7 @@ fun CategoryCard(
                 ) {
                     val lastIndex = tools.size - 1
                     tools.forEachIndexed { index, tool ->
-                        ToolItem(tool, isPassiveMode, settingsViewModel, onNavigate, onInhibitedClick)
+                        ToolItem(tool, isPassiveMode, settingsViewModel, onNavigate, onInhibitedClick, tool.name in favorites) { onToggleFavorite(tool) }
                         if (index != lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 4.dp),
@@ -866,7 +953,10 @@ fun ToolItem(
     isPassiveMode: Boolean,
     settingsViewModel: SettingsViewModel?,
     onNavigate: (String) -> Unit,
-    onInhibitedClick: () -> Unit
+    onInhibitedClick: () -> Unit,
+    isFavorite: Boolean = false,
+    /** Null hides the star (e.g. in previews without a settings store). */
+    onToggleFavorite: (() -> Unit)? = null
 ) {
     val isInhibited = isPassiveMode && tool.isAggressive
     val isApiKeyRequired = tool.requiresApiKey
@@ -944,6 +1034,15 @@ fun ToolItem(
                     text = tool.description,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (onToggleFavorite != null) {
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = if (isFavorite) "Remove ${tool.name} from favorites" else "Add ${tool.name} to favorites",
+                    tint = if (isFavorite) ComplianceGold else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

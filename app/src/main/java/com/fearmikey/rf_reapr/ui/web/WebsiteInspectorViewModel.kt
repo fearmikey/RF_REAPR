@@ -19,7 +19,8 @@ import kotlinx.coroutines.launch
 class WebsiteInspectorViewModel(
     private val repository: WebsiteInspectorRepository,
     private val logRepository: LogRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val findingRepository: com.fearmikey.rf_reapr.domain.repository.FindingRepository? = null
 ) : ViewModel() {
 
     val isPassiveMode: StateFlow<Boolean> = settingsRepository.isPassiveMode
@@ -45,8 +46,16 @@ class WebsiteInspectorViewModel(
 
         viewModelScope.launch {
             try {
+                var headersRecorded = false
                 repository.inspectWebsite(url).collect { status ->
                     _uiState.value = status
+
+                    // Header issues go to the shared findings store once per inspection.
+                    val http = (status.httpStatus as? InspectorStatus.Success)?.data
+                    if (http != null && !headersRecorded) {
+                        headersRecorded = true
+                        findingRepository?.record(com.fearmikey.rf_reapr.domain.service.SecurityHeaderAnalyzer.toDrafts(http))
+                    }
                     
                     // Log when all sections are finished
                     if (status.httpStatus is InspectorStatus.Success &&

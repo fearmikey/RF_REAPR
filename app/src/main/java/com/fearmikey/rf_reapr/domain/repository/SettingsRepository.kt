@@ -28,6 +28,10 @@ interface SettingsRepository {
     val appLaunchCount: Flow<Int>
         get() = flowOf(1)
 
+    /** Names of the tools pinned to the top of the main menu. */
+    val favoriteTools: Flow<Set<String>>
+        get() = flowOf(emptySet())
+
     suspend fun setThemePreference(preference: ThemePreference) {}
     suspend fun setVulnerabilityApiKey(key: String) {}
     suspend fun setHibpApiKey(key: String) {}
@@ -39,6 +43,7 @@ interface SettingsRepository {
     suspend fun setSdrPort(port: Int) {}
     suspend fun incrementAppLaunchCount(): Int = 1
     suspend fun setSupportDialogNeverAsk(neverAsk: Boolean) {}
+    suspend fun setFavoriteTool(name: String, favorite: Boolean) {}
     suspend fun setSupportDialogLastShownLaunch(launchCount: Int) {}
     fun getSupportDialogLastShownLaunch(): Int = 0
 }

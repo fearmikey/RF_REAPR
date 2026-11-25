@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-11-24
+
+### Added
+- **Engagements & Scope**:
+    - Active project with an authorized scope (hosts, CIDRs, domains). Target inputs warn when a target is out of scope, and logs/scans are tagged with the project.
+    - **Engagement Timeline**: Merged chronological view of logs, findings, evidence, scans and audit runs, with Markdown export.
+    - **Nmap XML Import**: Import Nmap results into the network history and findings (external entities disabled, 25 MB cap).
+- **Shared Findings Store**:
+    - De-duplicated findings fed by Port Scanner, TLS, DNS audit, UPnP, SNMP, ARP, NFC, USB, Cellular, Wi-Fi, Captive Portal, Website Inspector, Subdomain Finder, Shodan, Threat Intel, HIBP, Cloud Assets, BLE GATT and Nmap import.
+    - Triage status and notes, manual findings, and automatic FIXED → OPEN regression detection.
+    - Export as CSV (formula-injection safe), JSON, Markdown, self-contained HTML, and DefectDojo Generic Findings JSON.
+    - **Compliance mapping**: Findings suggest related checklist controls (never marked automatically).
+- **Audit Mode**: Guided audit that runs selected checks (Wi-Fi, captive portal, DNS, UPnP, discovery, ports, TLS, SNMP) or a preset against the current network or a target list, records results as findings, grades the run (A–F) and exports a Markdown report. Respects Passive Mode and scope.
+- **Audit History**: Saved audit runs with run-to-run comparison (new, resolved, persisting, not re-tested).
+- **Known Devices**: Per-project allowlist of expected MACs; the Network Monitor flags unknown devices as findings.
+- **Geotagged Survey**: Passive Wi-Fi/BLE/cell logging with GPS (`android.location` only), exportable to WiGLE CSV, KML and GPX. Nothing is uploaded.
+- **Wi-Fi Site Survey**: Tap-to-measure on an imported floor plan with an interpolated signal heatmap.
+- **BLE GATT Inspector**: Read-only service/characteristic enumeration behind an explicit consent prompt (never writes, subscribes or pairs).
+- **Evidence Integrity**: SHA-256 hash recorded at capture/import (existing evidence is backfilled), verified on display, in exports and in reports. Evidence can be linked to a finding.
+- **Report Builder**: Findings section with related controls and linked evidence (with hash and integrity status) in PDF and DOCX reports.
+- **Encrypted Backup & Restore**: Password-protected backup (PBKDF2 + AES-256-GCM).
+- **Background Network Watch**: Opt-in periodic network check (WorkManager, unmetered networks only, skipped in Passive Mode).
+- **Main Menu**: Favorites and keyword search; two-pane layouts for Findings and Topology on large screens.
+
+### Changed
+- **Tool Enhancement Pass**: Every tool's logic was moved into unit-tested analyzers and the screens were reworked:
+    - **Network**: Port Scanner (service banners, port catalog), UPnP/NAT-PMP auditor, DNS Security Auditor, Captive Portal, SNMP Browser, ARP spoofing detector, DHCP monitor, mDNS discovery, MAC/OUI lookup, Ping, Traceroute, iperf3 result parsing, packet capture summaries, subnet calculator, DNS query and Wake-on-LAN.
+    - **Wireless & Physical**: BLE tracker detection, Wi-Fi security analysis (incl. evil-twin hints), SDR DSP, NFC, magnetometer, USB OTG and cellular recon. WPS and HID tooling remain defensive.
+    - **Web**: TLS scanner grading, hash calculator, certificate decoder, A–F security header grading with cookie/CORS checks, and subdomain takeover hints (dangling CNAMEs).
+    - **OSINT**: Cloud asset scanner (anonymously listable buckets only), Shodan/InternetDB, HIBP plus a key-free **Pwned Passwords** check (k-anonymity, only a 5-character SHA-1 prefix is sent), Threat Intel (AbuseIPDB verdicts), Username OSINT (every site rule re-verified, uncertain results reported as such), offline Phone OSINT with a full ITU calling-code table, scoped Google Dorks, EXIF privacy analysis with verified metadata stripping, Payload Encoder with 11 formats and a JWT analyzer, and a validated Reverse Shell reference.
+- **Privacy**: Shodan, InternetDB and AbuseIPDB lookups refuse private, loopback and link-local addresses so internal addressing is never sent to third parties.
+- **Foreground Service**: Uses the `location` type only while a user-started geotagged survey is running.
+- **Architecture**: Process-wide dependency container (`AppContainer`); repositories are no longer recreated per Activity.
+- **Database**: Schema v18 with exported Room schemas and non-destructive auto-migrations (16 → 17 → 18). Destructive fallback now applies only to legacy v1–15 databases.
+- **Build**: Enabled KSP2; lint runs on a newer standalone lint version instead of disabling the crashing checks.
+- **Testing**: 268 unit tests for the extracted analyzers, plus an instrumented database migration test.
+- **Maintenance**: Version bump to 1.6.0 (versionCode 23).
+
 ## [1.5.7] - 2026-10-28
 
 ### Fixed

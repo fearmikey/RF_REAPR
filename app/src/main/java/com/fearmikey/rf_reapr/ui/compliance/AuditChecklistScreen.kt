@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.fearmikey.rf_reapr.domain.model.ComplianceControl
 import com.fearmikey.rf_reapr.domain.model.ComplianceStatus
+import com.fearmikey.rf_reapr.domain.model.Finding
 import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
 import com.fearmikey.rf_reapr.util.AuditExporter
 import java.text.SimpleDateFormat
@@ -36,6 +37,7 @@ fun AuditChecklistScreen(
     onBack: () -> Unit
 ) {
     val controls by viewModel.controls.collectAsStateWithLifecycle()
+    val findingsByControl by viewModel.findingsByControl.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showExportDialog by remember { mutableStateOf(false) }
 
@@ -115,6 +117,10 @@ fun AuditChecklistScreen(
             ) { control ->
                 ControlItem(
                     control = control,
+                    relatedFindings = findingsByControl[control.id].orEmpty(),
+                    onApplySuggestion = { notes ->
+                        viewModel.updateControlStatus(control.id, frameworkId, ComplianceStatus.NON_COMPLIANT, notes)
+                    },
                     onStatusChange = { newStatus ->
                         viewModel.updateControlStatus(control.id, frameworkId, newStatus, control.notes)
                     },
@@ -146,10 +152,16 @@ fun AuditChecklistScreen(
 fun ControlItem(
     control: ComplianceControl,
     onStatusChange: (ComplianceStatus) -> Unit,
-    onNotesChange: (String) -> Unit
+    onNotesChange: (String) -> Unit,
+    /** Findings in the active project that are evidence against this control. */
+    relatedFindings: List<Finding> = emptyList(),
+    /** Marks the control non-compliant with the given notes (the user's explicit choice). */
+    onApplySuggestion: (String) -> Unit = {}
 ) {
-    var notes by remember(control.id) { mutableStateOf(control.notes) }
+    // Keyed on the stored notes too, so applying a suggestion refreshes the field.
+    var notes by remember(control.id, control.notes) { mutableStateOf(control.notes) }
     var expanded by remember { mutableStateOf(false) }
+    var showFindings by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth()
@@ -172,6 +184,48 @@ fun ControlItem(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (relatedFindings.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    onClick = { showFindings = !showFindings },
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "${relatedFindings.size} open finding${if (relatedFindings.size == 1) "" else "s"} suggest a gap here" +
+                                if (showFindings) "" else " (tap to view)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        if (showFindings) {
+                            relatedFindings.take(8).forEach { f ->
+                                Text(
+                                    "[${f.severity.name}] ${f.title} — ${f.target}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            if (relatedFindings.size > 8) {
+                                Text(
+                                    "…and ${relatedFindings.size - 8} more in Findings",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            if (control.status != ComplianceStatus.NON_COMPLIANT) {
+                                TextButton(onClick = {
+                                    val summary = "Findings: " + relatedFindings.take(8).joinToString("; ") { "${it.title} (${it.target})" }
+                                    onApplySuggestion(listOf(control.notes, summary).filter { it.isNotBlank() }.joinToString("\n"))
+                                }) { Text("Mark non-compliant and note these findings") }
+                            }
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 

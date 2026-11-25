@@ -1,6 +1,14 @@
 package com.fearmikey.rf_reapr.data.repository
 
+import com.fearmikey.rf_reapr.data.db.dao.AuditRunDao
+import com.fearmikey.rf_reapr.data.db.dao.EventLogDao
+import com.fearmikey.rf_reapr.data.db.dao.KnownDeviceDao
+import com.fearmikey.rf_reapr.data.db.dao.SurveyDao
+import com.fearmikey.rf_reapr.domain.service.EvidenceHasher
+import com.fearmikey.rf_reapr.domain.service.EvidenceIntegrity
+import kotlinx.coroutines.withContext
 import com.fearmikey.rf_reapr.data.db.dao.EvidenceDao
+import com.fearmikey.rf_reapr.data.db.dao.FindingDao
 import com.fearmikey.rf_reapr.data.db.entity.EvidenceEntity
 import com.fearmikey.rf_reapr.data.db.entity.EvidenceFolderEntity
 import com.fearmikey.rf_reapr.data.db.entity.EvidenceProjectEntity
@@ -22,6 +30,12 @@ import java.util.UUID
 
 class EvidenceRepositoryImpl(
     private val evidenceDao: EvidenceDao,
+    /** Purging a project also removes the findings and logs tagged with it (no FK cascade exists). */
+    private val findingDao: FindingDao,
+    private val eventLogDao: EventLogDao,
+    private val auditRunDao: AuditRunDao,
+    private val knownDeviceDao: KnownDeviceDao,
+    private val surveyDao: SurveyDao,
     context: android.content.Context
 ) : EvidenceRepository {
 
@@ -73,6 +87,17 @@ class EvidenceRepositoryImpl(
         val folders = evidenceDao.getFoldersForProject(project.id).first()
         folders.forEach { evidenceDao.deleteFolderPermanently(it) }
         
+        // Evidence moved to another project may still point at this project's findings.
+        evidenceDao.unlinkFindingsOfProject(project.id)
+        findingDao.deleteForProject(project.id)
+        eventLogDao.deleteLogsForProject(project.id)
+        auditRunDao.deleteForProject(project.id)
+        knownDeviceDao.deleteForProject(project.id)
+        surveyDao.deleteSessionsForProject(project.id)
+        surveyDao.getSiteSurveysForProject(project.id).forEach { survey ->
+            survey.floorPlanPath?.let { File(it).delete() }
+        }
+        surveyDao.deleteSiteSurveysForProject(project.id)
         evidenceDao.deleteProjectPermanently(project.toEntity())
     }
 
@@ -188,8 +213,33 @@ class EvidenceRepositoryImpl(
     }
 
     override suspend fun saveEvidence(evidence: Evidence) {
-        evidenceDao.insertEvidence(evidence.toEntity())
+        // First save of a capture/import records its hash; later saves (notes edits) keep it.
+        val hash = evidence.sha256 ?: hashFile(evidence.filePath)
+        evidenceDao.insertEvidence(evidence.copy(sha256 = hash).toEntity())
     }
+
+    override fun getEvidenceForFinding(findingId: Long): Flow<List<Evidence>> =
+        evidenceDao.getEvidenceForFinding(findingId).map { entities -> entities.map { it.toDomain() } }
+
+    override suspend fun linkToFinding(evidenceId: String, findingId: Long?) =
+        evidenceDao.setFinding(evidenceId, findingId)
+
+    override suspend fun verifyIntegrity(evidence: Evidence): EvidenceIntegrity = withContext(Dispatchers.IO) {
+        EvidenceHasher.verify(File(evidence.filePath), evidence.sha256)
+    }
+
+    override suspend fun backfillHashes(): Int {
+        var hashed = 0
+        evidenceDao.getUnhashedEvidence().forEach { entity ->
+            hashFile(entity.filePath)?.let {
+                evidenceDao.setHash(entity.id, it)
+                hashed++
+            }
+        }
+        return hashed
+    }
+
+    private suspend fun hashFile(path: String): String? = withContext(Dispatchers.IO) { EvidenceHasher.sha256(File(path)) }
 
     override suspend fun deleteEvidence(evidence: Evidence) {
         evidenceDao.softDeleteEvidence(evidence.id, System.currentTimeMillis())
@@ -275,7 +325,9 @@ class EvidenceRepositoryImpl(
             folderId = targetFolderId,
             timestamp = System.currentTimeMillis(),
             isDeleted = false,
-            deletedAt = null
+            deletedAt = null,
+            // Same bytes, so the hash carries over; the finding link stays with the original.
+            findingId = null
         )
         evidenceDao.insertEvidence(newEntity)
     }
@@ -334,10 +386,12 @@ class EvidenceRepositoryImpl(
         // Delete original file
         originalFile.delete()
         
+        // Embedding rewrites the pixels, so the item gets the hash of its new content.
         val updatedEvidence = evidence.copy(
             filePath = newFile.absolutePath,
             hasStego = true,
-            stegoType = "TEXT"
+            stegoType = "TEXT",
+            sha256 = hashFile(newFile.absolutePath)
         )
         evidenceDao.insertEvidence(updatedEvidence.toEntity())
     }
@@ -418,7 +472,9 @@ class EvidenceRepositoryImpl(
             hasStego = hasStego,
             stegoType = stegoType,
             isDeleted = isDeleted,
-            deletedAt = deletedAt?.let { Date(it) }
+            deletedAt = deletedAt?.let { Date(it) },
+            sha256 = sha256,
+            findingId = findingId
         )
     }
 
@@ -436,7 +492,9 @@ class EvidenceRepositoryImpl(
             hasStego = hasStego,
             stegoType = stegoType,
             isDeleted = isDeleted,
-            deletedAt = deletedAt?.time
+            deletedAt = deletedAt?.time,
+            sha256 = sha256,
+            findingId = findingId
         )
     }
 }

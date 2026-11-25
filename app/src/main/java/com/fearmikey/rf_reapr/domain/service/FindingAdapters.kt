@@ -4,6 +4,7 @@ import com.fearmikey.rf_reapr.domain.model.FindingDraft
 import com.fearmikey.rf_reapr.domain.model.FindingTools
 import com.fearmikey.rf_reapr.domain.model.OpenPort
 import com.fearmikey.rf_reapr.domain.model.RiskLevel
+import com.fearmikey.rf_reapr.domain.model.WifiAccessPoint
 import com.fearmikey.rf_reapr.domain.repository.AlertSeverity
 import com.fearmikey.rf_reapr.domain.repository.ArpAlert
 import com.fearmikey.rf_reapr.domain.repository.TlsCipherScannerRepository.TlsScanResult
@@ -87,6 +88,85 @@ object FindingAdapters {
                 )
             }
         }
+    }
+
+    /**
+     * Wi-Fi posture: weak encryption / WPS / legacy modes on the *connected* network, plus
+     * evil-twin suspects (grouped per SSID so repeat scans with new BSSIDs merge).
+     * Neighbouring networks' own weak security isn't the user's finding, so it's ignored.
+     */
+    fun wifi(aps: List<WifiAccessPoint>): List<FindingDraft> = buildList {
+        aps.firstOrNull { it.isConnected }?.let { ap ->
+            val target = wifiTarget(ap.ssid)
+            val sec = WifiSecurityAnalyzer.analyze(ap.capabilities)
+            val weakFamily = sec.family in setOf(WifiSecurityFamily.OPEN, WifiSecurityFamily.WEP, WifiSecurityFamily.WPA)
+            if (weakFamily) {
+                add(
+                    FindingDraft(
+                        FindingTools.WIFI, target, sec.risk, "Connected Wi-Fi uses ${sec.family.label}",
+                        sec.issues.first() + "\nBSSID ${ap.bssid}" + (ap.vendor?.let { " ($it)" } ?: ""),
+                        "Switch the network to WPA3-Personal (or WPA2-AES at minimum) with a strong passphrase."
+                    )
+                )
+            }
+            if (sec.wps) {
+                add(
+                    FindingDraft(
+                        FindingTools.WIFI, target, RiskLevel.MEDIUM, "WPS enabled on connected Wi-Fi",
+                        "The access point advertises Wi-Fi Protected Setup, whose PIN mode can be brute-forced offline (Pixie Dust).",
+                        "Disable WPS in the router's wireless settings."
+                    )
+                )
+            }
+            // Remaining issues (TKIP allowed, WPA2/WPA3 transition) are hardening items.
+            val legacy = sec.issues.drop(if (weakFamily) 1 else 0).filterNot { it.startsWith("WPS") }
+            if (legacy.isNotEmpty()) {
+                add(
+                    FindingDraft(
+                        FindingTools.WIFI, target, RiskLevel.LOW, "Connected Wi-Fi allows legacy security modes",
+                        legacy.joinToString("\n"),
+                        "Disable TKIP and, once all clients support it, WPA2/WPA3 transition mode."
+                    )
+                )
+            }
+        }
+        aps.filter { it.isRogueSuspect }.groupBy { it.ssid }.forEach { (ssid, suspects) ->
+            add(
+                FindingDraft(
+                    FindingTools.WIFI, wifiTarget(ssid), RiskLevel.HIGH, "Possible evil twin of \"$ssid\"",
+                    suspects.joinToString("\n") { ap ->
+                        ap.bssid + (ap.vendor?.let { " ($it)" } ?: "") + " ch ${ap.getChannel()} ${ap.signalLevel} dBm: " +
+                            (ap.rogueReason ?: "suspicious security mismatch")
+                    },
+                    "Confirm which BSSIDs belong to the real deployment; enable rogue-AP detection / 802.11w (PMF) on the controller."
+                )
+            )
+        }
+    }
+
+    private fun wifiTarget(ssid: String) = if (ssid.isBlank()) "Hidden Wi-Fi network" else "Wi-Fi \"$ssid\""
+
+    /** Only interception / portals / proxies become findings; a clean or offline result doesn't. */
+    fun captivePortal(networkLabel: String?, verdict: PortalVerdict): List<FindingDraft> {
+        val target = networkLabel?.ifBlank { null }?.let { "$it network" } ?: "Active network"
+        val (severity, remediation) = when (verdict.status) {
+            PortalStatus.INTERCEPTED -> RiskLevel.HIGH to
+                "Treat the network as hostile: use a VPN and don't enter credentials until the interception is explained."
+            PortalStatus.CAPTIVE_PORTAL -> RiskLevel.LOW to
+                "Portals see unencrypted traffic before sign-in; use HTTPS/VPN and verify the portal belongs to the venue."
+            PortalStatus.PARTIAL -> if (verdict.title.contains("proxy", ignoreCase = true)) {
+                RiskLevel.LOW to "HTTP traffic is visible to the proxy operator; prefer HTTPS or a VPN."
+            } else {
+                return emptyList()
+            }
+            PortalStatus.OPEN, PortalStatus.OFFLINE -> return emptyList()
+        }
+        return listOf(
+            FindingDraft(
+                FindingTools.CAPTIVE_PORTAL, target, severity, verdict.title,
+                verdict.detail + (verdict.loginUrl?.let { "\nPortal: $it" } ?: ""), remediation
+            )
+        )
     }
 
     fun tls(result: TlsScanResult): List<FindingDraft> {

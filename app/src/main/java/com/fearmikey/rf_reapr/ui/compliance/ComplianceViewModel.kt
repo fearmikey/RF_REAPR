@@ -5,7 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.fearmikey.rf_reapr.domain.model.ComplianceControl
 import com.fearmikey.rf_reapr.domain.model.ComplianceFramework
 import com.fearmikey.rf_reapr.domain.model.ComplianceStatus
+import com.fearmikey.rf_reapr.domain.model.Finding
 import com.fearmikey.rf_reapr.domain.repository.ComplianceRepository
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
+import com.fearmikey.rf_reapr.domain.service.ComplianceMapper
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -17,8 +24,17 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
 class ComplianceViewModel(
-    private val repository: ComplianceRepository
+    private val repository: ComplianceRepository,
+    findingRepository: FindingRepository? = null
 ) : ViewModel() {
+
+    /**
+     * Open and risk-accepted findings of the active project, grouped by the control they are
+     * evidence against. Shown as a suggestion next to each control; nothing is marked automatically.
+     */
+    val findingsByControl: StateFlow<Map<String, List<Finding>>> =
+        (findingRepository?.observeActive()?.map { ComplianceMapper.findingsByControl(it) } ?: flowOf(emptyMap()))
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     private val _frameworks = MutableStateFlow<List<ComplianceFramework>>(emptyList())
     val frameworks: StateFlow<List<ComplianceFramework>> = _frameworks.asStateFlow()

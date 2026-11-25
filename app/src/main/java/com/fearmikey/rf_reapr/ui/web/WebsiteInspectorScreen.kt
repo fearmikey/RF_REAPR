@@ -128,6 +128,30 @@ fun WebsiteInspectorScreen(
                                 style = MaterialTheme.typography.titleSmall,
                                 color = if (result.statusCode < 400) Color.Green else Color.Red
                             )
+                            result.grade?.let { grade ->
+                                Text(
+                                    "Security headers: grade $grade" + (result.score?.let { " ($it/100)" } ?: ""),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    color = when (grade) {
+                                        "A", "B" -> Color(0xFF2E7D32)
+                                        "C" -> Color(0xFFC8A000)
+                                        else -> MaterialTheme.colorScheme.error
+                                    }
+                                )
+                                Text(
+                                    "Checked at ${result.url}. Issues are also recorded under Findings.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (result.passed.isNotEmpty()) {
+                                Text(
+                                    "In place: ${result.passed.joinToString(", ")}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             result.misconfigurations.forEach { MisconfigurationCard(it) }
                         }
                     }

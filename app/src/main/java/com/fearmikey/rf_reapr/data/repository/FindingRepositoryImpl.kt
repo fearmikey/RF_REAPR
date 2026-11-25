@@ -1,5 +1,6 @@
 package com.fearmikey.rf_reapr.data.repository
 
+import com.fearmikey.rf_reapr.data.db.dao.EvidenceDao
 import com.fearmikey.rf_reapr.data.db.dao.FindingDao
 import com.fearmikey.rf_reapr.data.db.entity.FindingEntity
 import com.fearmikey.rf_reapr.data.local.ActiveProjectStore
@@ -18,7 +19,9 @@ import kotlinx.coroutines.sync.withLock
 
 class FindingRepositoryImpl(
     private val dao: FindingDao,
-    private val activeProjectStore: ActiveProjectStore
+    private val activeProjectStore: ActiveProjectStore,
+    /** Evidence linked to a finding is detached (not deleted) when the finding goes away. */
+    private val evidenceDao: EvidenceDao
 ) : FindingRepository {
 
     /** Serializes read-merge-write so concurrent tools can't race on the unique index. */
@@ -51,7 +54,15 @@ class FindingRepositoryImpl(
 
     override suspend fun setNotes(id: Long, notes: String?) = dao.updateNotes(id, notes?.ifBlank { null })
 
-    override suspend fun delete(id: Long) = dao.delete(id)
+    override suspend fun delete(id: Long) {
+        evidenceDao.unlinkFinding(id)
+        dao.delete(id)
+    }
+
+    override suspend fun deleteAll(projectId: String?) = writeLock.withLock {
+        evidenceDao.unlinkFindingsOfProject(projectId.orEmpty())
+        dao.deleteForProject(projectId.orEmpty())
+    }
 
     private fun FindingEntity.toDomain() = Finding(
         id = id,

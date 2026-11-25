@@ -1,9 +1,5 @@
 package com.fearmikey.rf_reapr.ui.web
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,10 +18,10 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
@@ -36,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fearmikey.rf_reapr.domain.model.UsernameCheckResult
 import com.fearmikey.rf_reapr.domain.model.UsernameSiteCategory
+import com.fearmikey.rf_reapr.domain.model.UsernameStatus
 import com.fearmikey.rf_reapr.ui.theme.NetworkGreen
 import com.fearmikey.rf_reapr.ui.theme.WebGold
 
@@ -47,17 +44,15 @@ fun UsernameOsintScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
-    val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val copy = rememberCopyAction()
 
-    val displayedResults = state.results.filter { result ->
-        val matchesCategory = state.selectedCategory == null || result.site.category == state.selectedCategory
-        val matchesFound = !state.filterFoundOnly || result.exists
-        matchesCategory && matchesFound
-    }
-
-    val foundCount = state.results.count { it.exists }
+    val displayedResults = remember(state.results, state.selectedCategory, state.filterFoundOnly) { state.displayedResults }
     val progress = if (state.totalSites > 0) state.results.size.toFloat() / state.totalSites else 0f
+    val submit = {
+        keyboardController?.hide()
+        viewModel.startSearch()
+    }
 
     Scaffold(
         topBar = {
@@ -66,6 +61,13 @@ fun UsernameOsintScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    if (!state.isScanning && state.results.isNotEmpty()) {
+                        IconButton(onClick = { copy("Report", viewModel.report()) }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy report")
+                        }
                     }
                 }
             )
@@ -82,8 +84,8 @@ fun UsernameOsintScreen(
             OutlinedTextField(
                 value = state.username,
                 onValueChange = { viewModel.onUsernameChanged(it) },
-                label = { Text("Target Username") },
-                placeholder = { Text("e.g. torvalds, satoshi") },
+                label = { Text("Username") },
+                placeholder = { Text("e.g. torvalds") },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = WebGold) },
                 trailingIcon = {
                     if (state.isScanning) {
@@ -91,87 +93,56 @@ fun UsernameOsintScreen(
                             Icon(Icons.Default.Cancel, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.error)
                         }
                     } else {
-                        IconButton(
-                            onClick = {
-                                keyboardController?.hide()
-                                viewModel.startSearch()
-                            },
-                            enabled = state.username.isNotBlank()
-                        ) {
+                        IconButton(onClick = submit, enabled = state.username.isNotBlank()) {
                             Icon(Icons.Default.Search, contentDescription = "Search", tint = WebGold)
                         }
                     }
                 },
+                isError = state.inputError != null,
+                supportingText = {
+                    Text(state.inputError ?: "Requests the public profile page on ${state.totalSites} sites. No logins, nothing is posted.")
+                },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        keyboardController?.hide()
-                        viewModel.startSearch()
-                    }
-                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, autoCorrectEnabled = false),
+                keyboardActions = KeyboardActions(onSearch = { submit() }),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             if (state.isScanning) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = WebGold
-                )
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth(), color = WebGold)
                 Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(
-                        text = "Auditing platforms... (${state.results.size}/${state.totalSites})",
+                        text = "Checking sites… (${state.results.size}/${state.totalSites})",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "$foundCount matches found",
+                        text = "${state.foundCount} found",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
                         color = NetworkGreen
                     )
                 }
             } else if (state.results.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Completed: $foundCount / ${state.results.size} matches found",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (foundCount > 0) NetworkGreen else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (foundCount > 0) {
-                        TextButton(
-                            onClick = {
-                                val summary = state.results.filter { it.exists }
-                                    .joinToString("\n") { "${it.site.name}: ${it.profileUrl}" }
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("OSINT Profiles", summary)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "Copied matching profiles", Toast.LENGTH_SHORT).show()
-                            }
-                        ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Copy Matches", fontSize = 12.sp)
-                        }
-                    }
-                }
+                Text(
+                    text = "\"${state.searchedName}\": found on ${state.foundCount} of ${state.results.size} sites" +
+                        (if (state.uncertainCount > 0) ", ${state.uncertainCount} to check by hand" else ""),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state.foundCount > 0) NetworkGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "A matching username is a lead, not proof that the accounts belong to the same person.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Filter Chips
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -182,18 +153,16 @@ fun UsernameOsintScreen(
                 FilterChip(
                     selected = state.filterFoundOnly,
                     onClick = { viewModel.toggleFilterFoundOnly() },
-                    label = { Text("Found Only") },
+                    label = { Text("Found only") },
                     leadingIcon = if (state.filterFoundOnly) {
                         { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
                     } else null
                 )
-
                 FilterChip(
                     selected = state.selectedCategory == null,
                     onClick = { viewModel.selectCategory(null) },
-                    label = { Text("All Categories") }
+                    label = { Text("All categories") }
                 )
-
                 UsernameSiteCategory.entries.forEach { cat ->
                     FilterChip(
                         selected = state.selectedCategory == cat,
@@ -205,7 +174,6 @@ fun UsernameOsintScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Results List
             if (displayedResults.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -214,7 +182,11 @@ fun UsernameOsintScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (state.isScanning) "Searching platforms..." else if (state.results.isEmpty()) "Enter a username to begin profile reconnaissance" else "No matching results found for filters",
+                        text = when {
+                            state.isScanning -> "Checking sites…"
+                            state.results.isEmpty() -> "Enter a username to see where it is registered."
+                            else -> "Nothing matches the current filters."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -228,13 +200,8 @@ fun UsernameOsintScreen(
                     items(displayedResults, key = { it.site.name }) { result ->
                         UsernameResultCard(
                             result = result,
-                            onOpen = { uriHandler.openUri(result.profileUrl) },
-                            onCopy = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("Profile URL", result.profileUrl)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "URL copied", Toast.LENGTH_SHORT).show()
-                            }
+                            onOpen = { runCatching { uriHandler.openUri(result.profileUrl) } },
+                            onCopy = { copy("URL", result.profileUrl) }
                         )
                     }
                 }
@@ -249,14 +216,19 @@ fun UsernameResultCard(
     onOpen: () -> Unit,
     onCopy: () -> Unit
 ) {
+    val found = result.status == UsernameStatus.FOUND
+    // "Check manually" entries stay openable: the person can look where the automated check was blocked.
+    val openable = found || result.status == UsernameStatus.UNCERTAIN || result.status == UsernameStatus.ERROR
+    val statusColor = when (result.status) {
+        UsernameStatus.FOUND -> NetworkGreen
+        UsernameStatus.UNCERTAIN -> WebGold
+        UsernameStatus.ERROR -> MaterialTheme.colorScheme.error
+        UsernameStatus.NOT_FOUND, UsernameStatus.INVALID -> Color.Gray
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (result.exists) {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-            }
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (found) 0.8f else 0.3f)
         )
     ) {
         Row(
@@ -282,41 +254,27 @@ fun UsernameResultCard(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = result.profileUrl,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                if (result.exists) {
+                if (openable) {
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Profile exists (HTTP ${result.responseCode ?: 200})",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = NetworkGreen
-                    )
-                } else if (result.error != null) {
-                    Text(
-                        text = "Error: ${result.error}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                } else {
-                    Text(
-                        text = "Not found (HTTP ${result.responseCode ?: 404})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.Gray
+                        text = result.profileUrl,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = result.status.label + (result.note?.let { ": $it" } ?: ""),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (found) FontWeight.SemiBold else FontWeight.Normal,
+                    color = statusColor
+                )
             }
 
-            if (result.exists) {
+            if (openable) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onCopy, modifier = Modifier.size(36.dp)) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "Copy URL", modifier = Modifier.size(18.dp))

@@ -1,6 +1,7 @@
 package com.fearmikey.rf_reapr
 
 import android.app.Application
+import com.fearmikey.rf_reapr.data.audit.AuditEngine
 import com.fearmikey.rf_reapr.data.backup.BackupManager
 import com.fearmikey.rf_reapr.data.db.AppDatabase
 import com.fearmikey.rf_reapr.data.local.ActiveProjectStore
@@ -42,14 +43,16 @@ class AppContainer(private val app: Application) {
 
     // ---- Engagement / findings --------------------------------------------------------
     val activeProjectStore by lazy { ActiveProjectStore(app, database.evidenceDao(), applicationScope) }
-    val findingRepository by lazy { FindingRepositoryImpl(database.findingDao(), activeProjectStore) }
+    val findingRepository by lazy { FindingRepositoryImpl(database.findingDao(), activeProjectStore, database.evidenceDao()) }
     val engagementRepository by lazy {
         EngagementRepositoryImpl(
             database.evidenceDao(), database.scanSessionDao(), database.eventLogDao(),
-            findingRepository, activeProjectStore
+            findingRepository, activeProjectStore, database.auditRunDao()
         )
     }
+    val knownDeviceRepository by lazy { KnownDeviceRepositoryImpl(database.knownDeviceDao(), activeProjectStore) }
     val backupManager by lazy { BackupManager(app) }
+    val auditRunRepository by lazy { AuditRunRepositoryImpl(database.auditRunDao(), activeProjectStore, BuildConfig.VERSION_NAME) }
 
     // ---- Core -------------------------------------------------------------------------
     val settingsRepository by lazy { SettingsRepositoryImpl(app) }
@@ -74,6 +77,7 @@ class AppContainer(private val app: Application) {
     val tracerouteRepository by lazy { TracerouteRepositoryImpl() }
     val arpDetectorRepository by lazy { ArpDetectorRepositoryImpl(app, networkAlertNotifier) }
     val upnpScannerRepository by lazy { UpnpScannerRepositoryImpl(okHttpClient, discoveryRepository) }
+    val captivePortalRepository by lazy { CaptivePortalRepositoryImpl(app, okHttpClient) }
 
     // ---- Wireless & physical ----------------------------------------------------------
     val wifiRepository by lazy { WifiFingerprintRepositoryImpl(app) }
@@ -82,6 +86,11 @@ class AppContainer(private val app: Application) {
     val nfcRepository by lazy { NfcScannerRepositoryImpl() }
     val magnetometerRepository by lazy { MagnetometerRepositoryImpl(app) }
     val sdrRepository by lazy { RtlTcpRepositoryImpl() }
+    val gattInspectorRepository by lazy { GattInspectorRepositoryImpl(app) }
+    val surveyRepository by lazy {
+        SurveyRepositoryImpl(app, database.surveyDao(), activeProjectStore, applicationScope, BuildConfig.VERSION_NAME)
+    }
+    val siteSurveyRepository by lazy { SiteSurveyRepositoryImpl(app, database.surveyDao(), activeProjectStore) }
     val hidRepository by lazy { LocalHidRepository(database.hidScriptDao()) }
     val hidAssetRepository by lazy { LocalHidAssetRepository(app, database.hidAssetDao()) }
     val usbDriveRepository by lazy { UsbDriveRepositoryImpl(app, database.usbDriveDao()) }
@@ -98,12 +107,32 @@ class AppContainer(private val app: Application) {
     val internetDbRepository by lazy { InternetDbRepositoryImpl(okHttpClient) }
     val exifRepository by lazy { ExifRepositoryImpl(app) }
 
+    // ---- Audit Mode (orchestrates the tools above) ------------------------------------
+    val auditEngine by lazy {
+        AuditEngine(
+            app, applicationScope, settingsRepository, discoveryRepository, scanSessionRepository,
+            portRepository, vulnerabilityRepository, tlsCipherScannerRepository, snmpRepository,
+            upnpScannerRepository, dnsAuditorRepository, wifiRepository, captivePortalRepository,
+            findingRepository, logRepository, auditRunRepository
+        )
+    }
+
+    val nmapImportManager by lazy {
+        com.fearmikey.rf_reapr.data.audit.NmapImportManager(app, scanSessionRepository, findingRepository, logRepository)
+    }
+
     // ---- Evidence, compliance, reporting ----------------------------------------------
     val complianceRepository by lazy { ComplianceRepositoryImpl(database.complianceDao()) }
-    val evidenceRepository by lazy { EvidenceRepositoryImpl(database.evidenceDao(), app) }
+    val evidenceRepository by lazy {
+        EvidenceRepositoryImpl(
+            database.evidenceDao(), database.findingDao(), database.eventLogDao(), database.auditRunDao(),
+            database.knownDeviceDao(), database.surveyDao(), app
+        )
+    }
     val reportRepository by lazy {
         ReportRepositoryImpl(
-            app, database.scanSessionDao(), database.evidenceDao(), database.complianceDao(), database.eventLogDao()
+            app, database.scanSessionDao(), database.evidenceDao(), database.complianceDao(), database.eventLogDao(),
+            findingRepository
         )
     }
 }

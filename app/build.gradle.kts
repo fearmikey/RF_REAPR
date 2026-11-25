@@ -17,8 +17,8 @@ android {
         applicationId = "com.fearmikey.rf_reapr"
         minSdk = 26
         targetSdk = 35
-        versionCode = 22
-        versionName = "1.5.7"
+        versionCode = 23
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -80,14 +80,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-    lint {
-        // Works around a crash in the androidx.lifecycle lint detector
-        // (NonNullableMutableLiveDataDetector) when analyzing MainActivity.kt
-        // with this AGP/Lint/Kotlin toolchain combination:
-        // "Found class ...KaCallableMemberCall, but interface was expected".
-        // This is a lint-tooling bug, not a real project issue.
-        disable += "NullSafeMutableLiveData"
     }
     externalNativeBuild {
         cmake {

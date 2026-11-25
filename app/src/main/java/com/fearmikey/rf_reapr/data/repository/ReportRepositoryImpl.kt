@@ -10,7 +10,13 @@ import androidx.core.content.FileProvider
 import com.fearmikey.rf_reapr.data.db.dao.*
 import com.fearmikey.rf_reapr.data.db.entity.EventLogEntity
 import com.fearmikey.rf_reapr.domain.model.*
+import com.fearmikey.rf_reapr.domain.repository.FindingRepository
 import com.fearmikey.rf_reapr.domain.repository.ReportRepository
+import com.fearmikey.rf_reapr.domain.service.ComplianceCatalog
+import com.fearmikey.rf_reapr.domain.service.ComplianceMapper
+import com.fearmikey.rf_reapr.domain.service.EvidenceHasher
+import com.fearmikey.rf_reapr.domain.service.EvidenceIntegrity
+import com.fearmikey.rf_reapr.domain.service.FindingsExporter
 import com.fearmikey.rf_reapr.util.ReportGraphRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -37,8 +43,86 @@ class ReportRepositoryImpl(
     private val evidenceDao: EvidenceDao,
     private val complianceDao: ComplianceDao,
     private val eventLogDao: EventLogDao,
+    private val findingRepository: FindingRepository,
 ) : ReportRepository {
     private val gson = Gson()
+
+    override fun observeFindings(projectId: String?): Flow<List<Finding>> = findingRepository.observe(projectId)
+
+    override suspend fun buildReportFindings(findings: List<Finding>): List<ReportFinding> = withContext(Dispatchers.IO) {
+        val linked = evidenceDao.getLinkedEvidence().groupBy { it.findingId }
+        FindingsExporter.sortForReport(findings).map { finding ->
+            ReportFinding(
+                finding = finding,
+                controlIds = ComplianceMapper.controlIds(finding),
+                evidence = linked[finding.id].orEmpty().map { entity ->
+                    ReportEvidenceItem(entity.toReportEvidence(), EvidenceHasher.verify(File(entity.filePath), entity.sha256))
+                }
+            )
+        }
+    }
+
+    private fun com.fearmikey.rf_reapr.data.db.entity.EvidenceEntity.toReportEvidence() = Evidence(
+        id = id,
+        filePath = filePath,
+        timestamp = Date(timestamp),
+        latitude = latitude,
+        longitude = longitude,
+        notes = notes,
+        hasStego = hasStego,
+        sha256 = sha256,
+        findingId = findingId
+    )
+
+    /** Decodes an evidence image downsampled to roughly [targetWidth] px so large photos don't exhaust memory. */
+    private fun decodeForReport(path: String, targetWidth: Int = 1400): Bitmap? {
+        if (!File(path).isFile) return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0) return null
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= targetWidth) sample *= 2
+        return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+
+    private fun riskHex(risk: RiskLevel): String = when (risk) {
+        RiskLevel.CRITICAL -> "FF0000"
+        RiskLevel.HIGH -> "FF8000"
+        RiskLevel.MEDIUM -> "C8A000"
+        RiskLevel.LOW -> "2E7D32"
+    }
+
+    private fun addDocxEvidence(document: XWPFDocument, evidence: Evidence, integrity: EvidenceIntegrity?) {
+        val imgFile = File(evidence.filePath)
+        val p = document.createParagraph()
+        p.alignment = ParagraphAlignment.CENTER
+        val run = p.createRun()
+        if (!imgFile.exists()) {
+            run.setText("[Evidence file missing: ${imgFile.name}]")
+            return
+        }
+        try {
+            val pictureType = if (imgFile.extension.equals("png", ignoreCase = true)) PictureType.PNG else PictureType.JPEG
+            FileInputStream(imgFile).use { input ->
+                run.addPicture(input, pictureType, imgFile.name, Units.toEMU(400.0), Units.toEMU(300.0))
+            }
+            run.addBreak()
+            run.setText("Captured: ${SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(evidence.timestamp)}")
+            if (evidence.notes.isNotBlank()) {
+                run.addBreak()
+                val notesRun = p.createRun()
+                notesRun.isBold = true
+                notesRun.setText("Notes: ${evidence.notes}")
+            }
+            evidence.sha256?.let { hash ->
+                val hashRun = p.createRun()
+                hashRun.addBreak()
+                hashRun.fontSize = 8
+                hashRun.setText("SHA-256: $hash" + (integrity?.let { " (${it.label})" } ?: ""))
+            }
+        } catch (_: Exception) {
+        }
+    }
 
     override fun getAvailableScanSessions(): Flow<List<ReportScanSession>> {
         return scanSessionDao.getSessionsWithNodes().map { sessions ->
@@ -58,7 +142,8 @@ class ReportRepositoryImpl(
                             deviceType = nodeEntity.deviceType,
                             openPorts = nodeEntity.openPorts
                         )
-                    }
+                    },
+                    projectId = sessionWithNodes.session.projectId
                 )
             }
         }
@@ -71,7 +156,8 @@ class ReportRepositoryImpl(
                     id = projectEntity.id,
                     name = projectEntity.name,
                     createdAt = Date(projectEntity.createdAt),
-                    description = projectEntity.description
+                    description = projectEntity.description,
+                    scope = projectEntity.scope
                 )
                 ReportEvidenceProject(project, emptyList())
             }
@@ -80,25 +166,21 @@ class ReportRepositoryImpl(
     
     override suspend fun getFullEvidenceProject(projectId: String): ReportEvidenceProject {
         val projectEntity = evidenceDao.getProjectById(projectId) ?: throw Exception("Project not found")
-        val items = evidenceDao.getEvidenceForProject(projectId).first().map { entity ->
-            Evidence(
-                id = entity.id,
-                filePath = entity.filePath,
-                timestamp = Date(entity.timestamp),
-                latitude = entity.latitude,
-                longitude = entity.longitude,
-                notes = entity.notes,
-                hasStego = entity.hasStego
-            )
+        val entities = evidenceDao.getEvidenceForProject(projectId).first()
+        val items = entities.map { it.toReportEvidence() }
+        val integrity = withContext(Dispatchers.IO) {
+            entities.associate { it.id to EvidenceHasher.verify(File(it.filePath), it.sha256) }
         }
         return ReportEvidenceProject(
             EvidenceProject(
                 id = projectEntity.id,
                 name = projectEntity.name,
                 createdAt = Date(projectEntity.createdAt),
-                description = projectEntity.description
+                description = projectEntity.description,
+                scope = projectEntity.scope
             ),
-            items
+            items,
+            integrity
         )
     }
 
@@ -121,32 +203,7 @@ class ReportRepositoryImpl(
         }
     }
 
-    private fun getStaticControls(frameworkId: String): List<ComplianceControl> {
-        return when (frameworkId) {
-            "NIST" -> listOf(
-                ComplianceControl("NIST-3.1.1", "NIST", "Authorized User Access", "Limit system access to authorized users, processes acting on behalf of authorized users, and devices (including other systems)."),
-                ComplianceControl("NIST-3.1.2", "NIST", "Transaction/Function Limiting", "Limit system access to the types of transactions and functions that authorized users are permitted to execute."),
-                ComplianceControl("NIST-3.5.3", "NIST", "Multifactor Authentication", "Use multifactor authentication for local and network access to privileged accounts and for network access to non-privileged accounts."),
-                ComplianceControl("NIST-3.12.1", "NIST", "Security Control Assessment", "Periodically assess the security controls in organizational systems to determine if the controls are effective in their application."),
-                ComplianceControl("NIST-3.12.3", "NIST", "Continuous Monitoring", "Monitor organizational systems on an ongoing basis and notify designated organizational officials when a predetermined set of security events occurs.")
-            )
-            "ISO27001" -> listOf(
-                ComplianceControl("ISO-A.5.1", "ISO27001", "InfoSec Policies", "Information security policies shall be defined, approved by management, published and communicated to employees and relevant external parties."),
-                ComplianceControl("ISO-A.9.2.1", "ISO27001", "User Registration", "A formal user registration and de-registration process shall be implemented to enable assignment of access rights."),
-                ComplianceControl("ISO-A.9.4.2", "ISO27001", "Secure Log-on", "Where required by the access control policy, access to systems and applications shall be controlled by a secure log-on procedure."),
-                ComplianceControl("ISO-A.12.4.1", "ISO27001", "Event Logging", "Event logs recording user activities, exceptions, faults and information security events shall be produced, kept and regularly reviewed."),
-                ComplianceControl("ISO-A.18.1.1", "ISO27001", "Legal Identification", "All relevant legislative statutory, regulatory, contractual requirements and the organization’s approach to meet these requirements shall be explicitly identified.")
-            )
-            "SOC2" -> listOf(
-                ComplianceControl("SOC2-CC1.1", "SOC2", "Integrity & Ethics", "The organization demonstrates a commitment to integrity and ethical values through directives, actions, and behavior."),
-                ComplianceControl("SOC2-CC6.1", "SOC2", "Logical Access Restriction", "The entity restricts logical access to relevant information assets to authorized users, processes, and devices."),
-                ComplianceControl("SOC2-CC6.7", "SOC2", "Data Transmission Control", "The entity restricts the transmission, movement, and removal of information to authorized users and processes, and protects it during transmission."),
-                ComplianceControl("SOC2-CC7.1", "SOC2", "Vulnerability Management", "The entity identifies and manages system vulnerabilities to maintain the security of information and systems."),
-                ComplianceControl("SOC2-CC7.2", "SOC2", "Security Monitoring", "The entity monitors its system for security events and vulnerabilities, and evaluates the impact of any identified events.")
-            )
-            else -> emptyList()
-        }
-    }
+    private fun getStaticControls(frameworkId: String): List<ComplianceControl> = ComplianceCatalog.controls(frameworkId)
 
     override fun getAvailableLogs(): Flow<List<EventLog>> {
         return eventLogDao.getAllLogs().map { entities ->
@@ -237,6 +294,37 @@ class ReportRepositoryImpl(
                 y += headerHeight + 5f
             }
 
+            /** Image, capture time, notes and capture hash of one evidence item. */
+            fun drawEvidence(evidence: Evidence, integrity: EvidenceIntegrity?, maxWidth: Float) {
+                val bitmap = decodeForReport(evidence.filePath)
+                if (bitmap == null) {
+                    drawWrappedText("[Evidence file missing: ${File(evidence.filePath).name}]", 9f, color = Color.RED, indent = 20f)
+                    y += 8f
+                    return
+                }
+                // Fit inside the width and never taller than ~70% of a page.
+                val scale = minOf(maxWidth / bitmap.width, (pageHeight * 0.7f) / bitmap.height)
+                val drawWidth = bitmap.width * scale
+                val drawHeight = bitmap.height * scale
+                checkNewPage(drawHeight + 60f)
+                canvas.drawBitmap(bitmap, null, RectF(margin + 20f, y, margin + 20f + drawWidth, y + drawHeight), null)
+                y += drawHeight + 6f
+                bitmap.recycle()
+                drawWrappedText(
+                    "Captured: ${SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(evidence.timestamp)}",
+                    9f, indent = 20f
+                )
+                if (evidence.notes.isNotBlank()) drawWrappedText("Notes: ${evidence.notes}", 10f, isBold = true, indent = 20f)
+                evidence.sha256?.let { drawWrappedText("SHA-256: $it", 7.5f, color = Color.DKGRAY, indent = 20f) }
+                if (integrity != null && integrity != EvidenceIntegrity.UNHASHED) {
+                    drawWrappedText(
+                        "Integrity: ${integrity.label}", 8f, isBold = true, indent = 20f,
+                        color = if (integrity == EvidenceIntegrity.VERIFIED) Color.rgb(46, 125, 50) else Color.RED
+                    )
+                }
+                y += 12f
+            }
+
             // Header
             paint.textSize = 24f
             paint.isFakeBoldText = true
@@ -258,6 +346,66 @@ class ReportRepositoryImpl(
             y += 25f
             drawWrappedText(data.executiveSummary, 11f)
             y += 20f
+
+            // Engagement and scope
+            data.projectName?.let { projectName ->
+                drawWrappedText("Engagement: $projectName", 11f, isBold = true)
+                val scopeLines = FindingsExporter.scopeLines(data.scope)
+                drawWrappedText(
+                    if (scopeLines.isEmpty()) "Scope: not defined" else "Scope: ${scopeLines.joinToString(", ")}",
+                    10f, color = Color.DKGRAY
+                )
+                y += 15f
+            }
+
+            // Findings
+            if (data.findings.isNotEmpty()) {
+                checkNewPage(70f)
+                paint.color = Color.BLACK
+                paint.textSize = 16f
+                paint.isFakeBoldText = true
+                canvas.drawText("Findings", margin, y, paint)
+                paint.isFakeBoldText = false
+                y += 22f
+
+                val all = data.findings.map { it.finding }
+                drawWrappedText(
+                    RiskLevel.entries.reversed().joinToString("    ") { sev -> "${sev.name}: ${all.count { it.severity == sev }}" },
+                    10f, isBold = true
+                )
+                drawWrappedText("${all.count { it.status == FindingStatus.OPEN }} open of ${all.size} in this report", 10f, color = Color.DKGRAY)
+                y += 12f
+
+                val seenFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                data.findings.forEachIndexed { index, item ->
+                    val f = item.finding
+                    checkNewPage(70f)
+                    drawWrappedText("${index + 1}. [${f.severity.name}] ${f.title}", 12f, isBold = true, color = getRiskColor(f.severity))
+                    drawWrappedText("Target: ${f.target}", 10f, indent = 10f)
+                    drawWrappedText(
+                        "Source: ${f.tool}  ·  Status: ${f.status.label}  ·  Seen ${f.occurrences}×, last ${seenFormat.format(Date(f.lastSeen))}",
+                        9f, color = Color.DKGRAY, indent = 10f
+                    )
+                    if (f.detail.isNotBlank()) {
+                        y += 4f
+                        drawWrappedText(f.detail, 10f, indent = 10f)
+                    }
+                    f.remediation?.let {
+                        y += 4f
+                        drawWrappedText("Remediation: $it", 10f, indent = 10f)
+                    }
+                    f.notes?.takeIf { it.isNotBlank() }?.let { drawWrappedText("Auditor notes: $it", 10f, color = Color.DKGRAY, indent = 10f) }
+                    if (item.controlIds.isNotEmpty()) {
+                        drawWrappedText("Related controls: ${item.controlIds.joinToString(", ")}", 9f, color = Color.DKGRAY, indent = 10f)
+                    }
+                    if (item.evidence.isNotEmpty()) {
+                        y += 6f
+                        item.evidence.forEach { drawEvidence(it.evidence, it.integrity, 300f) }
+                    }
+                    y += 14f
+                }
+                paint.color = Color.BLACK
+            }
 
             // Network Scans
             if (data.networkScans.isNotEmpty()) {
@@ -589,31 +737,7 @@ class ReportRepositoryImpl(
                     y += 20f
                     
                     projectWithItems.items.forEach { evidence ->
-                        val imgFile = File(evidence.filePath)
-                        if (imgFile.exists()) {
-                            val bitmap = BitmapFactory.decodeFile(evidence.filePath)
-                            if (bitmap != null) {
-                                val maxWidth = 450f
-                                val scale = maxWidth / bitmap.width
-                                val drawHeight = bitmap.height * scale
-                                
-                                checkNewPage(drawHeight + 60f)
-                                
-                                val rect = RectF(margin + 20f, y, margin + 20f + maxWidth, y + drawHeight)
-                                canvas.drawBitmap(bitmap, null, rect, null)
-                                y += drawHeight + 10f
-                                
-                                paint.textSize = 9f
-                                paint.isFakeBoldText = false
-                                canvas.drawText("Captured: ${SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(evidence.timestamp)}", margin + 20f, y, paint)
-                                y += 15f
-                                if (evidence.notes.isNotBlank()) {
-                                    drawWrappedText("Notes: ${evidence.notes}", 10f, isBold = true, indent = 20f)
-                                }
-                                y += 15f
-                                bitmap.recycle()
-                            }
-                        }
+                        drawEvidence(evidence, projectWithItems.integrity[evidence.id], 450f)
                     }
                 }
             }
@@ -1012,6 +1136,56 @@ class ReportRepositoryImpl(
             }
             val summary = document.createParagraph()
             summary.createRun().setText(data.executiveSummary)
+
+            // Engagement and scope
+            data.projectName?.let { projectName ->
+                document.createParagraph().createRun().apply {
+                    isBold = true
+                    setText("Engagement: $projectName")
+                }
+                val scopeLines = FindingsExporter.scopeLines(data.scope)
+                document.createParagraph().createRun()
+                    .setText(if (scopeLines.isEmpty()) "Scope: not defined" else "Scope: ${scopeLines.joinToString(", ")}")
+            }
+
+            // Findings
+            if (data.findings.isNotEmpty()) {
+                document.createParagraph().createRun().apply {
+                    addBreak()
+                    isBold = true
+                    fontSize = 14
+                    setText("Findings")
+                }
+                val all = data.findings.map { it.finding }
+                document.createParagraph().createRun().setText(
+                    RiskLevel.entries.reversed().joinToString("   ") { sev -> "${sev.name}: ${all.count { it.severity == sev }}" } +
+                        "   (${all.count { it.status == FindingStatus.OPEN }} open of ${all.size})"
+                )
+                val seenFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                data.findings.forEachIndexed { index, item ->
+                    val f = item.finding
+                    document.createParagraph().createRun().apply {
+                        isBold = true
+                        color = riskHex(f.severity)
+                        setText("${index + 1}. [${f.severity.name}] ${f.title}")
+                    }
+                    val body = document.createParagraph()
+                    fun line(text: String, bold: Boolean = false) {
+                        body.createRun().apply {
+                            isBold = bold
+                            setText(text)
+                            addBreak()
+                        }
+                    }
+                    line("Target: ${f.target}")
+                    line("Source: ${f.tool} · Status: ${f.status.label} · Seen ${f.occurrences}×, last ${seenFormat.format(Date(f.lastSeen))}")
+                    f.detail.lines().filter { it.isNotBlank() }.forEach { line(it) }
+                    f.remediation?.let { line("Remediation: $it", bold = true) }
+                    f.notes?.takeIf { it.isNotBlank() }?.let { line("Auditor notes: $it") }
+                    if (item.controlIds.isNotEmpty()) line("Related controls: ${item.controlIds.joinToString(", ")}")
+                    item.evidence.forEach { addDocxEvidence(document, it.evidence, it.integrity) }
+                }
+            }
             
             // Network Scans
             if (data.networkScans.isNotEmpty()) {
@@ -1656,31 +1830,7 @@ class ReportRepositoryImpl(
                     }
                     
                     projectWithItems.items.forEach { evidence ->
-                        val p = document.createParagraph()
-                        p.alignment = ParagraphAlignment.CENTER
-                        val run = p.createRun()
-                        
-                        val imgFile = File(evidence.filePath)
-                        if (imgFile.exists()) {
-                            try {
-                                run.addPicture(
-                                    FileInputStream(imgFile),
-                                    PictureType.JPEG,
-                                    imgFile.name,
-                                    Units.toEMU(400.0),
-                                    Units.toEMU(300.0)
-                                )
-                                run.addBreak()
-                                run.setText("Captured: ${SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(evidence.timestamp)}")
-                                if (evidence.notes.isNotBlank()) {
-                                    run.addBreak()
-                                    val notesRun = p.createRun()
-                                    notesRun.isBold = true
-                                    notesRun.setText("Notes: ${evidence.notes}")
-                                }
-                                run.addBreak()
-                            } catch (_: Exception) {}
-                        }
+                        addDocxEvidence(document, evidence, projectWithItems.integrity[evidence.id])
                     }
                 }
             }
@@ -1699,6 +1849,6 @@ class ReportRepositoryImpl(
     }
 
     private fun EventLogEntity.toDomain(): EventLog {
-        return EventLog(id, type, timestamp, summary, detailJson)
+        return EventLog(id, type, timestamp, summary, detailJson, projectId)
     }
 }

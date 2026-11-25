@@ -330,6 +330,9 @@ class EvidenceCaptureViewModel(
         return result
     }
 
+    /** Re-hashes the file and compares it with the SHA-256 recorded at capture. */
+    suspend fun verifyIntegrity(evidence: Evidence) = evidenceRepository.verifyIntegrity(evidence)
+
     fun deleteEvidence(evidence: Evidence) {
         viewModelScope.launch {
             evidenceRepository.deleteEvidence(evidence)

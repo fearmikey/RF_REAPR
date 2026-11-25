@@ -243,10 +243,20 @@ fun SubdomainItemRow(
                     }
                 }
                 Text(
-                    text = item.ipAddress ?: "No IP",
+                    text = item.ipAddress ?: "Does not resolve",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                item.takeover?.let { hint ->
+                    val dangling = hint.risk == com.fearmikey.rf_reapr.domain.service.TakeoverRisk.DANGLING
+                    Text(
+                        text = if (dangling) "Possible takeover: dangling CNAME to ${hint.service} (${hint.cname})"
+                        else "Hosted on ${hint.service} (${hint.cname})",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (dangling) FontWeight.Bold else FontWeight.Normal,
+                        color = if (dangling) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

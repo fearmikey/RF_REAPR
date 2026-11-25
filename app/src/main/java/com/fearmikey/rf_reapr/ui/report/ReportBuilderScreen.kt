@@ -30,6 +30,15 @@ fun ReportBuilderScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbar = remember { SnackbarHostState() }
+    var showProjectMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.error) {
+        state.error?.let {
+            snackbar.showSnackbar("Couldn't generate the report: $it")
+            viewModel.clearResult()
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (autoGenerate) {
@@ -49,6 +58,7 @@ fun ReportBuilderScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text("Report Builder") },
@@ -101,6 +111,55 @@ fun ReportBuilderScreen(
                     label = { Text("Executive Summary / Comments") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 4
+                )
+            }
+
+            item { SectionHeader("Engagement", Icons.Default.Work) }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box {
+                        OutlinedButton(onClick = { showProjectMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(state.projectFilterName ?: "All data (no project filter)", modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(expanded = showProjectMenu, onDismissRequest = { showProjectMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("All data (no project filter)") },
+                                onClick = { showProjectMenu = false; viewModel.setProjectFilter(null) }
+                            )
+                            state.availableProjects.forEach { project ->
+                                DropdownMenuItem(
+                                    text = { Text(project.project.name) },
+                                    onClick = { showProjectMenu = false; viewModel.setProjectFilter(project.project.id) }
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        if (state.projectFilterId != null) "Scans, logs and findings below are limited to this project."
+                        else "Scans and logs from every project are listed. Findings are the ones recorded with no active project.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            item { SectionHeader("Findings", Icons.Default.BugReport) }
+            item {
+                val counts = riskLevelSummary(state.reportFindings)
+                SelectionItem(
+                    title = "Include findings (${state.reportFindings.size})",
+                    subtitle = if (state.reportFindings.isEmpty()) "No findings to report for this selection" else counts,
+                    isSelected = state.includeFindings,
+                    onToggle = { viewModel.setIncludeFindings(!state.includeFindings) }
+                )
+            }
+            item {
+                SelectionItem(
+                    title = "Also list fixed and false-positive findings",
+                    subtitle = "${state.availableFindings.size - state.reportFindings.size} more when enabled; linked evidence and capture hashes are included either way",
+                    isSelected = state.includeResolvedFindings,
+                    onToggle = { viewModel.setIncludeResolvedFindings(!state.includeResolvedFindings) }
                 )
             }
 
@@ -224,6 +283,13 @@ fun ReportBuilderScreen(
         }
     }
 }
+
+/** "2 CRITICAL · 1 HIGH · 4 LOW" (severities with no findings are left out). */
+private fun riskLevelSummary(findings: List<com.fearmikey.rf_reapr.domain.model.Finding>): String =
+    com.fearmikey.rf_reapr.domain.model.RiskLevel.entries.reversed()
+        .map { level -> level to findings.count { it.severity == level } }
+        .filter { it.second > 0 }
+        .joinToString(" · ") { (level, count) -> "$count ${level.name}" }
 
 @Composable
 fun SectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {

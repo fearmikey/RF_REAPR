@@ -18,5 +18,9 @@ data class EvidenceEntity(
     val hasStego: Boolean = false,
     val stegoType: String? = null,
     val isDeleted: Boolean = false,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    /** SHA-256 (lower-case hex) of the file as captured; null for items saved before v18 until backfilled. */
+    val sha256: String? = null,
+    /** The finding this item documents (findings.id), if any. Added in v18. */
+    val findingId: Long? = null
 )

@@ -1,0 +1,7 @@
+- Engagements with scope, shared findings with triage and HTML/DefectDojo export
+- Audit Mode with A-F grading and run history
+- Geotagged Wi-Fi/BLE/cell survey (WiGLE/KML/GPX) and floor-plan heatmap
+- Read-only BLE GATT inspector, known devices, Nmap import, timeline
+- Evidence SHA-256 integrity, encrypted backup
+- Every tool reworked; key-free Pwned Passwords check
+- Private IPs are never sent to online services

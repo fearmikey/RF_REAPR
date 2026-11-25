@@ -7,6 +7,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.fearmikey.rf_reapr.data.db.converter.RoomConverters
+import com.fearmikey.rf_reapr.data.db.dao.AuditRunDao
+import com.fearmikey.rf_reapr.data.db.dao.KnownDeviceDao
+import com.fearmikey.rf_reapr.data.db.dao.SurveyDao
+import com.fearmikey.rf_reapr.data.db.entity.AuditRunEntity
+import com.fearmikey.rf_reapr.data.db.entity.KnownDeviceEntity
+import com.fearmikey.rf_reapr.data.db.entity.SiteSurveyEntity
+import com.fearmikey.rf_reapr.data.db.entity.SiteSurveySampleEntity
+import com.fearmikey.rf_reapr.data.db.entity.SurveyObservationEntity
+import com.fearmikey.rf_reapr.data.db.entity.SurveySessionEntity
 import com.fearmikey.rf_reapr.data.db.dao.ComplianceDao
 import com.fearmikey.rf_reapr.data.db.dao.EvidenceDao
 import com.fearmikey.rf_reapr.data.db.dao.EventLogDao
@@ -46,12 +55,20 @@ import com.fearmikey.rf_reapr.data.db.entity.UsbDriveEntity
         HidAssetEntity::class,
         UsbDriveEntity::class,
         FindingEntity::class,
+        AuditRunEntity::class,
+        KnownDeviceEntity::class,
+        SurveySessionEntity::class,
+        SurveyObservationEntity::class,
+        SiteSurveyEntity::class,
+        SiteSurveySampleEntity::class,
     ],
     version = AppDatabase.VERSION,
     exportSchema = true,
     autoMigrations = [
         // v17: findings table; projectId on event_logs/scan_sessions; scope on evidence_projects.
         AutoMigration(from = 16, to = 17),
+        // v18: evidence.sha256/findingId; audit_runs, known_devices, survey_* and site_survey_* tables.
+        AutoMigration(from = 17, to = 18),
     ]
 )
 @TypeConverters(RoomConverters::class)
@@ -66,6 +83,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun hidAssetDao(): HidAssetDao
     abstract fun usbDriveDao(): UsbDriveDao
     abstract fun findingDao(): FindingDao
+    abstract fun auditRunDao(): AuditRunDao
+    abstract fun knownDeviceDao(): KnownDeviceDao
+    abstract fun surveyDao(): SurveyDao
 
     companion object {
         /**
@@ -73,7 +93,7 @@ abstract class AppDatabase : RoomDatabase() {
          * MUST ship with a migration (prefer AutoMigration) - user data is local-only, so a
          * destructive migration would silently wipe evidence, checklists and findings.
          */
-        const val VERSION = 17
+        const val VERSION = 18
         const val NAME = "reapr_database"
 
         /** Versions released before schemas were exported; these cannot be migrated. */

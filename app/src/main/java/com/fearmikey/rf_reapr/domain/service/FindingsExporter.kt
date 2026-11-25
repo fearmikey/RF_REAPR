@@ -19,6 +19,15 @@ data class ExportHost(
     val lastSeen: Long?
 )
 
+/** An evidence item attached to a finding, as listed in exports (the file itself isn't embedded). */
+data class ExportEvidence(
+    val fileName: String,
+    val capturedAt: Long,
+    val sha256: String?,
+    val integrity: EvidenceIntegrity,
+    val notes: String = ""
+)
+
 /** Everything an engagement export contains. */
 data class EngagementReport(
     val projectName: String,
@@ -30,7 +39,9 @@ data class EngagementReport(
     val scanCount: Int,
     val logCount: Int,
     val evidenceCount: Int,
-    val appVersion: String
+    val appVersion: String,
+    /** Evidence linked to findings, keyed by finding id. */
+    val evidenceByFinding: Map<Long, List<ExportEvidence>> = emptyMap()
 )
 
 /**
@@ -99,7 +110,24 @@ object FindingsExporter {
         append("\"scans\": ${report.scanCount}, \"logs\": ${report.logCount}, \"evidence\": ${report.evidenceCount}}")
         append(",\n")
         append("  \"findings\": ")
-        append(jsonArray(sortForReport(report.findings).map(::findingJson), indent = "  "))
+        append(
+            jsonArray(
+                sortForReport(report.findings).map { f ->
+                    val evidence = report.evidenceByFinding[f.id].orEmpty().map { e ->
+                        jsonObject(
+                            "file" to jsonString(e.fileName),
+                            "capturedAt" to jsonString(iso(e.capturedAt)),
+                            "sha256" to (e.sha256?.let(::jsonString) ?: "null"),
+                            "integrity" to jsonString(e.integrity.name)
+                        )
+                    }
+                    findingJson(f).dropLast(1) +
+                        ", \"controls\": " + jsonArray(ComplianceMapper.controlIds(f).map(::jsonString)) +
+                        ", \"evidence\": " + jsonArray(evidence) + "}"
+                },
+                indent = "  "
+            )
+        )
         append(",\n")
         append("  \"hosts\": ")
         append(jsonArray(report.hosts.map(::hostJson), indent = "  "))
@@ -215,6 +243,18 @@ object FindingsExporter {
                 appendLine()
                 appendLine("**Auditor notes:** ${md(it)}")
             }
+            ComplianceMapper.controlIds(f).takeIf { it.isNotEmpty() }?.let {
+                appendLine()
+                appendLine("**Related controls:** ${it.joinToString(", ")}")
+            }
+            report.evidenceByFinding[f.id]?.takeIf { it.isNotEmpty() }?.let { items ->
+                appendLine()
+                appendLine("**Evidence:**")
+                appendLine()
+                items.forEach { e ->
+                    appendLine("- `${e.fileName.replace("`", "'")}` captured ${human(e.capturedAt)}, SHA-256 `${e.sha256 ?: "not recorded"}` (${e.integrity.label})")
+                }
+            }
             appendLine()
         }
 
@@ -231,6 +271,146 @@ object FindingsExporter {
             }
             appendLine()
         }
+    }
+
+    // ---- HTML --------------------------------------------------------------------------
+
+    /** Self-contained HTML (inline CSS, no scripts or remote resources) for viewing or printing. */
+    fun toHtml(report: EngagementReport): String = buildString {
+        val findings = sortForReport(report.findings)
+        val open = findings.filter { it.status == FindingStatus.OPEN }
+        appendLine("<!DOCTYPE html>")
+        appendLine("<html lang=\"en\"><head><meta charset=\"utf-8\">")
+        appendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
+        appendLine("<title>${html(report.projectName)} — Security Assessment</title>")
+        appendLine(
+            "<style>body{font-family:system-ui,sans-serif;max-width:60em;margin:2em auto;padding:0 1em;color:#1b1b1f;line-height:1.45}" +
+                "h1{margin-bottom:.2em}h2{border-bottom:1px solid #ccc;padding-bottom:.2em;margin-top:2em}" +
+                "table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:.35em .6em;text-align:left;vertical-align:top}" +
+                "th{background:#f0f0f4}.finding{border:1px solid #ccc;border-left-width:6px;border-radius:4px;padding:.6em 1em;margin:1em 0;page-break-inside:avoid}" +
+                ".CRITICAL{border-left-color:#c62828}.HIGH{border-left-color:#ef6c00}.MEDIUM{border-left-color:#c8a000}.LOW{border-left-color:#2e7d32}" +
+                ".sev{font-weight:700;font-size:.8em;padding:.1em .5em;border-radius:3px;color:#fff;margin-right:.5em}" +
+                ".sev.CRITICAL{background:#c62828}.sev.HIGH{background:#ef6c00}.sev.MEDIUM{background:#c8a000}.sev.LOW{background:#2e7d32}" +
+                ".meta{color:#555;font-size:.9em}code{background:#f0f0f4;padding:.05em .3em;border-radius:3px;word-break:break-all}" +
+                "pre{white-space:pre-wrap;word-break:break-word;font-family:inherit;margin:.5em 0}</style></head><body>"
+        )
+        appendLine("<h1>${html(report.projectName)} — Security Assessment</h1>")
+        appendLine("<p class=\"meta\">Generated ${human(report.generatedAt)} by RF-REAPR ${html(report.appVersion)}</p>")
+        if (report.description.isNotBlank()) appendLine("<p>${html(report.description)}</p>")
+
+        appendLine("<h2>Summary</h2><table><tr><th>Severity</th><th>Open</th><th>Total</th></tr>")
+        RiskLevel.entries.reversed().forEach { sev ->
+            appendLine("<tr><td>${sev.name}</td><td>${open.count { it.severity == sev }}</td><td>${findings.count { it.severity == sev }}</td></tr>")
+        }
+        appendLine("</table>")
+        appendLine(
+            "<p class=\"meta\">Hosts observed: ${report.hosts.size} · Network scans: ${report.scanCount} · " +
+                "Tool log entries: ${report.logCount} · Evidence items: ${report.evidenceCount}</p>"
+        )
+
+        appendLine("<h2>Scope</h2>")
+        val scope = scopeLines(report.scope)
+        if (scope.isEmpty()) appendLine("<p><em>No scope was defined for this project.</em></p>")
+        else appendLine(scope.joinToString("", "<ul>", "</ul>") { "<li><code>${html(it)}</code></li>" })
+
+        appendLine("<h2>Findings</h2>")
+        if (findings.isEmpty()) appendLine("<p><em>No findings recorded.</em></p>")
+        findings.forEachIndexed { i, f ->
+            appendLine("<div class=\"finding ${f.severity.name}\">")
+            appendLine("<h3><span class=\"sev ${f.severity.name}\">${f.severity.name}</span>${i + 1}. ${html(f.title)}</h3>")
+            appendLine(
+                "<p class=\"meta\">Target <code>${html(f.target)}</code> · ${html(f.tool)} · ${f.status.label} · " +
+                    "first ${human(f.firstSeen)}, last ${human(f.lastSeen)} (${f.occurrences}×)</p>"
+            )
+            if (f.detail.isNotBlank()) appendLine("<pre>${html(f.detail)}</pre>")
+            f.remediation?.let { appendLine("<p><strong>Remediation:</strong> ${html(it)}</p>") }
+            f.notes?.takeIf { it.isNotBlank() }?.let { appendLine("<p><strong>Auditor notes:</strong> ${html(it)}</p>") }
+            ComplianceMapper.controlIds(f).takeIf { it.isNotEmpty() }?.let {
+                appendLine("<p class=\"meta\">Related controls: ${html(it.joinToString(", "))}</p>")
+            }
+            report.evidenceByFinding[f.id]?.takeIf { it.isNotEmpty() }?.let { items ->
+                appendLine("<p><strong>Evidence</strong></p><ul>")
+                items.forEach { e ->
+                    appendLine(
+                        "<li><code>${html(e.fileName)}</code> captured ${human(e.capturedAt)}, SHA-256 " +
+                            "<code>${html(e.sha256 ?: "not recorded")}</code> (${e.integrity.label})</li>"
+                    )
+                }
+                appendLine("</ul>")
+            }
+            appendLine("</div>")
+        }
+
+        if (report.hosts.isNotEmpty()) {
+            appendLine("<h2>Hosts</h2><table><tr><th>IP</th><th>Hostname</th><th>MAC</th><th>Type</th><th>Risk</th><th>Open ports</th></tr>")
+            report.hosts.forEach { h ->
+                appendLine(
+                    "<tr><td>${html(h.ip)}</td><td>${html(h.hostname.orEmpty())}</td><td>${html(h.mac.orEmpty())}</td>" +
+                        "<td>${html(h.deviceType.orEmpty())}</td><td>${h.risk.name}</td><td>${html(h.openPorts.joinToString(", "))}</td></tr>"
+                )
+            }
+            appendLine("</table>")
+        }
+        appendLine("</body></html>")
+    }
+
+    /** HTML text/attribute escaping for untrusted values (banners, SSIDs, hostnames). */
+    fun html(text: String): String = buildString {
+        text.forEach { c ->
+            when (c) {
+                '&' -> append("&amp;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                '"' -> append("&quot;")
+                '\'' -> append("&#39;")
+                else -> append(c)
+            }
+        }
+    }
+
+    // ---- DefectDojo --------------------------------------------------------------------
+
+    private val cvePattern = Regex("CVE-\\d{4}-\\d{4,}", RegexOption.IGNORE_CASE)
+    private val hostPortPattern = Regex("^([A-Za-z0-9._-]+)(?::(\\d{1,5}))?$")
+
+    /**
+     * DefectDojo "Generic Findings Import" JSON. Triage state maps onto DefectDojo's flags
+     * (active / false_p / risk_accepted / is_mitigated).
+     */
+    fun toDefectDojoJson(report: EngagementReport): String = buildString {
+        val day = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+        val items = sortForReport(report.findings).map { f ->
+            val pairs = mutableListOf(
+                "title" to jsonString(f.title),
+                "description" to jsonString(
+                    listOf("Target: ${f.target}", "Source: ${f.tool} (RF-REAPR ${report.appVersion})", f.detail, f.notes?.let { "Auditor notes: $it" })
+                        .filter { !it.isNullOrBlank() }.joinToString("\n\n")
+                ),
+                "severity" to jsonString(f.severity.name.lowercase().replaceFirstChar { it.uppercase() }),
+                "mitigation" to jsonString(f.remediation.orEmpty()),
+                "date" to jsonString(day.format(Date(f.firstSeen))),
+                "active" to (f.status == FindingStatus.OPEN).toString(),
+                "verified" to "false",
+                "false_p" to (f.status == FindingStatus.FALSE_POSITIVE).toString(),
+                "risk_accepted" to (f.status == FindingStatus.ACCEPTED).toString(),
+                "is_mitigated" to (f.status == FindingStatus.FIXED).toString(),
+                "static_finding" to "false",
+                "dynamic_finding" to "true",
+                "unique_id_from_tool" to jsonString(f.fingerprint),
+                "component_name" to jsonString(f.tool),
+                "nb_occurences" to f.occurrences.toString()
+            )
+            cvePattern.find(f.title)?.let { pairs += "cve" to jsonString(it.value.uppercase()) }
+            hostPortPattern.find(f.target.trim())?.let { match ->
+                val endpoint = mutableListOf("host" to jsonString(match.groupValues[1]))
+                match.groupValues[2].toIntOrNull()?.takeIf { it in 1..65535 }?.let { endpoint += "port" to it.toString() }
+                pairs += "endpoints" to jsonArray(listOf(jsonObject(*endpoint.toTypedArray())))
+            }
+            jsonObject(*pairs.toTypedArray())
+        }
+        append("{\n  \"findings\": ")
+        append(jsonArray(items, indent = "  "))
+        append("\n}\n")
     }
 
     // ---- helpers -----------------------------------------------------------------------

@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fearmikey.rf_reapr.domain.model.JwtInspectionResult
 import com.fearmikey.rf_reapr.domain.model.PayloadFormat
+import com.fearmikey.rf_reapr.ui.scanner.SeverityBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -142,6 +143,30 @@ private fun EncoderDecoderContent(
                 },
                 modifier = Modifier.weight(1f)
             )
+        }
+
+        // Suggestions: what the input looks like, so decoding is one tap instead of trial and error.
+        if (uiState.inputLooksLikeJwt) {
+            AssistChip(
+                onClick = { viewModel.inspectInputAsJwt() },
+                label = { Text("Looks like a JWT: open in the inspector") },
+                leadingIcon = { Icon(Icons.Default.VpnKey, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
+        }
+        val suggestions = uiState.detectedFormats.filterNot { uiState.mode == ConverterMode.DECODE && it == uiState.format }
+        if (suggestions.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Looks like", style = MaterialTheme.typography.labelMedium)
+                suggestions.forEach { format ->
+                    SuggestionChip(onClick = { viewModel.decodeAs(format) }, label = { Text("Decode ${format.displayName}") })
+                }
+            }
         }
 
         // Input card
@@ -339,11 +364,87 @@ private fun JwtInspectorContent(
                     }
                 }
             } else {
+                JwtFindingsCard(result)
+                if (result.isHmac) {
+                    JwtSecretCard(
+                        secret = uiState.jwtSecret,
+                        verified = uiState.jwtSecretValid,
+                        algorithm = result.algorithm.orEmpty(),
+                        onSecretChange = viewModel::setJwtSecret,
+                        onVerify = viewModel::verifyJwtSecret
+                    )
+                }
                 JwtDetailsView(
                     result = result,
                     clipboardManager = clipboardManager,
                     onShowToast = onShowToast
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun JwtFindingsCard(result: JwtInspectionResult) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Security Review", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            if (result.findings.isEmpty()) {
+                Text(
+                    "Nothing stands out in the header or claims. Whether the signature is valid can only be checked with the key.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            result.findings.forEach { finding ->
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SeverityBadge(finding.severity)
+                        Text(finding.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(finding.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun JwtSecretCard(
+    secret: String,
+    verified: Boolean?,
+    algorithm: String,
+    onSecretChange: (String) -> Unit,
+    onVerify: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Test a Signing Secret ($algorithm)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "Checks on the device whether a known or default secret produced this signature.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = secret,
+                    onValueChange = onSecretChange,
+                    label = { Text("Secret") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
+                )
+                Button(onClick = onVerify, enabled = secret.isNotEmpty()) { Text("Verify") }
+            }
+            when (verified) {
+                true -> Text(
+                    "Signature matches. Anyone who knows this secret can forge tokens.",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                false -> Text("Signature does not match this secret.", style = MaterialTheme.typography.bodySmall)
+                null -> Unit
             }
         }
     }
@@ -418,6 +519,7 @@ private fun JwtDetailsView(
                 ClaimRow("Expires At (exp)", result.expiresAtFormatted)
                 ClaimRow("Not Before (nbf)", result.notBeforeFormatted)
                 ClaimRow("JWT ID (jti)", result.jwtId)
+                ClaimRow("Key ID (kid, header)", result.keyId)
 
                 if (result.customClaims.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))

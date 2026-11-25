@@ -37,14 +37,38 @@ private val SCOPE_HELP = """
     !10.0.0.1 excludes a host · # starts a comment
 """.trimIndent()
 
+@Composable
+private fun WorkspaceLink(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+        Icon(icon, contentDescription = null)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EngagementScreen(
     viewModel: EngagementViewModel,
     onOpenFindings: () -> Unit,
     onOpenBackup: () -> Unit,
+    /** Navigates to another screen by route (timeline, audit history, known devices, report builder). */
+    onNavigate: (String) -> Unit = {},
     onBack: () -> Unit
 ) {
+    val nmapLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importNmap)
+    }
+    val importing by viewModel.importing.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val active by viewModel.activeProject.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
@@ -190,6 +214,35 @@ fun EngagementScreen(
                 }
             }
 
+            item(key = "workspace") {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Project workspace", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        WorkspaceLink(Icons.Default.Timeline, "Activity timeline", "Everything recorded, in the order it happened") {
+                            onNavigate(com.fearmikey.rf_reapr.ui.navigation.Screen.Timeline.route)
+                        }
+                        WorkspaceLink(Icons.Default.History, "Audit history", "Past Audit Mode runs and what changed between them") {
+                            onNavigate(com.fearmikey.rf_reapr.ui.navigation.Screen.AuditHistory.route)
+                        }
+                        WorkspaceLink(Icons.Default.VerifiedUser, "Known devices", "Devices expected on this network; anything else is flagged") {
+                            onNavigate(com.fearmikey.rf_reapr.ui.navigation.Screen.KnownDevices.route)
+                        }
+                        WorkspaceLink(Icons.Default.Description, "Build PDF / Word report", "Findings, evidence and scans for this project") {
+                            onNavigate(com.fearmikey.rf_reapr.ui.navigation.Screen.ReportBuilder.createRoute())
+                        }
+                        WorkspaceLink(
+                            Icons.Default.UploadFile,
+                            if (importing) "Importing Nmap scan…" else "Import Nmap XML",
+                            "Add hosts, ports and exposures from an nmap -oX file",
+                            enabled = !importing
+                        ) {
+                            // Nmap output has no dedicated MIME type; providers report text/xml, application/xml or octet-stream.
+                            nmapLauncher.launch(arrayOf("text/xml", "application/xml", "application/octet-stream", "text/plain"))
+                        }
+                    }
+                }
+            }
+
             item(key = "export") {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -202,12 +255,7 @@ fun EngagementScreen(
                         ExportFormat.entries.forEach { format ->
                             TextButton(onClick = {
                                 pendingExport = format
-                                val suffix = when (format) {
-                                    ExportFormat.HOSTS_CSV -> "hosts"
-                                    ExportFormat.CSV -> "findings"
-                                    else -> "report"
-                                }
-                                exportLauncher.launch(exportFileName(active?.name ?: "rf-reapr", suffix, format.extension))
+                                exportLauncher.launch(exportFileName(active?.name ?: "rf-reapr", format.fileSuffix, format.extension))
                             }) {
                                 Icon(Icons.Default.FileDownload, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))

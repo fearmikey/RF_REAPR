@@ -1,53 +1,54 @@
 package com.fearmikey.rf_reapr.domain.model
 
-import com.google.gson.annotations.SerializedName
-
+/** A Shodan `/shodan/host/{ip}` report, built by ShodanParser (never by reflection). */
 data class ShodanHostReport(
-    val ip_str: String,
-    val org: String?,
-    val isp: String?,
-    val asn: String?,
-    val os: String?,
-    val ports: List<Int>?,
-    val hostnames: List<String>?,
-    val domains: List<String>?,
-    val city: String?,
-    val country_name: String?,
-    val latitude: Double?,
-    val longitude: Double?,
-    val data: List<ShodanServiceData>?
+    val ip: String,
+    val org: String? = null,
+    val isp: String? = null,
+    val asn: String? = null,
+    val os: String? = null,
+    val ports: List<Int> = emptyList(),
+    val hostnames: List<String> = emptyList(),
+    val domains: List<String> = emptyList(),
+    val tags: List<String> = emptyList(),
+    val city: String? = null,
+    val country: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val lastUpdate: String? = null,
+    /** CVE IDs Shodan associates with the host (inferred from banners, not verified). */
+    val vulns: List<String> = emptyList(),
+    val services: List<ShodanService> = emptyList()
 )
 
-data class ShodanServiceData(
+data class ShodanService(
     val port: Int,
-    val transport: String?,
-    val data: String?,
-    val timestamp: String?,
-    @SerializedName("_shodan") val shodan: ShodanMetadata?
-)
-
-data class ShodanMetadata(
-    val module: String?
-)
+    val transport: String? = null,
+    val product: String? = null,
+    val version: String? = null,
+    val module: String? = null,
+    val banner: String? = null,
+    val timestamp: String? = null,
+    val cpes: List<String> = emptyList(),
+    val vulns: List<String> = emptyList()
+) {
+    val productLabel: String?
+        get() = listOfNotNull(product, version).joinToString(" ").ifBlank { null }
+}
 
 data class ShodanSearchResponse(
-    val total: Int,
-    val matches: List<ShodanMatch>
+    val total: Int = 0,
+    val matches: List<ShodanMatch> = emptyList()
 )
 
 data class ShodanMatch(
-    val ip_str: String,
+    val ip: String,
     val port: Int,
-    val org: String?,
-    val data: String?,
-    val hostnames: List<String>?,
-    val location: ShodanLocation?,
-    val timestamp: String?
-)
-
-data class ShodanLocation(
-    val city: String?,
-    val country_name: String?,
-    val latitude: Double?,
-    val longitude: Double?
+    val transport: String? = null,
+    val org: String? = null,
+    val product: String? = null,
+    val banner: String? = null,
+    val hostnames: List<String> = emptyList(),
+    val location: String? = null,
+    val timestamp: String? = null
 )

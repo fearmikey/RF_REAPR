@@ -43,6 +43,24 @@ fun RecycleBinScreen(
     val isEmpty by viewModel.isEmpty.collectAsStateWithLifecycle()
 
     var showEmptyConfirm by remember { mutableStateOf(false) }
+    /** A permanent delete awaiting confirmation: (what will be lost, the delete itself). */
+    var pendingPurge by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
+
+    pendingPurge?.let { (description, purge) ->
+        AlertDialog(
+            onDismissRequest = { pendingPurge = null },
+            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Delete permanently?") },
+            text = { Text("$description This can't be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { purge(); pendingPurge = null },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { pendingPurge = null }) { Text("Cancel") } }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -90,7 +108,10 @@ fun RecycleBinScreen(
                             icon = Icons.Default.Folder,
                             deletedAt = project.deletedAt,
                             onRestore = { viewModel.restoreProject(project) },
-                            onPurge = { viewModel.purgeProject(project) }
+                            onPurge = {
+                                pendingPurge = ("Project \"${project.name}\" is removed with all of its photos, folders, findings, " +
+                                    "logs, audit history, known devices and surveys.") to { viewModel.purgeProject(project) }
+                            }
                         )
                     }
                 }
@@ -103,7 +124,9 @@ fun RecycleBinScreen(
                             icon = Icons.Default.FolderSpecial,
                             deletedAt = folder.deletedAt,
                             onRestore = { viewModel.restoreFolder(folder) },
-                            onPurge = { viewModel.purgeFolder(folder) }
+                            onPurge = {
+                                pendingPurge = "Folder \"${folder.name}\" and the photos in it are removed." to { viewModel.purgeFolder(folder) }
+                            }
                         )
                     }
                 }
@@ -121,7 +144,7 @@ fun RecycleBinScreen(
                                 TrashPhotoItem(
                                     evidence = evidence,
                                     onRestore = { viewModel.restoreEvidence(evidence) },
-                                    onPurge = { viewModel.purgeEvidence(evidence) }
+                                    onPurge = { pendingPurge = "This photo is removed." to { viewModel.purgeEvidence(evidence) } }
                                 )
                             }
                         }

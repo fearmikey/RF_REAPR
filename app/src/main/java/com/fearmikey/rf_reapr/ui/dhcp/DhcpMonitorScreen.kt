@@ -22,6 +22,11 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlaylistAddCheck
+import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.filled.VerifiedUser
+import com.fearmikey.rf_reapr.domain.service.DeviceStanding
+import com.fearmikey.rf_reapr.domain.service.KnownDeviceMatcher
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Warning
@@ -57,8 +62,10 @@ private val OnlineColor = Color(0xFF4CAF50)
 fun DhcpMonitorScreen(
     viewModel: DhcpMonitorViewModel,
     onBack: () -> Unit,
+    onOpenKnownDevices: () -> Unit = {},
     onPortScan: (ip: String) -> Unit
 ) {
+    val knownMacs by viewModel.knownMacs.collectAsStateWithLifecycle()
     val status by viewModel.status.collectAsStateWithLifecycle()
     val isMonitoring by viewModel.isMonitoring.collectAsStateWithLifecycle()
     val isPassiveMode by viewModel.isPassiveMode.collectAsStateWithLifecycle()
@@ -126,6 +133,23 @@ fun DhcpMonitorScreen(
                                 text = { Text("Alert notifications") },
                                 trailingIcon = { Checkbox(checked = notifyOnNewDevice, onCheckedChange = null) },
                                 onClick = { viewModel.setNotifyOnNewDevice(!notifyOnNewDevice) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Mark all listed devices as known") },
+                                leadingIcon = { Icon(Icons.Default.PlaylistAddCheck, contentDescription = null) },
+                                enabled = devices.isNotEmpty(),
+                                onClick = {
+                                    showOverflow = false
+                                    viewModel.markAllKnown()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Known devices (${knownMacs.size})") },
+                                leadingIcon = { Icon(Icons.Default.VerifiedUser, contentDescription = null) },
+                                onClick = {
+                                    showOverflow = false
+                                    onOpenKnownDevices()
+                                }
                             )
                             DropdownMenuItem(
                                 text = { Text("Reset baseline") },
@@ -246,7 +270,15 @@ fun DhcpMonitorScreen(
                     }
                 }
                 items(filteredDevices, key = { it.ipAddress }) { device ->
-                    DeviceMonitorCard(device = device, isPassiveMode = isPassiveMode, onPortScan = onPortScan)
+                    DeviceMonitorCard(
+                        device = device,
+                        isPassiveMode = isPassiveMode,
+                        // Standing is only shown once the known-device list is in use.
+                        standing = if (knownMacs.isEmpty()) null else KnownDeviceMatcher.standing(device.macAddress, knownMacs),
+                        onMarkKnown = { viewModel.markKnown(device) },
+                        onUnmarkKnown = { viewModel.unmarkKnown(device) },
+                        onPortScan = onPortScan
+                    )
                 }
             } else {
                 if (events.isEmpty()) {
@@ -451,6 +483,9 @@ private fun StatItem(label: String, value: String, color: Color) {
 private fun DeviceMonitorCard(
     device: MonitoredDevice,
     isPassiveMode: Boolean,
+    standing: DeviceStanding? = null,
+    onMarkKnown: () -> Unit = {},
+    onUnmarkKnown: () -> Unit = {},
     onPortScan: (String) -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
@@ -506,6 +541,11 @@ private fun DeviceMonitorCard(
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (device.isNew) Tag("NEW DEVICE", MaterialTheme.colorScheme.error)
+                        when (standing) {
+                            DeviceStanding.KNOWN -> Tag("KNOWN", MaterialTheme.colorScheme.primary)
+                            DeviceStanding.UNKNOWN -> Tag("NOT ON KNOWN LIST", MaterialTheme.colorScheme.error)
+                            DeviceStanding.UNIDENTIFIED, null -> Unit
+                        }
                         if (device.isRandomizedMac) Tag("RANDOMIZED MAC", MaterialTheme.colorScheme.tertiary)
                         if (!device.isOnline) Tag("OFFLINE", MaterialTheme.colorScheme.outline)
                     }
@@ -522,6 +562,27 @@ private fun DeviceMonitorCard(
                     onPortScan(device.ipAddress)
                 }
             )
+            if (device.macAddress != null) {
+                if (standing == DeviceStanding.KNOWN) {
+                    DropdownMenuItem(
+                        text = { Text("Remove from known devices") },
+                        leadingIcon = { Icon(Icons.Default.RemoveCircleOutline, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onUnmarkKnown()
+                        }
+                    )
+                } else {
+                    DropdownMenuItem(
+                        text = { Text("Add to known devices") },
+                        leadingIcon = { Icon(Icons.Default.VerifiedUser, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onMarkKnown()
+                        }
+                    )
+                }
+            }
             DropdownMenuItem(
                 text = { Text("Copy IP") },
                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },

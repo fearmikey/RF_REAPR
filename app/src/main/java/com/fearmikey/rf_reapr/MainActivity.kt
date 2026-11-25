@@ -96,6 +96,20 @@ import com.fearmikey.rf_reapr.ui.sdr.SdrViewModel
 import com.fearmikey.rf_reapr.ui.iperf.IperfScreen
 import com.fearmikey.rf_reapr.ui.iperf.IperfViewModel
 import com.fearmikey.rf_reapr.ui.theme.RF_REAPRTheme
+import com.fearmikey.rf_reapr.ui.audit.AuditHistoryScreen
+import com.fearmikey.rf_reapr.ui.audit.AuditHistoryViewModel
+import com.fearmikey.rf_reapr.ui.audit.AuditModeScreen
+import com.fearmikey.rf_reapr.ui.dhcp.KnownDevicesScreen
+import com.fearmikey.rf_reapr.ui.dhcp.KnownDevicesViewModel
+import com.fearmikey.rf_reapr.ui.engagement.TimelineScreen
+import com.fearmikey.rf_reapr.ui.engagement.TimelineViewModel
+import com.fearmikey.rf_reapr.ui.survey.GeoSurveyScreen
+import com.fearmikey.rf_reapr.ui.survey.GeoSurveyViewModel
+import com.fearmikey.rf_reapr.ui.survey.SiteSurveyScreen
+import com.fearmikey.rf_reapr.ui.survey.SiteSurveyViewModel
+import com.fearmikey.rf_reapr.ui.wireless.GattInspectorScreen
+import com.fearmikey.rf_reapr.ui.wireless.GattInspectorViewModel
+import com.fearmikey.rf_reapr.ui.audit.AuditModeViewModel
 import com.fearmikey.rf_reapr.ui.backup.BackupScreen
 import com.fearmikey.rf_reapr.ui.backup.BackupViewModel
 import com.fearmikey.rf_reapr.ui.engagement.EngagementScreen
@@ -131,7 +145,6 @@ class MainActivity : ComponentActivity() {
         // Dependencies come from the process-wide AppContainer. Local delegates keep the
         // names used throughout the NavHost below and stay lazy (resolved on first use).
         val container = (application as RfReaprApplication).container
-        val okHttpClient by container::okHttpClient
         val settingsRepository by container::settingsRepository
         lifecycleScope.launch {
             settingsRepository.incrementAppLaunchCount()
@@ -178,6 +191,14 @@ class MainActivity : ComponentActivity() {
         val findingRepository by container::findingRepository
         val engagementRepository by container::engagementRepository
         val backupManager by container::backupManager
+        val captivePortalRepository by container::captivePortalRepository
+        val auditEngine by container::auditEngine
+        val auditRunRepository by container::auditRunRepository
+        val knownDeviceRepository by container::knownDeviceRepository
+        val surveyRepository by container::surveyRepository
+        val siteSurveyRepository by container::siteSurveyRepository
+        val gattInspectorRepository by container::gattInspectorRepository
+        val nmapImportManager by container::nmapImportManager
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         lifecycleScope.launch {
@@ -251,7 +272,7 @@ class MainActivity : ComponentActivity() {
                         LogViewModel(logRepository)
                     }
                     val complianceViewModel: ComplianceViewModel = viewModel {
-                        ComplianceViewModel(complianceRepository)
+                        ComplianceViewModel(complianceRepository, findingRepository)
                     }
                     val evidenceViewModel: EvidenceCaptureViewModel = viewModel {
                         EvidenceCaptureViewModel(evidenceRepository, logRepository)
@@ -344,6 +365,7 @@ class MainActivity : ComponentActivity() {
                                                 }
                             BluetoothProximityFinderScreen(
                                 viewModel = proximityViewModel,
+                                onInspectGatt = { address, name -> navController.navigate(Screen.GattInspector.createRoute(address, name)) },
                             ) { navController.popBackStack() }
                         }
                         composable(Screen.NfcScanner.route) {
@@ -371,11 +393,12 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.DhcpMonitor.route) {
                             val dhcpViewModel: DhcpMonitorViewModel = viewModel {
-                                                    DhcpMonitorViewModel(dhcpRepository, settingsRepository, networkAlertNotifier)
+                                                    DhcpMonitorViewModel(dhcpRepository, settingsRepository, networkAlertNotifier, knownDeviceRepository, findingRepository)
                                                 }
                             DhcpMonitorScreen(
                                 viewModel = dhcpViewModel,
                                 onBack = { navController.popBackStack() },
+                                onOpenKnownDevices = { navController.navigate(Screen.KnownDevices.route) },
                                 onPortScan = { ip ->
                                     navController.navigate(Screen.PortScanner.createRoute(ip))
                                 }
@@ -383,7 +406,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.WebsiteInspector.route) { backStackEntry ->
                             val websiteInspectorViewModel: WebsiteInspectorViewModel = viewModel {
-                                                    WebsiteInspectorViewModel(websiteInspectorRepository, logRepository, settingsRepository)
+                                                    WebsiteInspectorViewModel(websiteInspectorRepository, logRepository, settingsRepository, findingRepository)
                                                 }
                             WebsiteInspectorScreen(
                                 viewModel = websiteInspectorViewModel,
@@ -392,7 +415,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.SubdomainFinder.route) { backStackEntry ->
                             val subdomainFinderViewModel: SubdomainFinderViewModel = viewModel {
-                                                    SubdomainFinderViewModel(subdomainFinderRepository, logRepository, settingsRepository)
+                                                    SubdomainFinderViewModel(subdomainFinderRepository, logRepository, settingsRepository, findingRepository)
                                                 }
                             SubdomainFinderScreen(
                                 viewModel = subdomainFinderViewModel,
@@ -414,7 +437,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.CloudAssetScanner.route) { backStackEntry ->
                             val cloudAssetScannerViewModel: CloudAssetScannerViewModel = viewModel {
-                                                    CloudAssetScannerViewModel(cloudAssetScannerRepository, logRepository, settingsRepository)
+                                                    CloudAssetScannerViewModel(cloudAssetScannerRepository, logRepository, settingsRepository, findingRepository)
                                                 }
                             val domain = backStackEntry.arguments?.getString("domain")
                             CloudAssetScannerScreen(
@@ -425,7 +448,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.HibpChecker.route) {
                             val hibpViewModel: HibpViewModel = viewModel {
-                                                    HibpViewModel(hibpRepository, settingsRepository, logRepository)
+                                                    HibpViewModel(hibpRepository, settingsRepository, logRepository, findingRepository)
                                                 }
                             HibpScreen(
                                 viewModel = hibpViewModel,
@@ -433,7 +456,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.ShodanScanner.route) {
                             val shodanViewModel: ShodanViewModel = viewModel {
-                                                    ShodanViewModel(shodanRepository, internetDbRepository, settingsRepository, logRepository)
+                                                    ShodanViewModel(shodanRepository, internetDbRepository, settingsRepository, logRepository, findingRepository)
                                                 }
                             ShodanScreen(
                                 viewModel = shodanViewModel,
@@ -454,7 +477,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.UsernameOsint.route) {
                             val usernameViewModel: UsernameOsintViewModel = viewModel {
-                                UsernameOsintViewModel(usernameOsintRepository)
+                                UsernameOsintViewModel(usernameOsintRepository, logRepository)
                             }
                             UsernameOsintScreen(
                                 viewModel = usernameViewModel,
@@ -463,7 +486,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.ThreatIntel.route) { backStackEntry ->
                             val threatIntelViewModel: ThreatIntelViewModel = viewModel {
-                                ThreatIntelViewModel(threatIntelRepository, settingsRepository)
+                                ThreatIntelViewModel(threatIntelRepository, settingsRepository, logRepository, findingRepository)
                             }
                             // Prefill the IP when opened from another tool (e.g. the network map).
                             // The lookup itself still requires an explicit tap (online service).
@@ -686,7 +709,7 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.CaptivePortalDetector.route) {
                             val captiveViewModel: CaptivePortalViewModel = viewModel {
-                                CaptivePortalViewModel(applicationContext, okHttpClient, logRepository)
+                                CaptivePortalViewModel(captivePortalRepository, logRepository, findingRepository)
                             }
                             CaptivePortalDetectorScreen(viewModel = captiveViewModel) { navController.popBackStack() }
                         }
@@ -740,20 +763,67 @@ class MainActivity : ComponentActivity() {
                         // Engagement, findings and backup
                         composable(Screen.Engagement.route) {
                             val engagementViewModel: EngagementViewModel = viewModel {
-                                EngagementViewModel(engagementRepository, BuildConfig.VERSION_NAME)
+                                EngagementViewModel(engagementRepository, BuildConfig.VERSION_NAME, nmapImportManager)
                             }
                             EngagementScreen(
                                 viewModel = engagementViewModel,
                                 onOpenFindings = { navController.navigate(Screen.Findings.route) },
                                 onOpenBackup = { navController.navigate(Screen.Backup.route) },
+                                onNavigate = { route -> navController.navigate(route) },
                                 onBack = { navController.popBackStack() }
                             )
                         }
                         composable(Screen.Findings.route) {
                             val findingsViewModel: FindingsViewModel = viewModel {
-                                FindingsViewModel(findingRepository, engagementRepository, BuildConfig.VERSION_NAME)
+                                FindingsViewModel(findingRepository, engagementRepository, BuildConfig.VERSION_NAME, evidenceRepository)
                             }
                             FindingsScreen(viewModel = findingsViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.AuditMode.route) {
+                            val auditModeViewModel: AuditModeViewModel = viewModel {
+                                AuditModeViewModel(auditEngine, settingsRepository, BuildConfig.VERSION_NAME, auditRunRepository)
+                            }
+                            AuditModeScreen(
+                                viewModel = auditModeViewModel,
+                                onOpenFindings = { navController.navigate(Screen.Findings.route) },
+                                onOpenEngagement = { navController.navigate(Screen.Engagement.route) },
+                                onOpenHistory = { navController.navigate(Screen.AuditHistory.route) },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.AuditHistory.route) {
+                            val auditHistoryViewModel: AuditHistoryViewModel = viewModel { AuditHistoryViewModel(auditRunRepository) }
+                            AuditHistoryScreen(
+                                viewModel = auditHistoryViewModel,
+                                onOpenLogs = { navController.navigate(Screen.AuditLogs.route) },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(Screen.Timeline.route) {
+                            val timelineViewModel: TimelineViewModel = viewModel { TimelineViewModel(engagementRepository) }
+                            TimelineScreen(viewModel = timelineViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.KnownDevices.route) {
+                            val knownDevicesViewModel: KnownDevicesViewModel = viewModel { KnownDevicesViewModel(knownDeviceRepository) }
+                            KnownDevicesScreen(viewModel = knownDevicesViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.GeoSurvey.route) {
+                            val geoSurveyViewModel: GeoSurveyViewModel = viewModel { GeoSurveyViewModel(surveyRepository) }
+                            GeoSurveyScreen(viewModel = geoSurveyViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.SiteSurvey.route) {
+                            val siteSurveyViewModel: SiteSurveyViewModel = viewModel { SiteSurveyViewModel(siteSurveyRepository) }
+                            SiteSurveyScreen(viewModel = siteSurveyViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.GattInspector.route) { backStackEntry ->
+                            val gattViewModel: GattInspectorViewModel = viewModel {
+                                GattInspectorViewModel(gattInspectorRepository, findingRepository, logRepository)
+                            }
+                            GattInspectorScreen(
+                                viewModel = gattViewModel,
+                                address = backStackEntry.arguments?.getString("address").orEmpty(),
+                                deviceName = backStackEntry.arguments?.getString("name")?.takeUnless { it.isBlank() || it == "{name}" },
+                            ) { navController.popBackStack() }
                         }
                         composable(Screen.Backup.route) {
                             val backupViewModel: BackupViewModel = viewModel {
@@ -791,6 +861,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.SnmpLogs.route) {
                             LogListScreen("SNMP", "SNMP Browser Logs", logViewModel) { navController.popBackStack() }
+                        }
+                        composable(Screen.AuditLogs.route) {
+                            LogListScreen("AUDIT", "Audit Mode Logs", logViewModel) { navController.popBackStack() }
                         }
                         composable(Screen.PacketCaptureLogs.route) {
                             PcapLogListScreen(
@@ -833,7 +906,7 @@ class MainActivity : ComponentActivity() {
                             val startTime = startTimeStr?.toLongOrNull()
                             
                             val reportBuilderViewModel: ReportBuilderViewModel = viewModel {
-                                ReportBuilderViewModel(reportRepository)
+                                ReportBuilderViewModel(reportRepository, engagementRepository.activeProjectId.value)
                             }
                             ReportBuilderScreen(
                                 viewModel = reportBuilderViewModel,

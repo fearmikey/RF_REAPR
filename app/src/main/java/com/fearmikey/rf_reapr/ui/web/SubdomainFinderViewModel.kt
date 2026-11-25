@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
 class SubdomainFinderViewModel(
     private val repository: SubdomainFinderRepository,
     private val logRepository: LogRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val findingRepository: com.fearmikey.rf_reapr.domain.repository.FindingRepository? = null
 ) : ViewModel() {
 
     private val gson = Gson()
@@ -65,6 +66,11 @@ class SubdomainFinderViewModel(
                     _isFinished.value = result.isFinished
                     
                     if (result.isFinished) {
+                        findingRepository?.record(
+                            com.fearmikey.rf_reapr.domain.service.SubdomainTakeoverAnalyzer.toDrafts(
+                                result.subdomains.mapNotNull { item -> item.takeover?.let { item.hostname to it } }
+                            )
+                        )
                         logRepository.saveLog(
                             type = "WEB_SUBDOMAIN",
                             summary = "Subdomain scan for $domain",

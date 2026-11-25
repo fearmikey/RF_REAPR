@@ -3,8 +3,7 @@ package com.fearmikey.rf_reapr.data.worker
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.fearmikey.rf_reapr.data.db.AppDatabase
-import com.fearmikey.rf_reapr.data.repository.EvidenceRepositoryImpl
+import com.fearmikey.rf_reapr.RfReaprApplication
 import java.util.concurrent.TimeUnit
 
 class RecycleBinWorker(
@@ -13,12 +12,11 @@ class RecycleBinWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val database = AppDatabase.getDatabase(applicationContext)
-        val repository = EvidenceRepositoryImpl(database.evidenceDao(), applicationContext)
-        
+        val repository = (applicationContext as RfReaprApplication).container.evidenceRepository
+
         // Items older than 30 days
         val threshold = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
-        
+
         return try {
             repository.purgeExpiredEvidence(threshold)
             Result.success()

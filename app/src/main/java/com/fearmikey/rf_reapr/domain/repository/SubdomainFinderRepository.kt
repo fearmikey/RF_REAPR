@@ -18,7 +18,11 @@ interface SubdomainFinderRepository {
     data class SubdomainItem(
         val hostname: String,
         val ipAddress: String?,
-        val source: DiscoverySource = DiscoverySource.BRUTE_FORCE
+        val source: DiscoverySource = DiscoverySource.BRUTE_FORCE,
+        /** CNAME target, when the name is an alias. */
+        val cname: String? = null,
+        /** Set when the CNAME points at a self-service hosting platform (see SubdomainTakeoverAnalyzer). */
+        val takeover: com.fearmikey.rf_reapr.domain.service.TakeoverHint? = null
     )
 
     enum class DiscoverySource {

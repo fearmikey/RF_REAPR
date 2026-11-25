@@ -15,5 +15,9 @@ data class Evidence(
     val hasStego: Boolean = false,
     val stegoType: String? = null,
     val isDeleted: Boolean = false,
-    val deletedAt: Date? = null
+    val deletedAt: Date? = null,
+    /** SHA-256 of the file recorded at capture/import (see EvidenceHasher); null until hashed. */
+    val sha256: String? = null,
+    /** Id of the finding this item documents, if linked. */
+    val findingId: Long? = null
 )
