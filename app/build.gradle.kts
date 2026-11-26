@@ -17,8 +17,8 @@ android {
         applicationId = "com.fearmikey.rf_reapr"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.6.1"
+        versionCode = 25
+        versionName = "1.6.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -107,6 +107,16 @@ ksp {
 
 kotlin {
     jvmToolchain(17)
+}
+
+// Reproducible builds (F-Droid): R8's rewriting of the library ART/baseline profile depends on
+// the build machine's CPU count (2-core and 20-core builds produced different
+// assets/dexopt/baseline.prof from identical dex), so F-Droid could not verify the release APK.
+// AGP 8.7 has no switch for just that step, so ART profile generation is disabled entirely.
+tasks.whenTaskAdded {
+    if (name.contains("ArtProfile")) {
+        enabled = false
+    }
 }
 
 dependencies {

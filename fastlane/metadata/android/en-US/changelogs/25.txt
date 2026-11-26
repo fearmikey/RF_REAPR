@@ -1,0 +1,4 @@
+Build-only release, no app changes since 1.6.1.
+
+• Fixes reproducible builds: the bundled baseline profile depended on the build machine's CPU count, so it is no longer generated. F-Droid can now verify its build against the developer-signed APK
+• First launches after install may be slightly slower until Android has profiled the app

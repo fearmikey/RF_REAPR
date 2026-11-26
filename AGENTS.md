@@ -41,6 +41,7 @@ At the end of each development session, if any new features, files, repositories
 * `ndkVersion` in `app/build.gradle.kts` and `ndk:` in the F-Droid recipe **must match** exactly (currently `27.0.12077973`).
 * Keep `-ffile-prefix-map` and `LINKER:--build-id=none` in `app/src/main/cpp/CMakeLists.txt`.
 * Keep `dependenciesInfo { includeInApk = false; includeInBundle = false }` in `app/build.gradle.kts`.
+* Keep the `tasks.whenTaskAdded { if (name.contains("ArtProfile")) enabled = false }` block in `app/build.gradle.kts`. R8's baseline-profile rewriting (AGP 8.7.3) depends on the build machine's CPU count, which made `assets/dexopt/baseline.prof` differ from F-Droid's build (v1.6.1). Only re-enable profiles after proving that a 2-CPU build (`taskset -c 0-1`) and a full-core build of a fresh clone are byte-identical.
 
 ### 4. SECRETS
 * Never commit keystores (`*.jks`, `*.keystore`), `local.properties`, API keys, or tokens.

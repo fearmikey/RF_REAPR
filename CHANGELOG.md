@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.2] - 2026-11-25
+
+### Fixed
+- **Reproducible builds**: The 1.6.1 APK still differed from F-Droid's build in one file, `assets/dexopt/baseline.prof`. R8's rewriting of the library baseline profile depends on the build machine's CPU count. ART baseline profile generation is now disabled, so builds are identical regardless of the machine.
+
+### Changed
+- First launches after installing or updating may be slightly slower until Android has profiled the app on the device. No app functionality changes since 1.6.1.
+
 ## [1.6.1] - 2026-11-25
 
 ### Changed
